@@ -1,0 +1,15 @@
+{
+  "name": "barber-system",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*", "server"],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "test": "turbo test",
+    "lint": "turbo lint"
+  },
+  "devDependencies": {
+    "turbo": "latest",
+    "typescript": "^5.4.0"
+  }
+}
