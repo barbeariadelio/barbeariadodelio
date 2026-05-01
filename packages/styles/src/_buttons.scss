@@ -1,0 +1,85 @@
+@use 'variables' as *;
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: $space-2;
+  font-family: $font-ui;
+  font-weight: 600;
+  font-size: 0.875rem;
+  letter-spacing: 0.03em;
+  border: none;
+  cursor: pointer;
+  transition: all $transition-fast;
+  text-decoration: none;
+  white-space: nowrap;
+  border-radius: $radius-md;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0);
+    transition: background $transition-fast;
+  }
+
+  &:hover::before { background: rgba(255, 255, 255, 0.06); }
+  &:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+  // Sizes
+  &--xs  { padding: $space-1 $space-3; font-size: 0.75rem; border-radius: $radius-sm; }
+  &--sm  { padding: $space-2 $space-4; }
+  &--md  { padding: $space-3 $space-6; font-size: 1rem; }
+  &--lg  { padding: $space-4 $space-8; font-size: 1.125rem; }
+  &--xl  { padding: $space-5 $space-10; font-size: 1.25rem; border-radius: $radius-lg; }
+
+  // Modifiers
+  &--full    { width: 100%; }
+  &--rounded { border-radius: $radius-full; }
+
+  // Variants
+  &--primary {
+    background: $brand-blue;
+    color: #fff;
+    box-shadow: $shadow-blue;
+    &:hover:not(:disabled) { background: $brand-blue-light; transform: translateY(-1px); }
+  }
+
+  &--secondary {
+    background: transparent;
+    color: $brand-blue-light;
+    border: 1.5px solid $brand-blue;
+    &:hover:not(:disabled) { background: $brand-blue-subtle; border-color: $brand-blue-light; transform: translateY(-1px); }
+  }
+
+  &--danger {
+    background: $brand-red;
+    color: #fff;
+    box-shadow: $shadow-red;
+    &:hover:not(:disabled) { background: $brand-red-light; transform: translateY(-1px); }
+  }
+
+  &--ghost {
+    background: transparent;
+    color: $text-secondary;
+    border: 1.5px solid $border-default;
+    &:hover:not(:disabled) { border-color: $border-strong; color: $text-primary; background: $bg-elevated; }
+  }
+
+  &--gold {
+    background: $brand-gold;
+    color: #000;
+    font-weight: 700;
+    &:hover:not(:disabled) { background: $brand-gold-light; transform: translateY(-1px); }
+  }
+
+  &--dark {
+    background: $bg-overlay;
+    color: $text-primary;
+    border: 1px solid $border-default;
+    &:hover:not(:disabled) { background: $bg-elevated; border-color: $border-strong; }
+  }
+}

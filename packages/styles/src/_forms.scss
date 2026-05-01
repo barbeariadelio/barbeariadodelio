@@ -1,0 +1,62 @@
+@use 'variables' as *;
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: $space-2;
+}
+
+.form-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: $text-secondary;
+  letter-spacing: 0.02em;
+
+  .required { color: $brand-red-light; margin-left: 3px; }
+}
+
+.form-input {
+  background: $bg-elevated;
+  border: 1.5px solid $border-default;
+  border-radius: $radius-md;
+  padding: $space-3 $space-4;
+  font-family: $font-ui;
+  font-size: 1rem;
+  color: $text-primary;
+  transition: all $transition-fast;
+  outline: none;
+  width: 100%;
+
+  &::placeholder { color: $text-muted; }
+
+  &:focus {
+    border-color: $brand-blue;
+    background: $bg-surface;
+    box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.15);
+  }
+
+  &--error {
+    border-color: $color-error;
+    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+  }
+
+  &--success { border-color: $color-success; }
+}
+
+.form-hint  { font-size: 0.75rem; color: $text-muted; }
+.form-error { font-size: 0.75rem; color: $color-error; }
+
+.input-with-icon {
+  position: relative;
+
+  .input-icon {
+    position: absolute;
+    left: $space-4;
+    top: 50%;
+    transform: translateY(-50%);
+    color: $text-muted;
+    pointer-events: none;
+  }
+
+  .form-input { padding-left: $space-10; }
+}

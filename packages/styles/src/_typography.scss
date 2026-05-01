@@ -1,0 +1,36 @@
+@use 'variables' as *;
+
+.text-display {
+  font-family: $font-display;
+  letter-spacing: 0.02em;
+  line-height: 0.95;
+}
+
+.text-serif {
+  font-family: $font-serif;
+}
+
+.text-xs    { font-size: 0.75rem; }
+.text-sm    { font-size: 0.875rem; }
+.text-base  { font-size: 1rem; }
+.text-lg    { font-size: 1.125rem; }
+.text-xl    { font-size: 1.25rem; }
+.text-2xl   { font-size: 1.5rem; }
+.text-3xl   { font-size: 1.875rem; }
+.text-4xl   { font-size: 2.25rem; }
+
+.text-primary   { color: $text-primary; }
+.text-secondary { color: $text-secondary; }
+.text-muted     { color: $text-muted; }
+.text-blue      { color: $brand-blue-light; }
+.text-gold      { color: $brand-gold; }
+.text-success   { color: $color-success; }
+.text-error     { color: $color-error; }
+
+.eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: $brand-blue;
+}

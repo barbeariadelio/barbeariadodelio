@@ -1,0 +1,33 @@
+@use 'variables' as *;
+
+@mixin flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@mixin card-base {
+  background: $bg-surface;
+  border: 1px solid $border-subtle;
+  border-radius: $radius-xl;
+  overflow: hidden;
+}
+
+@mixin transition-hover {
+  transition: all $transition-normal;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: $shadow-lg;
+  }
+}
+
+@mixin respond-to($breakpoint) {
+  @if $breakpoint == md { @media (max-width: 768px) { @content; } }
+  @if $breakpoint == lg { @media (max-width: 1024px) { @content; } }
+}

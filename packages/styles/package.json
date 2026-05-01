@@ -1,0 +1,6 @@
+{
+  "name": "@barber/styles",
+  "version": "0.0.1",
+  "main": "./src/index.scss",
+  "private": true
+}

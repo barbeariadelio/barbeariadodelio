@@ -1,0 +1,26 @@
+@use 'variables' as *;
+@use 'mixins' as *;
+
+.card {
+  @include card-base;
+  transition: all $transition-normal;
+
+  &:hover {
+    border-color: $border-default;
+    transform: translateY(-2px);
+    box-shadow: $shadow-lg;
+  }
+
+  &__body { padding: $space-6; }
+}
+
+.barber-pole-accent {
+  height: 4px;
+  background: repeating-linear-gradient(
+    90deg,
+    $brand-red 0%, $brand-red 33%,
+    #fff 33%, #fff 66%,
+    $brand-blue 66%, $brand-blue 100%
+  );
+  background-size: 24px 4px;
+}
