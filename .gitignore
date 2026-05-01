@@ -4,3 +4,7 @@ dist/
 .env
 .env.local
 coverage/
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+.env.*.local
