@@ -23,7 +23,7 @@ export class EmployeeService {
     unitId: string;
   }): Promise<IUser> {
     const passwordHash = await bcrypt.hash(data.password, 10);
-    return UserModel.create({
+    const emp = await UserModel.create({
       name: data.name,
       email: data.email,
       passwordHash,
@@ -32,6 +32,7 @@ export class EmployeeService {
       role: 'employee',
       isActive: true,
     });
+    return UserModel.findById(emp._id).select('-passwordHash') as Promise<IUser>;
   }
 
   async update(id: string, data: Partial<IUser>): Promise<IUser> {
