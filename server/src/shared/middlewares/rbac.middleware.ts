@@ -15,7 +15,11 @@ export function requireRoles(...roles: UserRole[]) {
 
 export function requireSameUnit() {
   return (req: AuthRequest, _res: Response, next: NextFunction): void => {
-    const { role, unitId } = req.user!;
+    if (!req.user) {
+      next(new ForbiddenError());
+      return;
+    }
+    const { role, unitId } = req.user;
     const requestedUnit = req.query.unitId as string | undefined;
 
     if (role === 'owner' || role === 'franchisor') {
