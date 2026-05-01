@@ -71,8 +71,8 @@ export class FinanceService {
     }
 
     if (role === 'franchisee') {
-      const user = await UnitModel.findOne({ _id: userId });
-      return user ? [userId] : [];
+      // franchisee scope is their own unit only — caller should pass unitId from req.user.unitId
+      return [];
     }
 
     return [];

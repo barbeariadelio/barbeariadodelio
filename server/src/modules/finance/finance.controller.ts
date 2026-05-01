@@ -8,7 +8,7 @@ const service = new FinanceService();
 
 export async function getSummary(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const unitId = req.query.unitId as string | undefined;
+    const unitId = (req.query.unitId as string) || req.user!.unitId;
     const period = (req.query.period as 'month' | 'week' | 'year') || 'month';
     const summary = await service.getSummary(req.user!.id, req.user!.role, unitId, period);
     ok(res, summary);

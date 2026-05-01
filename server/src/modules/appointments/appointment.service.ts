@@ -58,8 +58,12 @@ export class AppointmentService {
     const conflict = await AppointmentModel.findOne({
       employeeId: data.employeeId,
       date: data.date,
-      startTime: data.startTime,
       status: { $nin: ['cancelled'] },
+      $or: [
+        { startTime: { $lt: data.endTime, $gte: data.startTime } },
+        { endTime: { $gt: data.startTime, $lte: data.endTime } },
+        { startTime: { $lte: data.startTime }, endTime: { $gte: data.endTime } },
+      ],
     });
     if (conflict) throw new AppError('Time slot already booked', 409);
     return AppointmentModel.create(data);
