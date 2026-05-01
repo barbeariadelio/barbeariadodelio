@@ -1,0 +1,60 @@
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { UserModel } from './auth.model';
+import { env } from '../../config/env';
+import { AppError } from '../../shared/errors/AppError';
+import type { AuthTokens, UserRole } from '@barber/types';
+
+export class AuthService {
+  async login(email: string, password: string): Promise<AuthTokens> {
+    const user = await UserModel.findOne({ email: email.toLowerCase(), isActive: true });
+    if (!user) throw new AppError('Invalid credentials', 401);
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) throw new AppError('Invalid credentials', 401);
+
+    return this.generateTokens(
+      user._id.toString(),
+      user.role,
+      user.unitId?.toString(),
+    );
+  }
+
+  async refresh(refreshToken: string): Promise<Pick<AuthTokens, 'accessToken'>> {
+    try {
+      const payload = jwt.verify(refreshToken, env.jwtRefreshSecret) as {
+        id: string;
+        role: UserRole;
+        unitId?: string;
+      };
+      const accessToken = this.signAccess(payload.id, payload.role, payload.unitId);
+      return { accessToken };
+    } catch {
+      throw new AppError('Invalid refresh token', 401);
+    }
+  }
+
+  async me(userId: string) {
+    const user = await UserModel.findById(userId).select('-passwordHash');
+    if (!user) throw new AppError('User not found', 404);
+    return user;
+  }
+
+  private generateTokens(id: string, role: UserRole, unitId?: string): AuthTokens {
+    const accessToken = this.signAccess(id, role, unitId);
+    const refreshToken = jwt.sign(
+      { id, role, unitId },
+      env.jwtRefreshSecret,
+      { expiresIn: env.jwtRefreshExpiresIn as any },
+    );
+    return { accessToken, refreshToken };
+  }
+
+  private signAccess(id: string, role: UserRole, unitId?: string): string {
+    return jwt.sign(
+      { id, role, unitId },
+      env.jwtSecret,
+      { expiresIn: env.jwtExpiresIn as any },
+    );
+  }
+}
