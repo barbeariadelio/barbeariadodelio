@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { connectDb } from './config/db';
 import { env } from './config/env';
+import { errorHandler } from './shared/middlewares/errorHandler';
 
 const app = express();
 
@@ -14,11 +15,7 @@ app.get('/health', (_req, res) => {
 
 // Module routes will be added in subsequent tasks
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  const status = err.statusCode ?? 500;
-  res.status(status).json({ message: err.message ?? 'Internal server error' });
-});
+app.use(errorHandler);
 
 async function start() {
   await connectDb();
