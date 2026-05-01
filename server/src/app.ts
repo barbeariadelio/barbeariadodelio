@@ -8,6 +8,9 @@ import { unitRoutes } from './modules/units/unit.routes';
 import { clientRoutes } from './modules/clients/client.routes';
 import { serviceRoutes } from './modules/services/service.routes';
 import { employeeRoutes } from './modules/employees/employee.routes';
+import { appointmentRoutes } from './modules/appointments/appointment.routes';
+import { financeRoutes } from './modules/finance/finance.routes';
+import { franchiseRoutes } from './modules/franchise/franchise.routes';
 
 const app = express();
 
@@ -19,6 +22,9 @@ app.use('/units', unitRoutes);
 app.use('/clients', clientRoutes);
 app.use('/services', serviceRoutes);
 app.use('/employees', employeeRoutes);
+app.use('/appointments', appointmentRoutes);
+app.use('/finance', financeRoutes);
+app.use('/franchise', franchiseRoutes);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
