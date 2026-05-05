@@ -83,13 +83,13 @@ interface FinanceSummary {
 
 interface Transaction {
   _id: string;
-  unitId: { name: string };
+  unitId: string | { _id: string; name: string };
   type: 'income' | 'expense' | 'royalty';
   category: string;
   amount: number;
   description: string;
   date: string;
-  createdBy?: { name: string };
+  createdBy?: string | { _id: string; name: string };
 }
 
 function formatCurrency(v: number) {
@@ -506,7 +506,7 @@ export default function Finance() {
                 <div className={styles.txInfo}>
                   <span className={styles.txDesc}>{tx.description}</span>
                   <span className={styles.txMeta}>
-                    {tx.unitId?.name && <span className={styles.txUnitBadge}>{tx.unitId.name}</span>}
+                    {typeof tx.unitId === 'object' && tx.unitId?.name && <span className={styles.txUnitBadge}>{tx.unitId.name}</span>}
                     {CATEGORY_LABELS[tx.category] || tx.category} · {tx.date}
                   </span>
                 </div>
