@@ -120,70 +120,88 @@ export default function Units() {
       {isLoading ? (
         <div className={styles.loading}>Carregando unidades...</div>
       ) : (
-        <div className={styles.grid}>
-          {units?.map(unit => {
-            const isNovaVeneza = unit.name.toLowerCase().includes('nova veneza');
-            const isMoradaDoSol = unit.name.toLowerCase().includes('morada do sol');
+        <div className={styles.unitGroup}>
+          {(() => {
+            const hostname = window.location.hostname;
+            const port = window.location.port;
+            
+            // Comprehensive dev detection
+            const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
+            const isDev = isLocal && (port === '3001' || port === '5173' || port === '5174' || port === '5175');
+
+            const routes = isDev ? {
+                admin: `http://${hostname}:5173/admin/`,
+                franchise: `http://${hostname}:5174/franchise-app/`,
+                booking: `http://${hostname}:5175/booking/`
+            } : {
+                admin: '/admin/',
+                franchise: '/franchise-app/',
+                booking: '/booking/'
+            };
 
             return (
-              <div key={unit._id} className={styles.portalCard}>
-                <div className={styles.portalTop}>
-                  <div className={styles.portalIcon}>
-                    <IconBuilding />
+              <>
+                {/* ADMIN CARD */}
+                <div className={`${styles.portalCard} ${styles.adminCard}`}>
+                  <div className={styles.portalTop}>
+                    <div className={`${styles.portalIcon} ${styles.adminIcon}`}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                    </div>
+                    <div className={styles.portalInfo}>
+                      <h3 className={styles.cardTitle}>Ecossistema Admin</h3>
+                      <div className={styles.portalSub}>Gestão de Franqueador</div>
+                    </div>
                   </div>
-                  <div className={styles.portalInfo}>
-                    <h3 className={styles.unitName}>{unit.name}</h3>
-                    <div className={styles.portalSub}>Sistema de Gestão Local</div>
+                  <div className={styles.cardBody}>
+                    <p className={styles.cardDesc}>Acesso ao painel administrativo global para controle de unidades e financeiro da rede.</p>
                   </div>
-                  <div className={styles.portalStatus}>
-                    <span className={`${styles.statusDot} ${styles.active}`} />
-                    <span className={styles.statusLabel}>
-                      Online
-                    </span>
-                  </div>
-                </div>
-                
-                <div className={styles.cardBody}>
-                  <div className={styles.infoRow}>
-                    <IconMapPin />
-                    <span>{unit.address}</span>
-                  </div>
-                  <div className={styles.infoRow}>
-                    <IconPhone />
-                    <span>{unit.phone}</span>
+                  <div className={styles.portalFooter}>
+                    <a href={routes.admin} className={styles.mainAccessBtn}>
+                      Acessar Admin <IconExternal />
+                    </a>
                   </div>
                 </div>
 
-                <div className={styles.portalFooter}>
-                  <div className={styles.mainActions}>
-                    <a 
-                      href={`${isLocal ? 'http://localhost:5174/franchise-app/' : '/franchise-app/'}?unitId=${unit._id}&token=${localStorage.getItem('accessToken')}`}
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className={styles.mainAccessBtn}
-                    >
-                      Entrar no Sistema
-                      <IconExternal />
-                    </a>
-
-                    <a 
-                      href={`${isLocal ? 'http://localhost:5175/booking/' : '/booking/'}?unitId=${unit._id}`}
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className={styles.bookingAccessBtn}
-                    >
-                      <IconCalendar />
-                      Link de Agendamento
-                    </a>
+                {/* FRANCHISE CARD */}
+                <div className={styles.portalCard}>
+                  <div className={styles.portalTop}>
+                    <div className={styles.portalIcon}><IconBuilding /></div>
+                    <div className={styles.portalInfo}>
+                      <h3 className={styles.cardTitle}>Gestão Local</h3>
+                      <div className={styles.portalSub}>Sistema da Franquia</div>
+                    </div>
                   </div>
-                  
-                  <div className={styles.secondaryActions}>
-                    <button className={styles.secondaryBtn} onClick={() => handleEdit(unit)}>Configurar</button>
+                  <div className={styles.cardBody}>
+                    <p className={styles.cardDesc}>Gerencie o dia a dia das unidades: profissionais, serviços, estoque e financeiro local.</p>
+                  </div>
+                  <div className={styles.portalFooter}>
+                    <a href={routes.franchise} className={styles.mainAccessBtn}>
+                      Entrar no Sistema <IconExternal />
+                    </a>
                   </div>
                 </div>
-              </div>
+
+                {/* BOOKING CARD */}
+                <div className={`${styles.portalCard} ${styles.bookingCard}`}>
+                  <div className={styles.portalTop}>
+                    <div className={`${styles.portalIcon} ${styles.bookingIcon}`}><IconCalendar /></div>
+                    <div className={styles.portalInfo}>
+                      <h3 className={styles.cardTitle}>Agendamento</h3>
+                      <div className={styles.portalSub}>Página do Cliente</div>
+                    </div>
+                  </div>
+                  <div className={styles.cardBody}>
+                    <p className={styles.cardDesc}>Portal público de agendamentos onde os clientes podem reservar horários online.</p>
+                  </div>
+                  <div className={styles.portalFooter}>
+                    <a href={routes.booking} className={styles.bookingAccessBtn}>
+                      Acessar App <IconExternal />
+                    </a>
+                  </div>
+                </div>
+              </>
             );
-          })}
+          })()}
         </div>
       )}
 
