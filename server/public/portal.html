@@ -211,7 +211,7 @@
 
         <div class="grid">
             <!-- ADMIN -->
-            <a href="http://localhost:5173/admin/" class="card" id="card-admin">
+            <a href="#" class="card" id="card-admin">
                 <div class="icon-box">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                 </div>
@@ -221,7 +221,7 @@
             </a>
 
             <!-- FRANCHISE -->
-            <a href="http://localhost:5174/franchise-app/" class="card" id="card-franchise">
+            <a href="#" class="card" id="card-franchise">
                 <div class="icon-box">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
                 </div>
@@ -231,7 +231,7 @@
             </a>
 
             <!-- BOOKING -->
-            <a href="http://localhost:5175/" class="card" id="card-booking">
+            <a href="#" class="card" id="card-booking">
                 <div class="icon-box">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 </div>
@@ -247,13 +247,27 @@
     </div>
 
     <script>
-        // Detection for Production vs Development
-        const isProd = window.location.port === '3001' || window.location.port === '80' || window.location.port === '443';
-        if (isProd) {
-            document.getElementById('card-admin').href = '/admin/';
-            document.getElementById('card-franchise').href = '/franchise-app/';
-            document.getElementById('card-booking').href = '/booking/';
-        }
+        // Intelligent environment detection
+        const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const port = window.location.port;
+        
+        // In dev, we are usually on 3001 (server) and apps are on 5173-5175
+        // In prod (Railway), everything is on the same port/domain
+        const isDev = isLocal && (port === '3001' || port === '5173' || port === '5174' || port === '5175');
+
+        const routes = isDev ? {
+            admin: 'http://localhost:5173/admin/',
+            franchise: 'http://localhost:5174/franchise-app/',
+            booking: 'http://localhost:5175/'
+        } : {
+            admin: '/admin/',
+            franchise: '/franchise-app/',
+            booking: '/booking/' // We'll set a base for booking to be safe
+        };
+
+        document.getElementById('card-admin').href = routes.admin;
+        document.getElementById('card-franchise').href = routes.franchise;
+        document.getElementById('card-booking').href = routes.booking;
     </script>
 </body>
 </html>

@@ -76,21 +76,7 @@ const bookingDist = path.resolve(__dirname, '../../apps/booking/dist');
 
 mountSpa('/admin', adminDist);
 mountSpa('/franchise-app', franchiseDist);
-
-if (fs.existsSync(path.join(bookingDist, 'index.html'))) {
-  app.use(express.static(bookingDist));
-  app.get('*', (req, res, next) => {
-    if (apiPrefixes.some(prefix => req.path === prefix || req.path.startsWith(`${prefix}/`))) {
-      return next();
-    }
-
-    if (!req.accepts('html')) {
-      return next();
-    }
-
-    return res.sendFile(path.join(bookingDist, 'index.html'));
-  });
-}
+mountSpa('/booking', bookingDist);
 
 app.use(errorHandler);
 
