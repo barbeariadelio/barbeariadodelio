@@ -1,12 +1,41 @@
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import ProtectedRoute from './components/ProtectedRoute/ProtectedRoute';
+import Layout from './components/Layout/Layout';
+
+const Login = lazy(() => import('./pages/Login/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'));
+const Services = lazy(() => import('./pages/Services/Services'));
+const Finance = lazy(() => import('./pages/Finance/Finance'));
+const Employees = lazy(() => import('./pages/Employees/Employees'));
+const Clients = lazy(() => import('./pages/Clients/Clients'));
+const Settings = lazy(() => import('./pages/Settings/Settings'));
+const Inventory = lazy(() => import('./pages/Inventory/Inventory'));
+const Permissions = lazy(() => import('./pages/Permissions/Permissions'));
+const Tasks = lazy(() => import('./pages/Tasks/Tasks'));
+
+function Loader() {
+  return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: '#A3A3A3', fontFamily: 'Inter, sans-serif' }}>Carregando...</div>;
+}
+
 export default function App() {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#080808', color: '#F5F5F5', fontFamily: 'Inter, sans-serif' }}>
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontFamily: '"Bebas Neue", sans-serif', fontSize: '3rem', color: '#1E88E5', letterSpacing: '0.05em' }}>
-          BARBEARIA DÉLIO
-        </div>
-        <div style={{ color: '#A3A3A3', marginTop: '0.5rem' }}>Sistema Franquia carregando...</div>
-      </div>
-    </div>
+    <Suspense fallback={<Loader />}>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/services" element={<Services />} />
+          <Route path="/finance" element={<Finance />} />
+          <Route path="/employees" element={<Employees />} />
+          <Route path="/clients" element={<Clients />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/permissions" element={<Permissions />} />
+          <Route path="/tasks" element={<Tasks />} />
+          <Route path="/settings" element={<Settings />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </Suspense>
   );
 }

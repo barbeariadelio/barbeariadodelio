@@ -1,0 +1,585 @@
+$bg:         #111111;
+$bg-card:    #1A1A1A;
+$gold:       #1565C0;
+$gold-dim:   rgba(21,101,192,.12);
+$text-main:  #F5F5F5;
+$text-dim:   #A3A3A3;
+$text-muted: #5A5A5A;
+$border:     #2C2C2C;
+$border-sub: rgba(44,44,44,0.6);
+
+.wrapper {
+  background: $bg;
+  border: 1px solid $border;
+  border-radius: 2px;
+  overflow: hidden;
+  animation: calIn 0.25s ease;
+}
+
+.wrapperDay { animation: slideDay 0.22s cubic-bezier(0.4, 0, 0.2, 1); }
+
+@keyframes calIn {
+  from { opacity: 0; } to { opacity: 1; }
+}
+@keyframes slideDay {
+  from { opacity: 0; transform: translateX(14px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Header ── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem 0.875rem;
+  border-bottom: 1px solid $border;
+}
+
+.monthTitleWrap { position: relative; }
+
+.monthTitleBtn {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 3px 6px;
+  border-radius: 4px;
+  outline: none;
+  transition: background 0.12s;
+  &:hover { background: rgba(255,255,255,0.05); }
+  &:hover .chevronDown { opacity: 1; }
+}
+
+.monthTitleText {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: $text-main;
+  text-transform: capitalize;
+  letter-spacing: -0.01em;
+}
+
+.monthYear {
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  font-weight: 400;
+  color: $text-muted;
+}
+
+.chevronDown {
+  align-self: center;
+  color: $text-muted;
+  opacity: 0.5;
+  transition: opacity 0.12s;
+  margin-left: 2px;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.todayBtn {
+  padding: 5px 12px;
+  border-radius: 2px;
+  border: 1px solid $border;
+  background: transparent;
+  color: $text-dim;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s;
+  &:hover { border-color: $gold; color: $gold; background: $gold-dim; }
+}
+
+.navBtns { display: flex; gap: 2px; }
+
+.navBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 2px;
+  border: 1px solid $border;
+  background: transparent;
+  color: $text-muted;
+  cursor: pointer;
+  transition: all 0.12s;
+  &:hover { background: rgba(255,255,255,0.05); color: $text-main; border-color: #2C2C2C; }
+}
+
+/* ── Picker ── */
+
+.pickerOverlay { position: fixed; inset: 0; z-index: 99; }
+
+.picker {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 100;
+  background: #1A1A1A;
+  border: 1px solid $border;
+  border-radius: 2px;
+  padding: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  min-width: 200px;
+  animation: calIn 0.15s ease;
+}
+
+.pickerYearRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.pickerYearLabel {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: $text-main;
+}
+
+.pickerYearBtn {
+  display: flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px;
+  background: transparent;
+  border: 1px solid $border;
+  border-radius: 2px;
+  color: $text-muted;
+  cursor: pointer;
+  transition: all 0.12s;
+  &:hover { color: $text-main; border-color: rgba(255,255,255,0.08); }
+}
+
+.pickerMonths {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+}
+
+.pickerMonth {
+  padding: 6px 3px;
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: $text-dim;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  cursor: pointer;
+  text-transform: capitalize;
+  transition: all 0.12s;
+  &:hover { color: $text-main; background: rgba(255,255,255,0.05); border-color: $border; }
+}
+
+.pickerMonthActive {
+  color: $gold !important;
+  background: $gold-dim !important;
+  border-color: rgba(21, 101, 192,0.25) !important;
+  font-weight: 600;
+}
+
+/* ── Week days ── */
+
+.weekDays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-bottom: 1px solid $border;
+}
+
+.weekDay {
+  padding: 0.5rem 0.25rem;
+  text-align: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: $text-muted;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* ── Month grid ── */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.cell {
+  min-height: 84px;
+  padding: 6px 5px 5px;
+  border-right: 1px solid $border-sub;
+  border-bottom: 1px solid $border-sub;
+  cursor: pointer;
+  transition: background 0.1s;
+
+  &:nth-child(7n)    { border-right: none; }
+  &:nth-last-child(-n+7) { border-bottom: none; }
+  &:hover { background: rgba(255,255,255,.04); }
+}
+
+.cellOut {
+  .dayNum { color: rgba(90, 80, 64, 0.4); }
+  .pill   { opacity: 0.35; }
+}
+
+.cellSel { background: rgba(21, 101, 192, 0.04) !important; }
+
+.dayNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: $text-dim;
+  margin-bottom: 3px;
+  transition: all 0.1s;
+}
+
+.dayToday {
+  background: $gold;
+  color: #080808;
+  font-weight: 700;
+  box-shadow: 0 0 8px rgba(21, 101, 192, 0.4);
+}
+
+.pills {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pill {
+  display: block;
+  padding: 2px 5px;
+  border-radius: 2px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.625rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+  transition: filter 0.1s;
+  cursor: pointer;
+  &:hover { filter: brightness(1.2); }
+}
+
+.pillMore {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.625rem;
+  color: $text-muted;
+  font-weight: 500;
+  padding: 1px 5px;
+}
+
+/* ── Day view ── */
+
+.dayHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid $border;
+  gap: 1rem;
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 2px;
+  border: 1px solid $border;
+  background: transparent;
+  color: $text-muted;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s;
+  &:hover { color: $text-main; border-color: #2C2C2C; background: rgba(255,255,255,.05); }
+}
+
+.dayTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex: 1;
+  justify-content: center;
+}
+
+.dayTitleWeekday {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: $text-main;
+  text-transform: capitalize;
+}
+
+.dayTitleDate {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8125rem;
+  color: $text-muted;
+}
+
+.todayChip {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.625rem;
+  font-weight: 700;
+  background: $gold-dim;
+  color: $gold;
+  border: 1px solid rgba(21, 101, 192,0.25);
+  padding: 2px 7px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  align-self: center;
+}
+
+.dayNav { display: flex; gap: 2px; }
+
+.dayBody {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.25rem;
+  gap: 0.5rem;
+  min-height: 200px;
+}
+
+.dayEmpty {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9375rem;
+  font-style: italic;
+  color: $text-muted;
+  text-align: center;
+  margin: auto;
+  padding: 2rem 0;
+}
+
+.dayAppt {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+  border-left: 2px solid transparent;
+  background: #1A1A1A;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.12s;
+  &:hover { background: rgba(21, 101, 192,0.04); }
+}
+
+.dayApptTime {
+  font-family: 'Inter', monospace;
+  font-size: 0.8125rem;
+  color: $text-dim;
+  min-width: 110px;
+  white-space: nowrap;
+}
+
+.dayApptInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dayApptClient {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: $text-main;
+}
+
+.dayApptMeta {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8125rem;
+  color: $text-dim;
+}
+
+/* ── Modal ── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  backdrop-filter: blur(3px);
+  animation: calIn 0.18s ease;
+}
+
+.panel {
+  background: #1A1A1A;
+  border: 1px solid #2C2C2C;
+  border-left: 3px solid $gold;
+  border-radius: 2px;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+  animation: panelIn 0.22s cubic-bezier(0.4,0,0.2,1);
+}
+
+@keyframes panelIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.125rem 1.25rem;
+  border-bottom: 1px solid $border;
+}
+
+.panelTitle {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  font-style: italic;
+  color: $text-main;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  background: none;
+  border: none;
+  color: $text-muted;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.12s;
+  &:hover { background: rgba(255,255,255,.06); color: $text-main; }
+}
+
+.panelBody {
+  padding: 1.25rem;
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.detailItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detailLabel {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: $text-muted;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.detailValue {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: $text-main;
+}
+
+.statusBadge {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+/* ── Status actions ── */
+
+.statusActions {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid $border;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.statusActionsLabel {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: $text-muted;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.statusActionsBtns {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.statusActionBtn {
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: filter 0.12s, opacity 0.12s;
+
+  &:hover:not(:disabled) { filter: brightness(1.2); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.deleteSection {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid $border;
+}
+
+.deleteBtn {
+  background: none;
+  border: 1px solid rgba(239,68,68,.3);
+  border-radius: 2px;
+  padding: 0.4rem 1rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #EF4444;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.12s, border-color 0.12s;
+
+  &:hover:not(:disabled) { background: rgba(239,68,68,.08); border-color: rgba(239,68,68,.5); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}

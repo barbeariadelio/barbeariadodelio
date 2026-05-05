@@ -1,0 +1,372 @@
+$bg:         #111111;
+$bg-card:    #1A1A1A;
+$gold:       #1565C0;
+$text-main:  #F5F5F5;
+$text-dim:   #A3A3A3;
+$border:     #2C2C2C;
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 500;
+  padding: 1.5rem;
+  backdrop-filter: blur(3px);
+  animation: fadeIn 0.18s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.modal {
+  background: $bg-card;
+  border: 1px solid #2C2C2C;
+  border-top: 3px solid $gold;
+  border-radius: 2px;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  animation: slideIn 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.125rem 1.25rem;
+  border-bottom: 1px solid $border;
+}
+
+.modalTitle {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: $text-main;
+  margin: 0;
+}
+
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  color: $text-dim;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.12s;
+
+  &:hover {
+    background: rgba(255,255,255,.06);
+    color: $text-main;
+  }
+}
+
+.form {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.label {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: $text-dim;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.input,
+.select,
+.textarea {
+  background: $bg;
+  border: 1px solid $border;
+  border-radius: 2px;
+  padding: 0.625rem 0.75rem;
+  color: $text-main;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  transition: border-color 0.12s, box-shadow 0.12s;
+
+  &:focus {
+    outline: none;
+    border-color: $gold;
+    box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.12);
+  }
+
+  option {
+    background: $bg-card;
+  }
+}
+
+/* ── Client search combobox ── */
+
+.clientBox {
+  position: relative;
+}
+
+.clientSearchWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: $bg;
+  border: 1px solid $border;
+  border-radius: 2px;
+  padding: 0 0.75rem;
+  transition: border-color 0.12s, box-shadow 0.12s;
+
+  &:focus-within {
+    border-color: $gold;
+    box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.12);
+  }
+}
+
+.clientSearchIcon {
+  display: flex;
+  align-items: center;
+  color: $text-dim;
+  flex-shrink: 0;
+}
+
+.clientSearchInput {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0.625rem 0;
+  color: $text-main;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+
+  &::placeholder { color: $text-dim; }
+}
+
+.clientSelected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: rgba(21, 101, 192, 0.06);
+  border: 1px solid rgba(21, 101, 192, 0.25);
+  border-radius: 2px;
+  padding: 0.5rem 0.625rem 0.5rem 0.875rem;
+}
+
+.clientSelectedInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.clientSelectedName {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: $text-main;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clientSelectedPhone {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  color: $text-dim;
+}
+
+.clientClearBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 2px;
+  border: none;
+  background: none;
+  color: $text-dim;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.12s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: $text-main;
+  }
+}
+
+.clientDropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: #1A1A1A;
+  border: 1px solid $border;
+  border-radius: 2px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  animation: dropIn 0.12s ease;
+}
+
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.clientDropdownEmpty {
+  padding: 0.875rem 1rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8125rem;
+  color: $text-dim;
+  font-style: italic;
+  text-align: center;
+}
+
+.clientOption {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(44,44,44,0.6);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: rgba(255,255,255,.05); }
+}
+
+.clientOptionInitial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(21,101,192,.12);
+  border: 1px solid rgba(21, 101, 192, 0.2);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: $gold;
+  flex-shrink: 0;
+}
+
+.clientOptionInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.clientOptionName {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: $text-main;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.clientOptionPhone {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  color: $text-dim;
+}
+
+.error {
+  background: rgba(198,40,40, 0.1);
+  border: 1px solid rgba(198,40,40, 0.28);
+  border-radius: 2px;
+  padding: 0.625rem 0.875rem;
+  color: #EF4444;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 0.625rem;
+  justify-content: flex-end;
+  padding-top: 0.25rem;
+}
+
+.cancelBtn {
+  background: none;
+  border: 1px solid $border;
+  border-radius: 2px;
+  padding: 0.5rem 1.125rem;
+  color: $text-dim;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s;
+
+  &:hover {
+    color: $text-main;
+    border-color: #2C2C2C;
+    background: rgba(255,255,255,.05);
+  }
+}
+
+.submitBtn {
+  background: $gold;
+  border: none;
+  border-radius: 2px;
+  padding: 0.5rem 1.375rem;
+  color: #080808;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  letter-spacing: 0.02em;
+
+  &:hover:not(:disabled) {
+    background: #1E88E5;
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}

@@ -31,3 +31,12 @@ export async function me(req: AuthRequest, res: Response, next: NextFunction): P
     next(e);
   }
 }
+
+export async function updateMe(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const user = await service.updateMe(req.user!.id, req.body);
+    ok(res, user);
+  } catch (e) {
+    next(e);
+  }
+}

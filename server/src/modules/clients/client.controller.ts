@@ -7,7 +7,9 @@ const service = new ClientService();
 
 export async function listClients(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const unitId = (req.query.unitId as string) || req.user!.unitId;
+    const unitId = req.user!.role === 'owner'
+      ? ((req.query.unitId as string) || req.user!.unitId)
+      : req.user!.unitId;
     if (!unitId) { ok(res, []); return; }
     const q = req.query.q as string | undefined;
     const clients = q

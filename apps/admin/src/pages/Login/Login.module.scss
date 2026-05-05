@@ -1,0 +1,213 @@
+$bg-base:    #080808;
+$bg-surface: #111111;
+$bg-card:    #1A1A1A;
+$gold:       #1565C0;
+$gold-glow:  rgba(21, 101, 192, 0.18);
+$text-main:  #F5F5F5;
+$text-dim:   #A3A3A3;
+$border:     rgba(21, 101, 192, 0.12);
+
+.page {
+  min-height: 100vh;
+  background: $bg-base;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+
+  /* radial vignette */
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 60% 60% at 50% 45%, transparent 30%, rgba(0,0,0,0.55) 100%);
+    pointer-events: none;
+  }
+
+  /* oversized watermark "D" */
+  &::after {
+    content: 'D';
+    position: absolute;
+    right: -4vw;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(220px, 28vw, 380px);
+    font-style: italic;
+    color: $gold;
+    opacity: 0.035;
+    line-height: 1;
+    pointer-events: none;
+    user-select: none;
+  }
+}
+
+.card {
+  background: $bg-surface;
+  border: 1px solid $border;
+  border-radius: 2px;
+  padding: 3rem 2.5rem 2.75rem;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(21, 101, 192,0.06);
+  position: relative;
+  z-index: 1;
+
+  @media (max-width: 480px) {
+    padding: 2rem 1.5rem;
+  }
+
+  /* top gold stripe */
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: $gold;
+    border-radius: 2px 2px 0 0;
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  justify-content: center;
+  margin-bottom: 0.125rem;
+}
+
+.brandName {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.5rem;
+  color: $text-main;
+  letter-spacing: 0.08em;
+}
+
+.brandHighlight {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 1.625rem;
+  color: $gold;
+  letter-spacing: 0.02em;
+}
+
+.brandRule {
+  display: block;
+  width: 40px;
+  height: 1px;
+  background: $gold;
+  opacity: 0.5;
+  margin: 0.75rem auto;
+}
+
+.subtitle {
+  text-align: center;
+  color: $text-dim;
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 1rem;
+  margin-bottom: 2.25rem;
+  letter-spacing: 0.01em;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.label {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: $text-dim;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.input {
+  background: $bg-card;
+  border: 1px solid rgba(21, 101, 192, 0.15);
+  border-radius: 2px;
+  padding: 0.75rem 1rem;
+  color: $text-main;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9375rem;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+
+  &::placeholder { color: rgba(154, 144, 128, 0.45); }
+
+  &:focus {
+    outline: none;
+    border-color: $gold;
+    box-shadow: 0 0 0 3px $gold-glow;
+  }
+}
+
+.pwWrap {
+  position: relative;
+
+  .input { padding-right: 2.75rem; }
+}
+
+.pwToggle {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: $text-dim;
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+
+  &:hover { color: $text-main; }
+}
+
+.error {
+  background: rgba(198, 40, 40, 0.1);
+  border: 1px solid rgba(198, 40, 40, 0.25);
+  border-radius: 2px;
+  padding: 0.625rem 0.875rem;
+  color: #EF4444;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.button {
+  background: $gold;
+  color: #080808;
+  border: none;
+  border-radius: 2px;
+  padding: 0.875rem 1.5rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  width: 100%;
+  transition: background 0.15s, box-shadow 0.15s;
+  margin-top: 0.375rem;
+
+  &:hover:not(:disabled) {
+    background: #D4A832;
+    box-shadow: 0 4px 24px rgba(21, 101, 192, 0.3);
+  }
+
+  &:active:not(:disabled) { transform: scale(0.98); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}

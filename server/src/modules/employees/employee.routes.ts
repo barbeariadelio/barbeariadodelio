@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import { listEmployees, getEmployee, createEmployee, updateEmployee, deactivateEmployee } from './employee.controller';
+import { listPublicEmployees, listEmployees, getEmployee, createEmployee, updateEmployee, deactivateEmployee } from './employee.controller';
 import { authenticate } from '../../shared/middlewares/auth.middleware';
 import { requireRoles, requireSameUnit } from '../../shared/middlewares/rbac.middleware';
 
 export const employeeRoutes = Router();
 
+employeeRoutes.get('/public', listPublicEmployees);
 employeeRoutes.get('/', authenticate, requireRoles('owner', 'franchisee', 'franchisor'), requireSameUnit(), listEmployees);
 employeeRoutes.get('/:id', authenticate, requireRoles('owner', 'franchisee', 'franchisor'), getEmployee);
 employeeRoutes.post('/', authenticate, requireRoles('owner', 'franchisee'), createEmployee);

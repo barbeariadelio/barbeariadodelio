@@ -1,0 +1,235 @@
+$bg-card:    #111111;
+$bg-surface: #1A1A1A;
+$gold:       #1565C0;
+$text-main:  #F5F5F5;
+$text-dim:   #A0A0A0;
+$border:     rgba(255,255,255,0.06);
+
+@mixin card {
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: 4px;
+}
+
+.page {
+  padding: 2rem;
+  animation: fadeIn 0.4s ease;
+  @media (max-width: 640px) { padding: 1rem; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: $text-main;
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: $text-dim;
+  margin-top: 4px;
+}
+
+.btnPrimary {
+  background: $gold;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover { background: #1976D2; transform: translateY(-1px); }
+}
+
+// KPI Grid
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+  @media (max-width: 1024px) { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 640px) { grid-template-columns: 1fr; }
+}
+
+.kpiCard {
+  @include card;
+  padding: 1.5rem;
+  position: relative;
+  overflow: hidden;
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+}
+
+.blue::before { background: linear-gradient(90deg, #1565C0, #60a5fa); }
+.green::before { background: linear-gradient(90deg, #22c55e, #4ade80); }
+.amber::before { background: linear-gradient(90deg, #F59E0B, #fbbf24); }
+
+.kpiLabel { font-size: 0.6875rem; color: $text-dim; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.kpiValue { font-size: 1.875rem; font-weight: 700; color: $text-main; letter-spacing: -0.02em; line-height: 1; margin: 0.75rem 0 4px; }
+
+// Controls
+.controls {
+  margin-bottom: 1.5rem;
+}
+
+.searchWrap {
+  max-width: 400px;
+}
+
+.searchInput {
+  width: 100%;
+  background: $bg-surface;
+  border: 1px solid $border;
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  color: $text-main;
+  font-size: 0.875rem;
+  outline: none;
+  &:focus { border-color: $gold; }
+}
+
+// Table
+.tableContainer {
+  @include card;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 800px;
+
+  th {
+    padding: 1rem 1.5rem;
+    text-align: left;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: $text-dim;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid $border;
+  }
+
+  td {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid $border;
+    font-size: 0.875rem;
+    color: $text-main;
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.01); }
+}
+
+.productCell {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.productIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  background: rgba(21, 101, 192, 0.1);
+  color: $gold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.productInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.productName { font-weight: 600; color: $text-main; }
+.productDesc { font-size: 0.75rem; color: $text-dim; }
+
+.categoryBadge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: $text-dim;
+  background: rgba(255,255,255,0.05);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.stockBadge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.badgeRed { background: rgba(239, 68, 68, 0.1); color: #f87171; }
+.badgeGreen { background: rgba(34, 197, 94, 0.1); color: #4ade80; }
+
+.lowStockRow td {
+  background: rgba(239, 68, 68, 0.02);
+}
+
+.priceCell { font-weight: 700; color: #60a5fa; }
+.profitCell { font-weight: 700; color: #4ade80; }
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.btnAction {
+  background: transparent;
+  border: 1px solid $border;
+  color: $text-dim;
+  padding: 0.4rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  &:hover { color: $text-main; background: rgba(255,255,255,0.03); border-color: $text-dim; }
+}
+
+.btnDanger {
+  color: #f87171;
+  &:hover { border-color: #f87171; background: rgba(239, 68, 68, 0.05); }
+}
+
+.empty {
+  padding: 3rem;
+  text-align: center;
+  color: $text-dim;
+}

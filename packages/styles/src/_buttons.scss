@@ -5,7 +5,7 @@
   align-items: center;
   justify-content: center;
   gap: $space-2;
-  font-family: $font-ui;
+  font-family: $font-body;
   font-weight: 600;
   font-size: 0.875rem;
   letter-spacing: 0.03em;
@@ -42,24 +42,24 @@
 
   // Variants
   &--primary {
-    background: $brand-blue;
-    color: #fff;
-    box-shadow: $shadow-blue;
-    &:hover:not(:disabled) { background: $brand-blue-light; transform: translateY(-1px); }
+    background: $gold;
+    color: #0D0B09;
+    box-shadow: $gold-shadow;
+    &:hover:not(:disabled) { background: $gold-light; transform: translateY(-1px); }
   }
 
   &--secondary {
     background: transparent;
-    color: $brand-blue-light;
-    border: 1.5px solid $brand-blue;
-    &:hover:not(:disabled) { background: $brand-blue-subtle; border-color: $brand-blue-light; transform: translateY(-1px); }
+    color: $gold-light;
+    border: 1.5px solid $gold;
+    &:hover:not(:disabled) { background: $gold-dim; border-color: $gold-light; transform: translateY(-1px); }
   }
 
   &--danger {
-    background: $brand-red;
+    background: $red;
     color: #fff;
-    box-shadow: $shadow-red;
-    &:hover:not(:disabled) { background: $brand-red-light; transform: translateY(-1px); }
+    box-shadow: 0 4px 20px rgba(168, 50, 50, 0.3);
+    &:hover:not(:disabled) { background: $red-light; transform: translateY(-1px); }
   }
 
   &--ghost {
@@ -70,10 +70,10 @@
   }
 
   &--gold {
-    background: $brand-gold;
-    color: #000;
+    background: $gold;
+    color: #0D0B09;
     font-weight: 700;
-    &:hover:not(:disabled) { background: $brand-gold-light; transform: translateY(-1px); }
+    &:hover:not(:disabled) { background: $gold-light; transform: translateY(-1px); }
   }
 
   &--dark {

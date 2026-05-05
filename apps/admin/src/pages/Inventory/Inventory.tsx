@@ -1,0 +1,169 @@
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../../api/client';
+import ProductForm from './ProductForm';
+import styles from './Inventory.module.scss';
+
+interface Product {
+  _id: string;
+  name: string;
+  description?: string;
+  price: number;
+  costPrice: number;
+  stockQuantity: number;
+  minStock: number;
+  category?: string;
+}
+
+function formatCurrency(v: number) {
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+}
+
+function IconPackage() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+    </svg>
+  );
+}
+
+export default function Inventory() {
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const qc = useQueryClient();
+
+  const { data: products = [], isLoading } = useQuery<Product[]>({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const { data } = await api.get('/products');
+      return Array.isArray(data) ? data : data.products ?? [];
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/products/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['products'] });
+      setSelectedProduct(null);
+    }
+  });
+
+  const filteredProducts = products.filter(p => 
+    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.category?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  function handleDelete(id: string) {
+    if (window.confirm('Tem certeza que deseja excluir este produto?')) {
+      deleteMutation.mutate(id);
+    }
+  }
+
+  return (
+    <div className={styles.page}>
+      <header className={styles.header}>
+        <div>
+          <h1 className={styles.title}>Estoque</h1>
+          <p className={styles.subtitle}>Gestão de produtos, insumos e controle de reposição</p>
+        </div>
+        <button className={styles.btnPrimary} onClick={() => { setSelectedProduct(null); setShowForm(true); }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Novo Produto
+        </button>
+      </header>
+
+      <div className={styles.kpiGrid}>
+        <div className={`${styles.kpiCard} ${styles.blue}`}>
+          <span className={styles.kpiLabel}>Itens Cadastrados</span>
+          <span className={styles.kpiValue}>{products.length}</span>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.amber}`}>
+          <span className={styles.kpiLabel}>Estoque Crítico</span>
+          <span className={styles.kpiValue}>
+            {products.filter(p => p.stockQuantity <= p.minStock).length}
+          </span>
+        </div>
+        <div className={`${styles.kpiCard} ${styles.green}`}>
+          <span className={styles.kpiLabel}>Valor Patrimonial</span>
+          <span className={styles.kpiValue}>
+            {formatCurrency(products.reduce((acc, p) => acc + (p.costPrice * p.stockQuantity), 0))}
+          </span>
+        </div>
+      </div>
+
+      <div className={styles.controls}>
+        <div className={styles.searchWrap}>
+          <input 
+            className={styles.searchInput} 
+            placeholder="Buscar por nome ou categoria..." 
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className={styles.tableContainer}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>Categoria</th>
+              <th align="center">Qtd.</th>
+              <th align="right">Preço Venda</th>
+              <th align="right">Lucro Un.</th>
+              <th align="right">Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading && <tr><td colSpan={6} className={styles.empty}>Carregando...</td></tr>}
+            {!isLoading && filteredProducts.length === 0 && (
+              <tr><td colSpan={6} className={styles.empty}>Nenhum produto encontrado.</td></tr>
+            )}
+            {filteredProducts.map(p => {
+              const isLow = p.stockQuantity <= p.minStock;
+              return (
+                <tr key={p._id} className={isLow ? styles.lowStockRow : ''}>
+                  <td>
+                    <div className={styles.productCell}>
+                      <div className={styles.productIcon}><IconPackage /></div>
+                      <div className={styles.productInfo}>
+                        <span className={styles.productName}>{p.name}</span>
+                        <span className={styles.productDesc}>{p.description || 'Sem descrição'}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td><span className={styles.categoryBadge}>{p.category || 'Geral'}</span></td>
+                  <td align="center">
+                    <span className={`${styles.stockBadge} ${isLow ? styles.badgeRed : styles.badgeGreen}`}>
+                      {p.stockQuantity} un
+                    </span>
+                  </td>
+                  <td align="right" className={styles.priceCell}>{formatCurrency(p.price)}</td>
+                  <td align="right" className={styles.profitCell}>{formatCurrency(p.price - p.costPrice)}</td>
+                  <td align="right">
+                    <div className={styles.actions}>
+                      <button className={styles.btnAction} onClick={() => { setSelectedProduct(p); setShowForm(true); }}>Editar</button>
+                      <button className={`${styles.btnAction} ${styles.btnDanger}`} onClick={() => handleDelete(p._id)}>Excluir</button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {showForm && (
+        <ProductForm
+          product={selectedProduct}
+          onClose={() => setShowForm(false)}
+          onSuccess={() => {
+            setShowForm(false);
+            qc.invalidateQueries({ queryKey: ['products'] });
+          }}
+        />
+      )}
+    </div>
+  );
+}

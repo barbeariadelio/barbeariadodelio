@@ -1,0 +1,275 @@
+$bg-card:    #111111;
+$bg-surface: #1A1A1A;
+$gold:       #1565C0;
+$text-main:  #F5F5F5;
+$text-dim:   #A0A0A0;
+$border:     rgba(255,255,255,0.06);
+
+.page {
+  padding: 2rem;
+  animation: fadeIn 0.4s ease;
+  @media (max-width: 640px) { padding: 1rem; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  gap: 1rem;
+}
+
+.title {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: $text-main;
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: $text-dim;
+  margin-top: 4px;
+}
+
+.btnPrimary {
+  background: $gold;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  &:hover { background: #1976D2; transform: translateY(-1px); }
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+  @media (max-width: 1024px) { grid-template-columns: 1fr; }
+}
+
+.column {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid $border;
+  border-radius: 4px;
+  padding: 1rem;
+  min-height: 400px;
+}
+
+.columnHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid $border;
+}
+
+.columnTitle {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: $text-main;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.columnCount {
+  background: $bg-surface;
+  color: $text-dim;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.taskCard {
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: 4px;
+  padding: 1rem;
+  transition: border-color 0.2s;
+  &:hover { border-color: rgba(21, 101, 192, 0.3); }
+}
+
+.taskHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.priority {
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 2px;
+  &.high { background: rgba(239, 68, 68, 0.1); color: #f87171; }
+  &.medium { background: rgba(245, 158, 11, 0.1); color: #F59E0B; }
+  &.low { background: rgba(34, 197, 94, 0.1); color: #4ade80; }
+}
+
+.btnCheck {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid $border;
+  color: $text-dim;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover { background: #22c55e; color: white; border-color: #22c55e; }
+}
+
+.taskTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: $text-main;
+  margin: 0 0 0.5rem;
+}
+
+.taskDesc {
+  font-size: 0.8125rem;
+  color: $text-dim;
+  line-height: 1.4;
+  margin: 0 0 1rem;
+}
+
+.taskFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid $border;
+}
+
+.dueDate {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: $text-dim;
+  svg { opacity: 0.6; }
+}
+
+.btnDelete {
+  background: none;
+  border: none;
+  color: #5A5A5A;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  &:hover { color: #f87171; }
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal {
+  background: #1A1A1A;
+  border: 1px solid #2A2A2A;
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modalTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #F5F5F5;
+  margin: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  label {
+    font-size: 0.8rem;
+    color: #888;
+    font-weight: 500;
+  }
+
+  input, textarea, select {
+    background: #111;
+    border: 1px solid #2A2A2A;
+    border-radius: 8px;
+    color: #F5F5F5;
+    padding: 10px 12px;
+    font-size: 0.9rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+
+    &:focus {
+      border-color: #1565C0;
+    }
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 80px;
+  }
+
+  select option {
+    background: #1A1A1A;
+  }
+}
+
+.modalActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.btnSecondary {
+  background: transparent;
+  border: 1px solid #2A2A2A;
+  color: #888;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+
+  &:hover {
+    border-color: #444;
+    color: #CCC;
+  }
+}

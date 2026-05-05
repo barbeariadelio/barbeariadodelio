@@ -5,6 +5,12 @@ import bcrypt from 'bcryptjs';
 export class EmployeeService {
   async findByUnit(unitId: string): Promise<IUser[]> {
     return UserModel.find({ unitId, role: 'employee', isActive: true })
+      .select('-passwordHash -passwordPlain')
+      .sort({ name: 1 });
+  }
+
+  async findAdminByUnit(unitId: string): Promise<IUser[]> {
+    return UserModel.find({ unitId, role: 'employee', isActive: true })
       .select('-passwordHash')
       .sort({ name: 1 });
   }
@@ -27,6 +33,7 @@ export class EmployeeService {
       name: data.name,
       email: data.email,
       passwordHash,
+      passwordPlain: data.password,
       phone: data.phone,
       unitId: data.unitId,
       role: 'employee',
@@ -35,10 +42,16 @@ export class EmployeeService {
     return UserModel.findById(emp._id).select('-passwordHash') as Promise<IUser>;
   }
 
-  async update(id: string, data: Partial<IUser>): Promise<IUser> {
+  async update(id: string, data: any): Promise<IUser> {
+    const updateData = { ...data };
+    if (updateData.password) {
+      updateData.passwordHash = await bcrypt.hash(updateData.password, 10);
+      updateData.passwordPlain = updateData.password;
+      delete updateData.password;
+    }
     const emp = await UserModel.findByIdAndUpdate(
       id,
-      { $set: data },
+      { $set: updateData },
       { new: true },
     ).select('-passwordHash');
     if (!emp) throw new NotFoundError('Employee');

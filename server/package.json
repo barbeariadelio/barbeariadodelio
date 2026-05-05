@@ -6,7 +6,9 @@
     "dev": "tsx watch src/app.ts",
     "build": "tsc",
     "start": "node dist/app.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed": "tsx src/seed.ts",
+    "seed:reset": "tsx src/seed.ts --reset"
   },
   "dependencies": {
     "express": "^4.19.0",

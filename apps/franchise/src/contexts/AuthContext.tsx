@@ -1,8 +1,10 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import type { User } from '@barber/types';
+import { api } from '../api/client';
 
 interface AuthContextValue {
   user: User | null;
+  loading: boolean;
   setUser: (user: User | null) => void;
   logout: () => void;
 }
@@ -10,7 +12,17 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<User | null>(() => {
+    // Check for token in URL (SSO from Admin)
+    const params = new URLSearchParams(window.location.search);
+    const urlToken = params.get('token');
+    if (urlToken) {
+      localStorage.setItem('accessToken', urlToken);
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
     try {
       const stored = localStorage.getItem('user');
       return stored ? (JSON.parse(stored) as User) : null;
@@ -19,9 +31,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   });
 
+  useEffect(() => {
+    async function init() {
+      const token = localStorage.getItem('accessToken');
+      if (token && !user) {
+        try {
+          const { data } = await api.get('/auth/me');
+          handleSetUser(data);
+        } catch {
+          localStorage.removeItem('accessToken');
+        }
+      }
+      setLoading(false);
+    }
+    init();
+  }, [user]);
+
   function handleSetUser(u: User | null) {
     if (u) localStorage.setItem('user', JSON.stringify(u));
-    else localStorage.removeItem('user');
+    else {
+      localStorage.removeItem('user');
+      localStorage.removeItem('accessToken');
+    }
     setUser(u);
   }
 
@@ -31,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, setUser: handleSetUser, logout }}>
+    <AuthContext.Provider value={{ user, loading, setUser: handleSetUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

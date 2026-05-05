@@ -1,0 +1,262 @@
+// --- Design Tokens (Matching Barber System) ---
+$bg-card:    #111111;
+$bg-surface: #1A1A1A;
+$bg-input:   #111111;
+$gold:       #1565C0;
+$text-main:  #F5F5F5;
+$text-dim:   #A0A0A0;
+$border:     rgba(255,255,255,0.06);
+$border-accent: rgba(21,101,192,0.3);
+
+@mixin card {
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: 4px;
+}
+
+@mixin flex-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.page { 
+  padding: 2rem; 
+  animation: fadeIn 0.4s ease; 
+  @media (max-width: 640px) { padding: 1rem; } 
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.header { 
+  @include flex-between; 
+  margin-bottom: 2.5rem; 
+  flex-wrap: wrap; 
+  gap: 1rem; 
+}
+
+.pageTitle { 
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 2.5rem; 
+  font-weight: 700; 
+  color: $text-main; 
+  letter-spacing: -0.5px; 
+  margin: 0;
+}
+
+.subtitle { 
+  font-size: 0.875rem; 
+  color: $text-dim; 
+  margin-top: 4px; 
+}
+
+.newBtn {
+  background: $gold;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover { background: #1976D2; transform: translateY(-1px); }
+}
+
+// Grid of Units using Portal Card Style
+.grid { 
+  display: grid; 
+  grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); 
+  gap: 2rem; 
+  @media (max-width: 640px) { grid-template-columns: 1fr; } 
+}
+
+.portalCard {
+  @include card;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s, border-color 0.2s;
+  
+  &:hover { transform: translateY(-4px); border-color: $border-accent; }
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #1565C0, #60a5fa);
+  }
+}
+
+.portalTop {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.portalIcon {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: rgba(21, 101, 192, 0.1); 
+  color: #1565C0;
+}
+
+.portalInfo {
+  flex: 1;
+}
+
+.unitName { 
+  font-size: 1.125rem; 
+  font-weight: 700; 
+  color: $text-main;
+  margin: 0;
+}
+
+.portalSub { font-size: 0.75rem; color: $text-dim; margin-top: 2px; }
+
+.portalStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  &.active { background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,0.3); }
+  &.inactive { background: #f87171; }
+}
+
+.statusLabel { font-size: 0.6875rem; color: $text-dim; font-weight: 600; }
+
+.cardBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.infoRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8125rem;
+  color: $text-dim;
+  svg { opacity: 0.5; }
+}
+
+.portalFooter {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid $border;
+}
+
+.mainAccessBtn {
+  flex: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: $gold;
+  color: white;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.875rem;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover { background: #1976D2; }
+}
+
+.secondaryBtn {
+  flex: 1;
+  padding: 0.75rem;
+  background: #1A1A1A;
+  border: 1px solid $border;
+  color: $text-dim;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover { background: #222; color: white; border-color: $text-dim; }
+}
+
+// Modal Styles
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: 4px;
+  width: 100%;
+  max-width: 460px;
+  padding: 2rem;
+  animation: modalIn 0.3s ease;
+}
+
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.modalHead { @include flex-between; margin-bottom: 2rem; }
+.modalTitle { font-family: 'Playfair Display', serif; font-size: 1.5rem; font-weight: 700; color: white; margin: 0; }
+.closeBtn { background: none; border: none; color: $text-dim; cursor: pointer; &:hover { color: white; } }
+
+.form { display: flex; flex-direction: column; gap: 1.5rem; }
+.field { display: flex; flex-direction: column; gap: 0.5rem; }
+.label { font-size: 0.6875rem; font-weight: 700; color: $text-dim; text-transform: uppercase; letter-spacing: 0.1em; }
+.input, .select {
+  background: $bg-surface;
+  border: 1px solid $border;
+  border-radius: 4px;
+  padding: 0.875rem;
+  color: white;
+  outline: none;
+  font-family: inherit;
+  &:focus { border-color: $gold; }
+}
+
+.submitBtn {
+  background: $gold;
+  color: white;
+  border: none;
+  padding: 1rem;
+  border-radius: 4px;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  &:hover { background: #1976D2; }
+}
+
+.loading, .empty { padding: 4rem; text-align: center; color: $text-dim; font-size: 1rem; }

@@ -1,0 +1,212 @@
+$text-main:  #F5F5F5;
+$text-dim:   #A3A3A3;
+$text-muted: #5A5A5A;
+$gold:       #1565C0;
+$border:     rgba(255,255,255,.06);
+
+.page {
+  max-width: 1400px;
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pageHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.pageTitle {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 2.5rem;
+  font-weight: 600;
+  color: $text-main;
+  margin: 0;
+}
+
+.newBtn {
+  background: $gold;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover { background: #1976D2; transform: translateY(-1px); }
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 2rem;
+  align-items: start;
+  @media (max-width: 1024px) { grid-template-columns: 1fr; }
+}
+
+.listPanel {
+  background: #111;
+  border: 1px solid $border;
+  border-radius: 4px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.searchInput {
+  background: #1A1A1A;
+  border: 1px solid #2C2C2C;
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  color: white;
+  font-size: 0.875rem;
+  outline: none;
+  &:focus { border-color: $gold; }
+}
+
+.clientList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.clientRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+
+  &:hover { background: rgba(255,255,255,0.03); }
+  &.selected { background: rgba(21,101,192,0.1); border-color: rgba(21,101,192,0.3); }
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #1A1A1A;
+  color: $gold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  border: 1px solid $border;
+}
+
+.clientInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.clientName { font-size: 0.9375rem; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clientSub { font-size: 0.75rem; color: $text-dim; margin-top: 2px; }
+
+.arrow { color: $text-muted; font-size: 1.25rem; }
+
+// Detail Panel
+.detailPanel {
+  background: #111;
+  border: 1px solid $border;
+  border-radius: 4px;
+  padding: 2.5rem;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.detailHeader {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+  @media (max-width: 640px) { flex-direction: column; align-items: center; text-align: center; }
+}
+
+.detailAvatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #1A1A1A;
+  color: $gold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  border: 2px solid $gold;
+}
+
+.detailName { font-family: 'Playfair Display', serif; font-size: 2.5rem; font-weight: 700; margin: 0 0 0.5rem; color: white; }
+.detailMeta { font-size: 0.875rem; color: $text-dim; margin: 0; }
+.detailNotes { font-size: 0.8125rem; color: $text-muted; margin-top: 1rem; font-style: italic; }
+
+.historyTitle {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: $text-muted;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid $border;
+  padding-bottom: 0.75rem;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: $border;
+}
+
+.historyRow {
+  background: #111;
+  padding: 1.25rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  @media (max-width: 640px) { flex-direction: column; align-items: flex-start; gap: 1rem; }
+}
+
+.historyInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.historyDate { font-size: 0.8125rem; font-weight: 700; color: white; }
+.historySub { font-size: 0.75rem; color: $text-dim; }
+
+.historyRight {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 2px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.historyPrice { font-size: 0.9375rem; font-weight: 700; color: #22C55E; }
+
+.empty { padding: 3rem; text-align: center; color: $text-muted; font-size: 0.875rem; }

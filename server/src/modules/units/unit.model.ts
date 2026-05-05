@@ -5,6 +5,7 @@ export interface IUnit extends Document {
   address: string;
   phone: string;
   cnpj?: string;
+  apiUrl?: string;
   ownerId: mongoose.Types.ObjectId;
   franchiseId?: mongoose.Types.ObjectId;
   isActive: boolean;
@@ -16,6 +17,7 @@ const unitSchema = new Schema<IUnit>(
     address:     { type: String, required: true },
     phone:       { type: String, required: true },
     cnpj:        String,
+    apiUrl:      String,
     ownerId:     { type: Schema.Types.ObjectId, ref: 'User', required: true },
     franchiseId: { type: Schema.Types.ObjectId, ref: 'Franchise' },
     isActive:    { type: Boolean, default: true },

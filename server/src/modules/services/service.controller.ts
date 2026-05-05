@@ -7,7 +7,7 @@ const service = new ServiceService();
 
 export async function listServices(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const unitId = req.query.unitId as string;
+    const unitId = (req.query.unitId as string) || (req as AuthRequest).user?.unitId;
     if (!unitId) { ok(res, []); return; }
     const services = await service.findByUnit(unitId);
     ok(res, services);
@@ -16,7 +16,8 @@ export async function listServices(req: Request, res: Response, next: NextFuncti
 
 export async function createService(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const svc = await service.create(req.body);
+    const unitId = req.body.unitId || req.user?.unitId;
+    const svc = await service.create({ ...req.body, unitId });
     created(res, svc);
   } catch (e) { next(e); }
 }

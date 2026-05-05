@@ -1,0 +1,135 @@
+$bg-card:    #111111;
+$bg-surface: #1A1A1A;
+$gold:       #1565C0;
+$text-main:  #F5F5F5;
+$text-dim:   #A0A0A0;
+$border:     rgba(255,255,255,0.06);
+
+.page {
+  max-width: 600px;
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pageTitle {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 2.5rem;
+  font-weight: 600;
+  color: $text-main;
+  margin: 0 0 2rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid $border;
+}
+
+.tab {
+  background: none;
+  border: none;
+  color: #5A5A5A;
+  padding: 0.75rem 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.2s;
+
+  &:hover { color: $text-dim; }
+  &.active {
+    color: $gold;
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: $gold;
+    }
+  }
+}
+
+.section {
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: 4px;
+  padding: 2rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.label {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #A0A0A0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.input {
+  background: #1A1A1A;
+  border: 1px solid #2C2C2C;
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  color: white;
+  font-family: inherit;
+  font-size: 0.875rem;
+  outline: none;
+  &:focus { border-color: $gold; }
+}
+
+.saveBtn {
+  background: $gold;
+  color: white;
+  border: none;
+  padding: 0.875rem;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 1rem;
+  &:hover { background: #1976D2; transform: translateY(-1px); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.success {
+  background: rgba(34, 197, 94, 0.1);
+  color: #22C55E;
+  padding: 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.error {
+  background: rgba(239, 68, 68, 0.1);
+  color: #EF4444;
+  padding: 0.75rem;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: center;
+}

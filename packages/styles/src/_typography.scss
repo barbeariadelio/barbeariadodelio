@@ -22,8 +22,7 @@
 .text-primary   { color: $text-primary; }
 .text-secondary { color: $text-secondary; }
 .text-muted     { color: $text-muted; }
-.text-blue      { color: $brand-blue-light; }
-.text-gold      { color: $brand-gold; }
+.text-gold      { color: $gold; }
 .text-success   { color: $color-success; }
 .text-error     { color: $color-error; }
 
@@ -32,5 +31,5 @@
   font-weight: 600;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: $brand-blue;
+  color: $gold;
 }

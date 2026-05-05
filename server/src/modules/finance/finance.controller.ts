@@ -8,8 +8,11 @@ const service = new FinanceService();
 
 export async function getSummary(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const unitId = (req.query.unitId as string) || req.user!.unitId;
-    const period = (req.query.period as 'month' | 'week' | 'year') || 'month';
+    const unitId = req.user!.role === 'owner'
+      ? (Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string) || req.user!.unitId)
+      : req.user!.unitId;
+    const periodRaw = Array.isArray(req.query.period) ? req.query.period[0] : req.query.period;
+    const period = (periodRaw as 'month' | 'week' | 'year') || 'month';
     const summary = await service.getSummary(req.user!.id, req.user!.role, unitId, period);
     ok(res, summary);
   } catch (e) { next(e); }
@@ -17,7 +20,9 @@ export async function getSummary(req: AuthRequest, res: Response, next: NextFunc
 
 export async function listTransactions(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const unitId = (req.query.unitId as string) || req.user!.unitId;
+    const unitId = req.user!.role === 'owner'
+      ? (Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string) || req.user!.unitId)
+      : (req.user!.unitId as string);
     if (!unitId) { ok(res, { data: [], total: 0 }); return; }
     const { page, limit } = parsePagination(req.query);
     const result = await service.getTransactions(unitId, page, limit);

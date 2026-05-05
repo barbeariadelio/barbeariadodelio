@@ -12,7 +12,7 @@
   color: $text-secondary;
   letter-spacing: 0.02em;
 
-  .required { color: $brand-red-light; margin-left: 3px; }
+  .required { color: $red-light; margin-left: 3px; }
 }
 
 .form-input {
@@ -20,7 +20,7 @@
   border: 1.5px solid $border-default;
   border-radius: $radius-md;
   padding: $space-3 $space-4;
-  font-family: $font-ui;
+  font-family: $font-body;
   font-size: 1rem;
   color: $text-primary;
   transition: all $transition-fast;
@@ -30,14 +30,14 @@
   &::placeholder { color: $text-muted; }
 
   &:focus {
-    border-color: $brand-blue;
+    border-color: $gold;
     background: $bg-surface;
-    box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.15);
+    box-shadow: 0 0 0 3px rgba(196, 154, 44, 0.15);
   }
 
   &--error {
     border-color: $color-error;
-    box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+    box-shadow: 0 0 0 3px rgba(168, 50, 50, 0.12);
   }
 
   &--success { border-color: $color-success; }

@@ -1,15 +1,34 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { UnitService } from './unit.service';
 import { AuthRequest } from '../../shared/middlewares/auth.middleware';
 import { ok, created } from '../../shared/utils/responseHelper';
 
 const service = new UnitService();
 
+export async function listPublicUnits(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const units = await service.findAll();
+    ok(res, units);
+  } catch (e) { next(e); }
+}
+
+export async function getPublicUnit(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const unit = await service.findById(req.params.id);
+    ok(res, unit);
+  } catch (e) { next(e); }
+}
+
 export async function listUnits(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const units = req.user!.role === 'owner'
-      ? await service.findByOwner(req.user!.id)
-      : await service.findAll();
+    let units;
+    if (req.user!.role === 'owner') {
+      units = await service.findByOwner(req.user!.id);
+    } else if (req.user!.unitId) {
+      units = [await service.findById(req.user!.unitId)];
+    } else {
+      units = [];
+    }
     ok(res, units);
   } catch (e) { next(e); }
 }

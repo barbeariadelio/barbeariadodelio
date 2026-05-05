@@ -1,0 +1,255 @@
+$bg-card:    #111111;
+$bg-surface: #1A1A1A;
+$gold:       #1565C0;
+$text-main:  #F5F5F5;
+$text-dim:   #A0A0A0;
+$border:     rgba(255,255,255,0.06);
+
+@mixin card {
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: 4px;
+}
+
+.page {
+  padding: 2rem;
+  animation: fadeIn 0.4s ease;
+  @media (max-width: 640px) { padding: 1rem; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: $text-main;
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: $text-dim;
+  margin-top: 4px;
+}
+
+.btnPrimary {
+  background: $gold;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover { background: #1976D2; transform: translateY(-1px); }
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 2rem;
+  align-items: start;
+  @media (max-width: 1024px) { grid-template-columns: 1fr; }
+}
+
+// User List
+.userList {
+  @include card;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 250px);
+  min-height: 500px;
+}
+
+.listTitle {
+  padding: 1.25rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: $text-dim;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-bottom: 1px solid $border;
+}
+
+.listScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.05); border-radius: 10px; }
+}
+
+.userCard {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-bottom: 4px;
+  &:hover { background: rgba(255,255,255,0.03); border-color: $border; }
+}
+
+.userCardActive {
+  background: rgba(21, 101, 192, 0.08) !important;
+  border-color: rgba(21, 101, 192, 0.3) !important;
+}
+
+.userAvatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(21, 101, 192, 0.15);
+  color: $gold;
+  font-weight: 700;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.userInfo { flex: 1; min-width: 0; }
+.userName { font-size: 0.9375rem; font-weight: 600; color: $text-main; margin-bottom: 2px; }
+.userEmail { font-size: 0.75rem; color: $text-dim; }
+
+.badge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+.badgeGold { background: rgba(21, 101, 192, 0.1); color: #60a5fa; }
+.badgeGray { background: rgba(255,255,255,0.05); color: $text-dim; }
+
+// Perm Panel
+.permPanel {
+  @include card;
+  padding: 2rem;
+  min-height: 500px;
+}
+
+.permEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  height: 400px;
+  color: $text-dim;
+  svg { opacity: 0.2; }
+}
+
+.permHeader {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid $border;
+}
+
+.permTitle { font-family: 'Playfair Display', serif; font-size: 1.5rem; font-weight: 700; color: $text-main; margin: 0; }
+.permSub { font-size: 0.875rem; color: $text-dim; margin-top: 4px; }
+
+.roleSelector {
+  margin-bottom: 2.5rem;
+  max-width: 300px;
+}
+
+.label {
+  display: block;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: $text-dim;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.select {
+  width: 100%;
+  background: $bg-surface;
+  border: 1px solid $border;
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  color: $text-main;
+  font-family: inherit;
+  outline: none;
+  &:focus { border-color: $gold; }
+}
+
+.permGroups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 2rem;
+}
+
+.permGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.permGroupLabel {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: $text-dim;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+.permItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  color: $text-dim;
+  cursor: pointer;
+  &:hover { color: $text-main; }
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: $gold;
+}
+
+.permFooter {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid $border;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btnDanger {
+  background: rgba(239, 68, 68, 0.08);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 0.75rem 1.25rem;
+  border-radius: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  &:hover { background: rgba(239, 68, 68, 0.15); border-color: #f87171; }
+}

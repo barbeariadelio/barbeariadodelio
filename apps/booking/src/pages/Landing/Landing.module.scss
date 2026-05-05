@@ -1,0 +1,242 @@
+$bg:     #0D0B09;
+$surf:   #141210;
+$gold:   #C49A2C;
+$goldL:  #E5B53C;
+$text:   #F2EDE6;
+$text2:  #9A9080;
+$text3:  #5A5448;
+$border: #1E1B16;
+$border2:#2A261E;
+
+.page {
+  min-height: 100vh;
+  background: $bg;
+  position: relative;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, $gold 30%, $gold 70%, transparent);
+    z-index: 1;
+  }
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 2rem;
+  border-bottom: 1px solid $border;
+  position: sticky;
+  top: 0;
+  background: rgba(13,11,9,.93);
+  backdrop-filter: blur(16px);
+  z-index: 10;
+}
+
+.logo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.w {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.25rem;
+  color: $text2;
+  letter-spacing: 0.1em;
+}
+
+.b {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.625rem;
+  color: $gold;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.loginBtn {
+  background: none;
+  border: 1px solid $border2;
+  border-radius: 6px;
+  padding: 0.5rem 1.125rem;
+  color: $text2;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  &:hover { color: $text; border-color: $gold; }
+}
+
+.avatarBtn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(196,154,44,.12);
+  border: 1px solid rgba(196,154,44,.3);
+  color: $gold;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s;
+  &:hover { background: rgba(196,154,44,.2); border-color: $gold; }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+.main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 4.5rem 2rem;
+}
+
+.heroText {
+  text-align: center;
+  margin-bottom: 4rem;
+}
+
+.headline {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(3.25rem, 9vw, 5.5rem);
+  letter-spacing: 0.06em;
+  color: $text;
+  margin: 0;
+  line-height: 0.92;
+}
+
+.headlineAccent {
+  display: block;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1.25rem, 3vw, 1.875rem);
+  color: $gold;
+  letter-spacing: 0.08em;
+  margin-top: 0.5rem;
+  text-transform: none;
+}
+
+.sub {
+  color: $text2;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1rem;
+  margin: 1.25rem auto 0;
+  max-width: 420px;
+  line-height: 1.6;
+}
+
+.loading {
+  color: $text3;
+  font-family: 'DM Sans', sans-serif;
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+// ── Unit grid ─────────────────────────────────────────────────────────────────
+.unitGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.125rem;
+}
+
+.unitCard {
+  background: $surf;
+  border: 1px solid $border2;
+  border-radius: 12px;
+  padding: 1.625rem 1.75rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, $gold, transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  &:hover {
+    border-color: rgba(196,154,44,.25);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0,0,0,.5), 0 0 0 1px rgba(196,154,44,.12);
+    &::after { opacity: 1; }
+    .unitCta { color: $goldL; }
+  }
+}
+
+.unitCardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.unitName {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: $text;
+  margin: 0;
+}
+
+.unitBadge {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: $gold;
+  background: rgba(196,154,44,.1);
+  border: 1px solid rgba(196,154,44,.2);
+  border-radius: 999px;
+  padding: 0.2rem 0.625rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.unitAddress,
+.unitPhone {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  color: $text2;
+  margin: 0;
+}
+
+.unitFooter {
+  margin-top: 0.875rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid $border;
+}
+
+.unitCta {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-size: 1rem;
+  color: $gold;
+  transition: color 0.15s;
+}

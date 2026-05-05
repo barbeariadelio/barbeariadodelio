@@ -10,10 +10,9 @@
   border-radius: $radius-full;
   letter-spacing: 0.04em;
 
-  &--blue    { background: $brand-blue-subtle; color: $brand-blue-light; border: 1px solid rgba(21, 101, 192, 0.2); }
-  &--red     { background: $brand-red-subtle; color: $brand-red-light; border: 1px solid rgba(198, 40, 40, 0.2); }
-  &--gold    { background: rgba(245, 158, 11, 0.12); color: $brand-gold; border: 1px solid rgba(245, 158, 11, 0.2); }
-  &--success { background: rgba(34, 197, 94, 0.1); color: $color-success; border: 1px solid rgba(34, 197, 94, 0.2); }
+  &--gold    { background: $gold-dim; color: $gold-light; border: 1px solid rgba(196, 154, 44, 0.2); }
+  &--red     { background: $red-dim;  color: $red-light;  border: 1px solid rgba(168, 50, 50, 0.2); }
+  &--success { background: rgba(61, 158, 92, 0.1); color: $color-success; border: 1px solid rgba(61, 158, 92, 0.2); }
   &--muted   { background: $bg-elevated; color: $text-secondary; border: 1px solid $border-default; }
 
   &--dot::before {

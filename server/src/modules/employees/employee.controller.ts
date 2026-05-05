@@ -1,15 +1,26 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { EmployeeService } from './employee.service';
 import { AuthRequest } from '../../shared/middlewares/auth.middleware';
 import { ok, created } from '../../shared/utils/responseHelper';
 
 const service = new EmployeeService();
 
-export async function listEmployees(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+export async function listPublicEmployees(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const unitId = (req.query.unitId as string) || req.user!.unitId;
+    const unitId = req.query.unitId as string;
     if (!unitId) { ok(res, []); return; }
     const employees = await service.findByUnit(unitId);
+    ok(res, employees);
+  } catch (e) { next(e); }
+}
+
+export async function listEmployees(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const unitId = req.user!.role === 'owner'
+      ? ((req.query.unitId as string) || req.user!.unitId)
+      : req.user!.unitId;
+    if (!unitId) { ok(res, []); return; }
+    const employees = await service.findAdminByUnit(unitId);
     ok(res, employees);
   } catch (e) { next(e); }
 }

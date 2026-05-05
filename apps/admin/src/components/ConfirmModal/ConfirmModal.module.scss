@@ -1,0 +1,117 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0,0,0,.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.dialog {
+  background: #1A1A1A;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 2px;
+  width: min(380px, 100%);
+  padding: 2rem 1.75rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0;
+  box-shadow: 0 32px 80px rgba(0,0,0,.8);
+  animation: popIn 0.16s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.iconWrap {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.125rem;
+}
+
+.iconDanger {
+  background: rgba(239,68,68,.12);
+  color: #EF4444;
+  border: 1px solid rgba(239,68,68,.25);
+}
+
+.iconWarn {
+  background: rgba(245,158,11,.12);
+  color: #F59E0B;
+  border: 1px solid rgba(245,158,11,.25);
+}
+
+.title {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #F5F5F5;
+  margin: 0 0 0.625rem;
+}
+
+.message {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  color: #A3A3A3;
+  margin: 0 0 1.5rem;
+  line-height: 1.6;
+}
+
+.actions {
+  display: flex;
+  gap: 0.625rem;
+  width: 100%;
+}
+
+.cancelBtn {
+  flex: 1;
+  background: none;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 2px;
+  padding: 0.625rem 1rem;
+  color: #A3A3A3;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s;
+  &:hover:not(:disabled) { color: #F5F5F5; border-color: rgba(255,255,255,.2); }
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
+}
+
+.confirmBtn {
+  flex: 1;
+  border: none;
+  border-radius: 2px;
+  padding: 0.625rem 1rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.12s, box-shadow 0.12s;
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
+}
+
+.confirmDanger {
+  background: #C62828;
+  color: #fff;
+  &:hover:not(:disabled) { background: #EF4444; box-shadow: 0 4px 16px rgba(239,68,68,.35); }
+}
+
+.confirmWarn {
+  background: #E65100;
+  color: #fff;
+  &:hover:not(:disabled) { background: #F59E0B; box-shadow: 0 4px 16px rgba(245,158,11,.3); }
+}

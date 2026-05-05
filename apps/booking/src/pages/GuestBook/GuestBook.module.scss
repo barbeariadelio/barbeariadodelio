@@ -1,0 +1,227 @@
+$bg:     #0D0B09;
+$surf:   #141210;
+$surf2:  #1D1A15;
+$surf3:  #2A261E;
+$gold:   #C49A2C;
+$goldL:  #E5B53C;
+$text:   #F2EDE6;
+$text2:  #9A9080;
+$text3:  #5A5448;
+$border: #1D1A15;
+$border2:#2A261E;
+
+.page {
+  min-height: 100vh;
+  background: $bg;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.topLine {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, $gold 30%, $gold 70%, transparent);
+  flex-shrink: 0;
+}
+
+// ── Header ────────────────────────────────────────────────────────────────────
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 2rem;
+  border-bottom: 1px solid $border;
+  position: sticky;
+  top: 0;
+  background: rgba(13,11,9,.94);
+  backdrop-filter: blur(16px);
+  z-index: 10;
+}
+
+.logoBtn {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.logoW {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.25rem;
+  color: $text2;
+  letter-spacing: 0.1em;
+}
+
+.logoB {
+  font-family: 'Cormorant Garamond', serif;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 1.625rem;
+  color: $gold;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.loginLink {
+  background: none;
+  border: 1px solid $border2;
+  border-radius: 6px;
+  padding: 0.4375rem 1rem;
+  color: $text2;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  &:hover { color: $text; border-color: $gold; }
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+.main {
+  flex: 1;
+  max-width: 680px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 3.5rem 1.5rem 4rem;
+}
+
+// ── Hero ──────────────────────────────────────────────────────────────────────
+.hero {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.title {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  font-weight: 600;
+  color: $text;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.sub {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9375rem;
+  color: $text2;
+  margin: 1.25rem auto 0;
+  max-width: 380px;
+  line-height: 1.65;
+}
+
+
+// ── Divider ───────────────────────────────────────────────────────────────────
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+
+  &::before, &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: $border;
+  }
+
+  span {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: $text3;
+    white-space: nowrap;
+  }
+}
+
+// ── Unit grid ─────────────────────────────────────────────────────────────────
+.loading {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9375rem;
+  color: $text3;
+  text-align: center;
+}
+
+.unitGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.unitCard {
+  background: $surf;
+  border: 1px solid $border;
+  border-radius: 12px;
+  padding: 0;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+
+  &:hover {
+    border-color: rgba(196,154,44,.3);
+    background: rgba(196,154,44,.02);
+    box-shadow: 0 4px 20px rgba(0,0,0,.3);
+
+    .unitArrow { color: $gold; transform: translateX(3px); }
+    .unitIcon { color: $gold; background: rgba(196,154,44,.1); }
+  }
+}
+
+.unitCardInner {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.125rem 1.25rem;
+}
+
+.unitIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: $surf2;
+  color: $text3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+
+.unitInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.unitName {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: $text;
+}
+
+.unitAddress {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.8125rem;
+  color: $text2;
+}
+
+.unitPhone {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.8125rem;
+  color: $text3;
+}
+
+.unitArrow {
+  color: $text3;
+  flex-shrink: 0;
+  transition: color 0.15s, transform 0.15s;
+}

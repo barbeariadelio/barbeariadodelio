@@ -18,9 +18,9 @@
   height: 4px;
   background: repeating-linear-gradient(
     90deg,
-    $brand-red 0%, $brand-red 33%,
-    #fff 33%, #fff 66%,
-    $brand-blue 66%, $brand-blue 100%
+    $red   0%,   $red   33%,
+    #fff   33%,  #fff   66%,
+    $gold  66%,  $gold  100%
   );
   background-size: 24px 4px;
 }

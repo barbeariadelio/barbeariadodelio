@@ -6,6 +6,7 @@ export interface IService extends Document {
   price: number;
   durationMinutes: number;
   unitId: mongoose.Types.ObjectId;
+  image?: string;
   isActive: boolean;
 }
 
@@ -16,6 +17,7 @@ const serviceSchema = new Schema<IService>(
     price:           { type: Number, required: true, min: 0 },
     durationMinutes: { type: Number, required: true, min: 1 },
     unitId:          { type: Schema.Types.ObjectId, ref: 'Unit', required: true },
+    image:           String,
     isActive:        { type: Boolean, default: true },
   },
   { timestamps: true },

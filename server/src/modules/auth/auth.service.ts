@@ -40,6 +40,16 @@ export class AuthService {
     return user;
   }
 
+  async updateMe(userId: string, data: { name?: string; email?: string; phone?: string }) {
+    const user = await UserModel.findByIdAndUpdate(
+      userId,
+      { $set: data },
+      { new: true },
+    ).select('-passwordHash');
+    if (!user) throw new AppError('User not found', 404);
+    return user;
+  }
+
   private generateTokens(id: string, role: UserRole, unitId?: string): AuthTokens {
     const accessToken = this.signAccess(id, role, unitId);
     const refreshToken = jwt.sign(

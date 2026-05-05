@@ -1,0 +1,136 @@
+$bg-card:    #111111;
+$bg-surface: #1A1A1A;
+$gold:       #1565C0;
+$text-main:  #F5F5F5;
+$text-dim:   #A0A0A0;
+$border:     rgba(255,255,255,0.06);
+
+.page {
+  padding: 2rem;
+  max-width: 1400px;
+  animation: fadeIn 0.4s ease;
+  @media (max-width: 640px) { padding: 1rem; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.header {
+  margin-bottom: 2.5rem;
+}
+
+.title {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: $text-main;
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 0.875rem;
+  color: $text-dim;
+  margin-top: 4px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 2rem;
+  @media (max-width: 480px) { grid-template-columns: 1fr; }
+}
+
+.unitCard {
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: 4px;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  transition: all 0.2s;
+  &:hover { border-color: rgba(255,255,255,0.12); transform: translateY(-2px); }
+  &.inactive { opacity: 0.6; }
+}
+
+.unitHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.statusWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #5A5A5A;
+  &.active { background: #22C55E; box-shadow: 0 0 10px rgba(34, 197, 94, 0.4); }
+}
+
+.statusText {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #A0A0A0;
+  letter-spacing: 0.05em;
+}
+
+.unitCode {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: $border;
+}
+
+.unitBody {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.unitName {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: white;
+  margin: 0;
+}
+
+.locationWrap, .contactWrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: $text-dim;
+  svg { opacity: 0.5; }
+}
+
+.unitFooter {
+  padding-top: 1.5rem;
+  border-top: 1px solid $border;
+}
+
+.enterBtn {
+  width: 100%;
+  background: #1A1A1A;
+  border: 1px solid $border;
+  color: white;
+  padding: 0.875rem;
+  border-radius: 4px;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover { background: #222; border-color: white; }
+}
+
+.empty { padding: 4rem; text-align: center; color: #5A5A5A; font-size: 1rem; }
