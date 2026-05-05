@@ -58,8 +58,7 @@ export class AppointmentService {
       .populate('serviceId', 'name price')
       .populate('employeeId', 'name')
       .populate('unitId', 'name address')
-      .sort({ date: -1, startTime: -1 })
-      .lean();
+      .sort({ date: -1, startTime: -1 });
   }
 
   async getAvailableSlots(

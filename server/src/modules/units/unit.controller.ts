@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import type { IUnit } from './unit.model';
 import { UnitService } from './unit.service';
 import { AuthRequest } from '../../shared/middlewares/auth.middleware';
 import { ok, created } from '../../shared/utils/responseHelper';
@@ -21,7 +22,7 @@ export async function getPublicUnit(req: Request, res: Response, next: NextFunct
 
 export async function listUnits(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    let units;
+    let units: IUnit[];
     if (req.user!.role === 'owner') {
       units = await service.findByOwner(req.user!.id);
     } else if (req.user!.unitId) {

@@ -20,6 +20,8 @@ export interface FinanceSummary {
   netProfit: number;
   byUnit: UnitFinance[];
   byCategory: CategoryFinance[];
+  byService: ServiceFinance[];
+  byEmployee: EmployeeFinance[];
   chart: ChartPoint[];
 }
 
@@ -34,6 +36,21 @@ export interface UnitFinance {
 export interface CategoryFinance {
   category: TransactionCategory;
   amount: number;
+}
+
+export interface ServiceFinance {
+  name: string;
+  revenue: number;
+  count: number;
+}
+
+export interface EmployeeFinance {
+  id: string;
+  name: string;
+  unitId: string;
+  unitName: string;
+  appointments: number;
+  grossRevenue: number;
 }
 
 export interface ChartPoint {

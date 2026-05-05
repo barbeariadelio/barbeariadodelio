@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
+    "start": "npm --workspace @barber/server start",
     "test": "turbo test",
     "lint": "turbo lint"
   },

@@ -1,7 +1,7 @@
-import { TransactionModel } from './transaction.model';
+import { TransactionModel, ITransaction } from './transaction.model';
 import { UnitModel } from '../units/unit.model';
 import { AppointmentModel } from '../appointments/appointment.model';
-import type { FinanceSummary } from '@barber/types';
+import type { FinanceSummary, TransactionCategory } from '@barber/types';
 
 export class FinanceService {
   async getSummary(
@@ -121,7 +121,7 @@ export class FinanceService {
     let totalIncome = 0;
     let totalExpense = 0;
     const byUnitMap = new Map<string, { unitId: string; name: string; income: number; expense: number; profit: number }>();
-    const byCategoryMap = new Map<string, number>();
+    const byCategoryMap = new Map<TransactionCategory, number>();
     const dailyMap = new Map<string, { date: string; income: number; expense: number }>();
 
     for (const t of transactions) {
