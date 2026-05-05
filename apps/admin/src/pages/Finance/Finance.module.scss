@@ -29,6 +29,24 @@
   margin: 0;
 }
 
+.txMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #5A5448;
+}
+
+.txUnitBadge {
+  background: rgba(255,255,255,0.05);
+  color: #888;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
 .subtitle {
   font-size: 0.875rem;
   color: #A0A0A0;
@@ -270,6 +288,26 @@
   height: 100%;
   background: #1565C0;
   border-radius: 2px;
+}
+
+.serviceUnitGroup {
+  margin-bottom: 2rem;
+  &:last-child { margin-bottom: 0; }
+}
+
+.serviceUnitHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #A0A0A0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0 0 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  margin-bottom: 1.25rem;
+  svg { color: #60a5fa; flex-shrink: 0; }
 }
 
 // Commission Table
@@ -603,6 +641,9 @@
 
 .txDesc { font-size: 0.875rem; font-weight: 600; color: #F5F5F5; }
 .txMeta { 
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-size: 0.75rem; 
   color: #A0A0A0; 
 
@@ -610,11 +651,142 @@
     display: none;
   }
 }
+
+.txRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
 .txAmount { font-size: 0.9375rem; font-weight: 700; }
+
+.txActions {
+  display: flex;
+  gap: 0.5rem;
+  opacity: 0.15;
+  transition: opacity 0.2s;
+}
+
+.txRow:hover .txActions {
+  opacity: 1;
+}
+
+.actionBtn {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #888;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    border-color: rgba(255,255,255,0.2);
+  }
+
+  &.delete:hover {
+    background: #ef444422;
+    color: #ef4444;
+    border-color: #ef444455;
+  }
+}
 
 .txType {
   @media (max-width: 480px) {
     min-width: 40px;
     font-size: 0.6rem;
   }
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: 1.5rem;
+  color: #A0A0A0;
+  font-size: 0.9375rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(21, 101, 192, 0.1);
+  border-top-color: #1565C0;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirmModal {
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+
+  h3 {
+    margin: 0 0 1rem;
+    font-size: 1.1rem;
+    color: #fff;
+    letter-spacing: 0.05em;
+  }
+
+  p {
+    color: #888;
+    line-height: 1.5;
+    margin-bottom: 2rem;
+  }
+}
+
+.modalActions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+
+  button {
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+}
+
+.cancelBtn {
+  background: #222;
+  border: 1px solid #333;
+  color: #fff;
+  &:hover { background: #333; }
+}
+
+.deleteBtn {
+  background: #ef4444;
+  border: none;
+  color: #fff;
+  &:hover { background: #dc2626; transform: scale(1.02); }
 }

@@ -7,6 +7,15 @@ interface Unit { _id: string; name: string; }
 
 interface Props {
   units: Unit[];
+  initialData?: {
+    _id: string;
+    type: 'income' | 'expense' | 'royalty';
+    category: string;
+    amount: number;
+    description: string;
+    date: string;
+    unitId?: { _id: string } | string;
+  };
   onClose: () => void;
   onSuccess: () => void;
 }
@@ -31,20 +40,26 @@ const CATEGORY_LABELS: Record<string, string> = {
   other: 'Outro',
 };
 
-export default function TransactionForm({ units, onClose, onSuccess }: Props) {
-  const [type, setType] = useState<'income' | 'expense'>('income');
-  const [category, setCategory] = useState('service');
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
-  const [date, setDate] = useState(todayISO());
-  const [unitId, setUnitId] = useState(units[0]?._id ?? '');
+export default function TransactionForm({ units, initialData, onClose, onSuccess }: Props) {
+  const isEdit = !!initialData;
+  const initialUnitId = typeof initialData?.unitId === 'object' ? initialData.unitId._id : (initialData?.unitId || units[0]?._id || '');
+
+  const [type, setType] = useState<'income' | 'expense'>(initialData?.type === 'royalty' ? 'expense' : (initialData?.type || 'income'));
+  const [category, setCategory] = useState(initialData?.category || 'service');
+  const [amount, setAmount] = useState(initialData ? formatBR(initialData.amount) : '');
+  const [description, setDescription] = useState(initialData?.description || '');
+  const [date, setDate] = useState(initialData?.date || todayISO());
+  const [unitId, setUnitId] = useState(initialUnitId);
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: (payload: object) => api.post('/finance/transactions', payload),
+    mutationFn: (payload: object) => 
+      isEdit 
+        ? api.patch(`/finance/transactions/${initialData._id}`, payload)
+        : api.post('/finance/transactions', payload),
     onSuccess,
     onError: (err: unknown) => {
-      setError(err instanceof Error ? err.message : 'Erro ao registrar transação.');
+      setError(err instanceof Error ? err.message : 'Erro ao salvar transação.');
     },
   });
 
@@ -61,7 +76,7 @@ export default function TransactionForm({ units, onClose, onSuccess }: Props) {
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className={styles.modal}>
         <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>NOVA TRANSAÇÃO</h2>
+          <h2 className={styles.modalTitle}>{isEdit ? 'EDITAR LANÇAMENTO' : 'NOVA TRANSAÇÃO'}</h2>
           <button className={styles.closeBtn} onClick={onClose}>✕</button>
         </div>
 
@@ -132,7 +147,7 @@ export default function TransactionForm({ units, onClose, onSuccess }: Props) {
           <div className={styles.actions}>
             <button type="button" className={styles.cancelBtn} onClick={onClose}>Cancelar</button>
             <button type="submit" className={styles.submitBtn} disabled={mutation.isPending}>
-              {mutation.isPending ? 'Salvando...' : 'Registrar'}
+              {mutation.isPending ? 'Salvando...' : isEdit ? 'Salvar Alterações' : 'Registrar'}
             </button>
           </div>
         </form>

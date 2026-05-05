@@ -42,6 +42,8 @@ export interface ServiceFinance {
   name: string;
   revenue: number;
   count: number;
+  unitId: string;
+  unitName: string;
 }
 
 export interface EmployeeFinance {

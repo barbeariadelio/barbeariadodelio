@@ -3,6 +3,14 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import styles from './Layout.module.scss';
 
+function IconHome() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+    </svg>
+  );
+}
+
 function IconGrid() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -96,6 +104,7 @@ function IconMenu() {
 }
 
 const NAV_ITEMS = [
+  { path: '/',           label: 'Portal de Acesso', icon: <IconHome />, external: true },
   { path: '/dashboard',  label: 'Dashboard',     icon: <IconGrid /> },
   { path: '/inventory',  label: 'Estoque',       icon: <IconBox /> },
   { path: '/clients',    label: 'Clientes',       icon: <IconUsers /> },
@@ -128,16 +137,27 @@ export default function Layout() {
 
         <nav className={styles.nav}>
           {NAV_ITEMS.map(item => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                `${styles.navItem} ${isActive ? styles.active : ''}`
-              }
-            >
-              <span className={styles.navIcon}>{item.icon}</span>
-              {!collapsed && <span className={styles.navLabel}>{item.label}</span>}
-            </NavLink>
+            item.external ? (
+              <a
+                key={item.path}
+                href={item.path.startsWith('/') ? `http://localhost:3001${item.path}` : item.path}
+                className={styles.navItem}
+              >
+                <span className={styles.navIcon}>{item.icon}</span>
+                {!collapsed && <span className={styles.navLabel}>{item.label}</span>}
+              </a>
+            ) : (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) =>
+                  `${styles.navItem} ${isActive ? styles.active : ''}`
+                }
+              >
+                <span className={styles.navIcon}>{item.icon}</span>
+                {!collapsed && <span className={styles.navLabel}>{item.label}</span>}
+              </NavLink>
+            )
           ))}
         </nav>
 

@@ -1,0 +1,11 @@
+node_modules
+dist
+.turbo
+.git
+*.log
+.env
+.env.local
+.vscode
+apps/*/node_modules
+server/node_modules
+packages/*/node_modules

@@ -25,7 +25,7 @@ export async function listTransactions(req: AuthRequest, res: Response, next: Ne
       : (req.user!.unitId as string);
     if (!unitId) { ok(res, { data: [], total: 0 }); return; }
     const { page, limit } = parsePagination(req.query);
-    const result = await service.getTransactions(unitId, page, limit);
+    const result = await service.getTransactions(req.user!.id, req.user!.role, unitId, page, limit);
     ok(res, result);
   } catch (e) { next(e); }
 }
@@ -35,5 +35,19 @@ export async function createTransaction(req: AuthRequest, res: Response, next: N
     const unitId = req.body.unitId || req.user!.unitId;
     const transaction = await service.create({ ...req.body, unitId, createdBy: req.user!.id });
     created(res, transaction);
+  } catch (e) { next(e); }
+}
+
+export async function updateTransaction(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const transaction = await service.update(req.params.id, req.body);
+    ok(res, transaction);
+  } catch (e) { next(e); }
+}
+
+export async function deleteTransaction(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    await service.delete(req.params.id);
+    ok(res, { deleted: true });
   } catch (e) { next(e); }
 }

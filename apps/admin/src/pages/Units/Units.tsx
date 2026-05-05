@@ -139,7 +139,7 @@ export default function Units() {
                 <div className={styles.portalFooter}>
                   {isNovaVeneza ? (
                     <a 
-                      href={`/franchise-app?token=${localStorage.getItem('accessToken')}`}
+                      href={`http://localhost:5174/franchise-app/?token=${localStorage.getItem('accessToken')}`}
                       target="_blank" 
                       rel="noopener noreferrer" 
                       className={styles.mainAccessBtn}

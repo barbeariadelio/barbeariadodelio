@@ -99,13 +99,24 @@ export default function Finance() {
     },
   });
 
-  const { data: transactions = [] } = useQuery<Transaction[]>({
+  const { data: transactions = [], isLoading: txLoading } = useQuery<Transaction[]>({
     queryKey: ['finance-transactions', unitId],
     queryFn: async () => {
       const { data } = await api.get(`/finance/transactions?unitId=${unitId}`);
-      return Array.isArray(data) ? data : data.transactions ?? [];
+      return Array.isArray(data) ? data : data.data ?? [];
     },
   });
+
+  if (!summary && !transactions.length) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.loading}>
+          <div className={styles.spinner} />
+          <span>Carregando dados financeiros...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.page}>
@@ -261,7 +272,11 @@ export default function Finance() {
               </div>
             </div>
 
-            {(summary?.byEmployee ?? []).length === 0 && <p className={styles.empty}>Nenhum agendamento confirmado no período.</p>}
+            {(summary?.byEmployee ?? []).length === 0 && (
+              <p className={styles.empty}>
+                Nenhum agendamento confirmado ou concluído encontrado para esta unidade no período selecionado ({period}).
+              </p>
+            )}
             {(summary?.byEmployee ?? []).length > 0 && (
               <div className={styles.commissionTable}>
                 <div className={styles.commissionHeader}>

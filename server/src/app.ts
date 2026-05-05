@@ -23,6 +23,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Serve static portal at root
+const publicDir = path.resolve(__dirname, '../public');
+app.use(express.static(publicDir));
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(publicDir, 'portal.html'));
+});
+
 app.use('/auth', authRoutes);
 app.use('/units', unitRoutes);
 app.use('/clients', clientRoutes);
