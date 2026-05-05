@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../api/client';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import TransactionForm from './TransactionForm';
@@ -81,6 +82,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function Finance() {
+  const { user } = useAuth();
   const [period, setPeriod] = useState('month');
   const [activeTab, setActiveTab] = useState('geral');
   const [showForm, setShowForm] = useState(false);
@@ -88,15 +90,17 @@ export default function Finance() {
   const [taxRate, setTaxRate] = useState(27.5);
   const qc = useQueryClient();
 
-  // In franchise app, we use VITE_UNIT_ID from env
-  const unitId = import.meta.env.VITE_UNIT_ID || '';
+  // Robust unitId detection: prioritize user profile, then env
+  const u = user as any;
+  const unitId = u?.unitId || import.meta.env.VITE_UNIT_ID || '';
 
-  const { data: summary } = useQuery<FinanceSummary>({
+  const { data: summary, isLoading: summaryLoading } = useQuery<FinanceSummary>({
     queryKey: ['finance-summary', unitId, period],
     queryFn: async () => {
       const { data } = await api.get(`/finance/summary?unitId=${unitId}&period=${period}`);
       return data;
     },
+    enabled: !!unitId,
   });
 
   const { data: transactions = [], isLoading: txLoading } = useQuery<Transaction[]>({
@@ -105,9 +109,12 @@ export default function Finance() {
       const { data } = await api.get(`/finance/transactions?unitId=${unitId}`);
       return Array.isArray(data) ? data : data.data ?? [];
     },
+    enabled: !!unitId,
   });
 
-  if (!summary && !transactions.length) {
+  const isLoading = summaryLoading || txLoading;
+
+  if (isLoading && !summary && !transactions.length) {
     return (
       <div className={styles.page}>
         <div className={styles.loading}>

@@ -128,21 +128,6 @@ export default function Profile() {
           </button>
         </div>
 
-        {/* ── Stats ── */}
-        {appointments.length > 0 && (
-          <div className={styles.stats}>
-            <div className={styles.statItem}>
-              <span className={styles.statVal}>{appointments.length}</span>
-              <span className={styles.statLabel}>Agendamentos</span>
-            </div>
-            <div className={styles.statDivider} />
-            <div className={styles.statItem}>
-              <span className={styles.statVal}>{upcoming.length}</span>
-              <span className={styles.statLabel}>Próximos</span>
-            </div>
-          </div>
-        )}
-
         {/* ── Next appointment highlight ── */}
         {nextAppt && (() => {
           const [y, m, d] = nextAppt.date.split('-').map(Number);

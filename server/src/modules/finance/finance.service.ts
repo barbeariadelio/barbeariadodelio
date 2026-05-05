@@ -26,11 +26,15 @@ export class FinanceService {
     const appointments = await AppointmentModel.find({
       unitId: { $in: unitIds },
       date: { $gte: startDate, $lte: endDate },
-      status: { $in: ['confirmed', 'completed'] },
+      status: { $in: ['pending', 'confirmed', 'completed'] },
     })
       .populate('serviceId', 'name price')
       .populate('employeeId', 'name')
       .populate('unitId', 'name');
+
+    console.log(`[FinanceService] Data Detail:`);
+    transactions.forEach(t => console.log(`  - TX: ${t.type}, ${t.amount}, ${t.description}`));
+    appointments.forEach(a => console.log(`  - Appt: ${(a as any).status}, ${(a as any).serviceId?.name}, ${a.date}`));
 
     console.log(`[FinanceService] Found ${transactions.length} transactions and ${appointments.length} appointments`);
 
@@ -100,9 +104,22 @@ export class FinanceService {
 
   private async resolveUnitIds(userId: string, role: string, unitId?: string): Promise<string[]> {
     const allowedIds = await this.getAllowedUnitIds(userId, role);
+    console.log(`[FinanceService] getAllowedUnitIds for ${userId} (${role}):`, allowedIds);
     
     if (unitId && unitId !== 'all') {
-      return allowedIds.includes(unitId) ? [unitId] : [];
+      // If owner, trust the unitIdParam
+      if (role === 'owner') {
+        console.log(`[FinanceService] Owner requesting specific unit: ${unitId}. Granting access.`);
+        return [unitId];
+      }
+
+      if (allowedIds.includes(unitId)) return [unitId];
+      
+      const user = await UserModel.findById(userId).select('unitId');
+      console.log(`[FinanceService] User fallback check for unitId ${unitId}: user.unitId=${user?.unitId}`);
+      if (user?.unitId?.toString() === unitId) return [unitId];
+
+      return [];
     }
 
     return allowedIds;
@@ -110,7 +127,13 @@ export class FinanceService {
 
   private async getAllowedUnitIds(userId: string, role: string): Promise<string[]> {
     if (role === 'owner') {
-      const units = await UnitModel.find({ ownerId: userId, isActive: true }).select('_id');
+      const units = await UnitModel.find({ 
+        $or: [
+          { ownerId: userId },
+          { _id: (await UserModel.findById(userId).select('unitId'))?.unitId }
+        ],
+        isActive: true 
+      }).select('_id');
       return units.map(u => u._id.toString());
     }
 
@@ -120,7 +143,7 @@ export class FinanceService {
       return franchise ? franchise.units.map(u => u.toString()) : [];
     }
 
-    if (role === 'franchisee' || role === 'employee') {
+    if (role === 'franchisee' || role === 'employee' || role === 'admin') {
       const user = await UserModel.findById(userId).select('unitId');
       return user?.unitId ? [user.unitId.toString()] : [];
     }
@@ -209,7 +232,12 @@ export class FinanceService {
       const svcName = appt.serviceId?.name || 'Outro';
       const unitId = appt.unitId?._id?.toString() || appt.unitId?.toString() || '';
       const unitName = appt.unitId?.name || '';
-      const date = appt.date;
+      const status = (appt as any).status;
+
+      // Add to total income if confirmed or completed to show real business movement
+      if (status === 'confirmed' || status === 'completed') {
+        totalIncome += price;
+      }
 
       // Stats by service (unit-aware)
       const svcKey = `${unitId}-${svcName}`;
@@ -232,20 +260,16 @@ export class FinanceService {
       empEntry.appointments += 1;
       empEntry.grossRevenue += price;
 
-      // Ensure unit exists in map for income/profit tracking even if no transactions
       if (unitKey) {
         if (!byUnitMap.has(unitKey)) {
           byUnitMap.set(unitKey, { unitId: unitKey, name: unitName || 'Unidade', income: 0, expense: 0, profit: 0 });
         }
-        // Note: We DON'T add appt.price to unit.income here to avoid double counting with transactions.
-        // We only add it if there is NO linked transaction, but the logic gets complex.
-        // For simplicity, totalIncome and unit.income follow Transactions (actual cash).
-        // If the user wants to see "Projected Revenue" from appointments, we could add a separate KPI.
+        const unit = byUnitMap.get(unitKey)!;
+        if (status === 'confirmed' || status === 'completed') {
+          unit.income += price;
+          unit.profit = unit.income - unit.expense;
+        }
       }
-
-      // Add to daily chart if not already accounted for by a transaction
-      // Actually, many appointments have transactions on the same date.
-      // Let's stick to Transactions for the chart to keep it clean.
     }
 
     const chart = Array.from(dailyMap.values()).sort((a, b) => a.date.localeCompare(b.date));
