@@ -10,12 +10,19 @@ async function check() {
   await mongoose.connect(MONGO_URI);
   console.log('Connected to DB');
 
-  const units = await mongoose.connection.db.collection('units').find().toArray();
-  console.log('Units:', units.map(u => ({ id: u._id, name: u.name })));
+    const db = mongoose.connection.db;
+    if (!db) throw new Error('Database not connected');
 
-  const services = await mongoose.connection.db.collection('services').find().toArray();
-  console.log('Services count:', services.length);
-  console.log('Sample service unitId:', services[0]?.unitId);
+    const collections = await db.listCollections().toArray();
+    console.log('Collections:', collections.map(c => c.name));
+
+    const counts = await Promise.all(
+      collections.map(async (c) => ({
+        name: c.name,
+        count: await db.collection(c.name).countDocuments()
+      }))
+    );
+  console.log('Stats:', counts);
 
   await mongoose.disconnect();
 }

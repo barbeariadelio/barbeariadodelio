@@ -10,13 +10,16 @@ async function cleanup() {
   await mongoose.connect(MONGO_URI);
   console.log('Connected to DB');
 
+  const db = mongoose.connection.db;
+  if (!db) throw new Error('DB not connected');
+
   const collections = ['users', 'franchises', 'units', 'services', 'clients', 'products', 'appointments', 'transactions', 'tasks'];
   
   for (const colName of collections) {
     try {
-      await mongoose.connection.db.collection(colName).deleteMany({});
+      await db.collection(colName).deleteMany({});
       console.log(`Cleared ${colName}`);
-    } catch (e) {
+    } catch (e: any) {
       console.log(`Error clearing ${colName}:`, e.message);
     }
   }
