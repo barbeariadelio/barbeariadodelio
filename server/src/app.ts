@@ -1,6 +1,8 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
 import { connectDb } from './config/db';
 import { env } from './config/env';
 import { errorHandler } from './shared/middlewares/errorHandler';
@@ -36,6 +38,52 @@ app.use('/tasks', taskRoutes);
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+const apiPrefixes = [
+  '/appointments',
+  '/auth',
+  '/clients',
+  '/employees',
+  '/finance',
+  '/franchise',
+  '/health',
+  '/products',
+  '/services',
+  '/tasks',
+  '/units',
+  '/users',
+];
+
+function mountSpa(basePath: string, distPath: string): void {
+  const indexPath = path.join(distPath, 'index.html');
+  if (!fs.existsSync(indexPath)) return;
+
+  app.use(basePath, express.static(distPath));
+  app.get(basePath, (_req, res) => res.sendFile(indexPath));
+  app.get(`${basePath}/*`, (_req, res) => res.sendFile(indexPath));
+}
+
+const adminDist = path.resolve(__dirname, '../../apps/admin/dist');
+const franchiseDist = path.resolve(__dirname, '../../apps/franchise/dist');
+const bookingDist = path.resolve(__dirname, '../../apps/booking/dist');
+
+mountSpa('/admin', adminDist);
+mountSpa('/franchise-app', franchiseDist);
+
+if (fs.existsSync(path.join(bookingDist, 'index.html'))) {
+  app.use(express.static(bookingDist));
+  app.get('*', (req, res, next) => {
+    if (apiPrefixes.some(prefix => req.path === prefix || req.path.startsWith(`${prefix}/`))) {
+      return next();
+    }
+
+    if (!req.accepts('html')) {
+      return next();
+    }
+
+    return res.sendFile(path.join(bookingDist, 'index.html'));
+  });
+}
 
 app.use(errorHandler);
 

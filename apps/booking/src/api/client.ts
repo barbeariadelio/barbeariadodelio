@@ -1,7 +1,16 @@
 import axios from 'axios';
 
+export const apiBaseUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001' : '');
+
+export function resolveApiBaseUrl(unitApiUrl?: string): string {
+  if (unitApiUrl && !(import.meta.env.PROD && unitApiUrl.includes('localhost'))) {
+    return unitApiUrl;
+  }
+  return apiBaseUrl;
+}
+
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001',
+  baseURL: apiBaseUrl,
 });
 
 apiClient.interceptors.request.use(config => {
@@ -22,8 +31,7 @@ apiClient.interceptors.response.use(
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {
         try {
-          const base = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-          const { data } = await axios.post(`${base}/auth/refresh`, { refreshToken });
+          const { data } = await axios.post(`${apiBaseUrl}/auth/refresh`, { refreshToken });
           localStorage.setItem('accessToken', data.data.accessToken);
           error.config.headers.Authorization = `Bearer ${data.data.accessToken}`;
           return axios(error.config);

@@ -1,7 +1,7 @@
 import { FormEvent, useState, useRef, useEffect, useMemo } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
-import { api } from '../../api/client';
+import { api, resolveApiBaseUrl } from '../../api/client';
 import styles from './AppointmentForm.module.scss';
 
 interface Unit { _id: string; name: string; apiUrl?: string; }
@@ -68,7 +68,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate }: Pro
   const selectedUnit = units.find(u => u._id === unitId);
 
   const unitApi = useMemo(() => {
-    const base = selectedUnit?.apiUrl ?? (import.meta.env.VITE_API_URL || 'http://localhost:3001');
+    const base = resolveApiBaseUrl(selectedUnit?.apiUrl);
     const instance = axios.create({ baseURL: base });
     instance.interceptors.request.use(config => {
       const token = localStorage.getItem('accessToken');

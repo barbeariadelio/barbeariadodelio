@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
-import { api } from '../../api/client';
+import { api, resolveApiBaseUrl } from '../../api/client';
 import styles from './Book.module.scss';
 
 interface Unit { _id: string; name: string; apiUrl?: string; }
@@ -161,7 +161,7 @@ export default function Book() {
   });
 
   const unitApi = useMemo(() => {
-    const base = unit?.apiUrl ?? (import.meta.env.VITE_API_URL || 'http://localhost:3001');
+    const base = resolveApiBaseUrl(unit?.apiUrl);
     const instance = axios.create({ baseURL: base });
     instance.interceptors.request.use(cfg => {
       const token = localStorage.getItem('accessToken');

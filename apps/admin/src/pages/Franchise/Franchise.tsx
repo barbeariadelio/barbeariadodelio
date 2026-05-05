@@ -3,7 +3,7 @@ import styles from './Franchise.module.scss';
 
 export default function Franchise() {
   const [online, setOnline] = useState<boolean | null>(null);
-  const franchiseUrl = "http://localhost:5174";
+  const franchiseUrl = "/franchise-app";
 
   const checkStatus = useCallback(async () => {
     try {
