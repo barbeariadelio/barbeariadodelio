@@ -140,11 +140,6 @@ export default function Profile() {
               <span className={styles.statVal}>{upcoming.length}</span>
               <span className={styles.statLabel}>Próximos</span>
             </div>
-            <div className={styles.statDivider} />
-            <div className={styles.statItem}>
-              <span className={`${styles.statVal} ${styles.statValGold}`}>{fmt(totalSpent)}</span>
-              <span className={styles.statLabel}>Total gasto</span>
-            </div>
           </div>
         )}
 
