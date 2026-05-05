@@ -30,6 +30,8 @@ function IconPackage() {
 export default function Inventory() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  const [detailedProduct, setDetailedProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const qc = useQueryClient();
 
@@ -58,6 +60,13 @@ export default function Inventory() {
     if (window.confirm('Tem certeza que deseja excluir este produto?')) {
       deleteMutation.mutate(id);
     }
+  }
+
+  function handleRowClick(p: Product, e: React.MouseEvent) {
+    // Don't open details if clicking on action buttons
+    if ((e.target as HTMLElement).closest(`.${styles.actions}`)) return;
+    setDetailedProduct(p);
+    setShowDetails(true);
   }
 
   return (
@@ -123,7 +132,7 @@ export default function Inventory() {
             {filteredProducts.map(p => {
               const isLow = p.stockQuantity <= p.minStock;
               return (
-                <tr key={p._id} className={isLow ? styles.lowStockRow : ''}>
+                <tr key={p._id} className={`${styles.row} ${isLow ? styles.lowStockRow : ''}`} onClick={(e) => handleRowClick(p, e)}>
                   <td>
                     <div className={styles.productCell}>
                       <div className={styles.productIcon}><IconPackage /></div>
@@ -143,8 +152,8 @@ export default function Inventory() {
                   <td align="right" className={styles.profitCell}>{formatCurrency(p.price - p.costPrice)}</td>
                   <td align="right">
                     <div className={styles.actions}>
-                      <button className={styles.btnAction} onClick={() => { setSelectedProduct(p); setShowForm(true); }}>Editar</button>
-                      <button className={`${styles.btnAction} ${styles.btnDanger}`} onClick={() => handleDelete(p._id)}>Excluir</button>
+                      <button className={styles.btnAction} onClick={(e) => { e.stopPropagation(); setSelectedProduct(p); setShowForm(true); }}>Editar</button>
+                      <button className={`${styles.btnAction} ${styles.btnDanger}`} onClick={(e) => { e.stopPropagation(); handleDelete(p._id); }}>Excluir</button>
                     </div>
                   </td>
                 </tr>
@@ -163,6 +172,78 @@ export default function Inventory() {
             qc.invalidateQueries({ queryKey: ['products'] });
           }}
         />
+      )}
+
+      {showDetails && detailedProduct && (
+        <div className={styles.modalOverlay} onClick={() => setShowDetails(false)}>
+          <div className={styles.detailsModal} onClick={e => e.stopPropagation()}>
+            <header className={styles.modalHeader}>
+              <div>
+                <h2 className={styles.modalTitle}>{detailedProduct.name}</h2>
+                <span className={styles.modalSub}>{detailedProduct.category || 'Categoria Geral'}</span>
+              </div>
+              <button className={styles.btnClose} onClick={() => setShowDetails(false)}>&times;</button>
+            </header>
+
+            <div className={styles.modalBody}>
+              <div className={styles.specGrid}>
+                <div className={styles.specItem}>
+                  <label>ID do Produto</label>
+                  <span>#{detailedProduct._id.slice(-6).toUpperCase()}</span>
+                </div>
+                <div className={styles.specItem}>
+                  <label>Estoque Atual</label>
+                  <span className={detailedProduct.stockQuantity <= detailedProduct.minStock ? styles.textRed : styles.textGreen}>
+                    {detailedProduct.stockQuantity} unidades
+                  </span>
+                </div>
+                <div className={styles.specItem}>
+                  <label>Estoque Mínimo</label>
+                  <span>{detailedProduct.minStock} unidades</span>
+                </div>
+                <div className={styles.specItem}>
+                  <label>Preço de Custo</label>
+                  <span>{formatCurrency(detailedProduct.costPrice)}</span>
+                </div>
+                <div className={styles.specItem}>
+                  <label>Preço de Venda</label>
+                  <span className={styles.textBlue}>{formatCurrency(detailedProduct.price)}</span>
+                </div>
+                <div className={styles.specItem}>
+                  <label>Margem de Lucro</label>
+                  <span className={styles.textGreen}>
+                    {formatCurrency(detailedProduct.price - detailedProduct.costPrice)} ({(((detailedProduct.price - detailedProduct.costPrice) / detailedProduct.price) * 100).toFixed(1)}%)
+                  </span>
+                </div>
+              </div>
+
+              <div className={styles.descriptionBox}>
+                <label>Descrição Detalhada</label>
+                <p>{detailedProduct.description || 'Nenhuma descrição adicional cadastrada para este produto.'}</p>
+              </div>
+
+              <div className={styles.valuationBox}>
+                <div className={styles.valuationItem}>
+                  <label>Valor Total em Estoque (Custo)</label>
+                  <span>{formatCurrency(detailedProduct.costPrice * detailedProduct.stockQuantity)}</span>
+                </div>
+                <div className={styles.valuationItem}>
+                  <label>Potencial de Receita (Venda)</label>
+                  <span>{formatCurrency(detailedProduct.price * detailedProduct.stockQuantity)}</span>
+                </div>
+              </div>
+            </div>
+
+            <footer className={styles.modalFooter}>
+              <button className={styles.btnSecondary} onClick={() => setShowDetails(false)}>Fechar</button>
+              <button className={styles.btnPrimary} onClick={() => { 
+                setSelectedProduct(detailedProduct); 
+                setShowDetails(false);
+                setShowForm(true); 
+              }}>Editar Produto</button>
+            </footer>
+          </div>
+        </div>
       )}
     </div>
   );

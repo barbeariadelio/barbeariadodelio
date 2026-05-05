@@ -144,6 +144,23 @@ export default function Layout() {
     }
   };
 
+  function getDynamicLink(path: string) {
+    if (!path.startsWith('/')) return path;
+    
+    const hostname = window.location.hostname;
+    const port = window.location.port;
+    const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.');
+    const isDev = isLocal && (port === '3001' || port === '5173' || port === '5174' || port === '5175');
+
+    // In dev, the main portal is served by the backend on 3001
+    if (isDev) {
+      return `http://${hostname}:3001${path}`;
+    }
+
+    // In production (Railway), everything is relative to root
+    return path;
+  }
+
   return (
     <div className={`
       ${styles.shell} 
@@ -169,7 +186,7 @@ export default function Layout() {
             item.external ? (
               <a
                 key={item.path}
-                href={item.path.startsWith('/') ? `http://localhost:3001${item.path}` : item.path}
+                href={getDynamicLink(item.path)}
                 className={styles.navItem}
               >
                 <span className={styles.navIcon}>{item.icon}</span>

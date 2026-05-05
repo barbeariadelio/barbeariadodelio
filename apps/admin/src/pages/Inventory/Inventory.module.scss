@@ -47,19 +47,25 @@ $border:     rgba(255,255,255,0.06);
 }
 
 .btnPrimary {
-  background: $gold;
+  background: linear-gradient(135deg, #1565C0, #1976D2);
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  font-weight: 600;
-  font-size: 0.8125rem;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.875rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  transition: all 0.2s;
-  &:hover { background: #1976D2; transform: translateY(-1px); }
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(21, 101, 192, 0.3);
+  
+  &:hover { 
+    transform: translateY(-2px); 
+    box-shadow: 0 6px 16px rgba(21, 101, 192, 0.4);
+    filter: brightness(1.1);
+  }
 }
 
 // KPI Grid
@@ -226,6 +232,141 @@ $border:     rgba(255,255,255,0.06);
 .btnDanger {
   color: #f87171;
   &:hover { border-color: #f87171; background: rgba(239, 68, 68, 0.05); }
+}
+
+.row {
+  cursor: pointer;
+  transition: background 0.2s;
+  &:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+}
+
+.modalOverlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 2rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.detailsModal {
+  background: #111;
+  border: 1px solid #2C2C2C;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 32px 64px rgba(0,0,0,0.5);
+  display: flex;
+  flex-direction: column;
+}
+
+.modalHeader {
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #222;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modalTitle { font-size: 1.5rem; font-weight: 700; color: white; margin: 0; }
+.modalSub { font-size: 0.8125rem; color: #5A5448; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.btnClose {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 2rem;
+  cursor: pointer;
+  line-height: 1;
+  &:hover { color: white; }
+}
+
+.modalBody {
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.specGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  @media (max-width: 600px) { grid-template-columns: 1fr 1fr; }
+}
+
+.specItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  label { font-size: 0.6875rem; color: #666; text-transform: uppercase; font-weight: 600; }
+  span { font-size: 1rem; color: #EEE; font-weight: 500; }
+}
+
+.textRed { color: #f87171 !important; }
+.textGreen { color: #4ade80 !important; }
+.textBlue { color: #60a5fa !important; }
+
+.descriptionBox {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid #222;
+  padding: 1.25rem;
+  border-radius: 12px;
+  label { font-size: 0.6875rem; color: #666; text-transform: uppercase; font-weight: 600; display: block; margin-bottom: 0.75rem; }
+  p { font-size: 0.875rem; color: #AAA; line-height: 1.6; margin: 0; }
+}
+
+.valuationBox {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #222;
+}
+
+.valuationItem {
+  label { font-size: 0.75rem; color: #666; display: block; margin-bottom: 0.25rem; }
+  span { font-size: 1.25rem; font-weight: 700; color: #F5F5F5; }
+}
+
+.btnSecondary {
+  background: rgba(255, 255, 255, 0.05);
+  color: #A0A0A0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.75rem 1.5rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover { 
+    background: rgba(255, 255, 255, 0.08); 
+    color: white;
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+}
+
+.modalFooter {
+  padding: 1.5rem 2rem;
+  border-top: 1px solid #222;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .empty {
