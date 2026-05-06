@@ -392,7 +392,14 @@ export default function Book() {
                     <p className={styles.slotsEmpty}>Nenhum horário disponível para este dia.</p>
                   ) : (
                     <div className={styles.slotsGrid}>
-                      {slots.map(s => (
+                      {slots.filter(s => {
+                        if (selectedDate !== todayISO()) return true;
+                        const [sh, sm] = s.split(':').map(Number);
+                        const now = new Date();
+                        const nh = now.getHours();
+                        const nm = now.getMinutes();
+                        return sh > nh || (sh === nh && sm > nm);
+                      }).map(s => (
                         <button
                           key={s}
                           className={`${styles.slot} ${selectedTime === s ? styles.slotSel : ''}`}

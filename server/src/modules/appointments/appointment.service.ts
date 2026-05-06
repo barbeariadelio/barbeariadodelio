@@ -79,12 +79,19 @@ export class AppointmentService {
       status: { $nin: ['cancelled'] },
     }).select('startTime endTime');
 
-    const allSlots = this.generateSlots(schedule.start, schedule.end, 15); // Generate every 15 min for more flexibility
+    const allSlots = this.generateSlots(schedule.start, schedule.end, 15);
+    const today = new Date();
+    const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const nowMins = today.getHours() * 60 + today.getMinutes();
 
     return allSlots.filter(slot => {
       const [sh, sm] = slot.split(':').map(Number);
       const slotStart = sh * 60 + sm;
       const slotEnd = slotStart + durationMinutes;
+
+      // 0. Prevent past time for today
+      if (date === todayISO && slotStart < nowMins) return false;
+      if (date < todayISO) return false;
 
       // 1. Check if it's within work hours
       const [wsh, wsm] = schedule.start.split(':').map(Number);
@@ -119,6 +126,15 @@ export class AppointmentService {
       const svc = await ServiceModel.findById(data.serviceId);
       if (svc) data.endTime = calcEndTime(data.startTime, svc.durationMinutes);
     }
+
+    // Past date/time validation
+    const today = new Date();
+    const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const nowTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
+    
+    if (data.date! < todayISO || (data.date === todayISO && data.startTime! < nowTime)) {
+      throw new AppError('Cannot book in the past', 400);
+    }
     const conflict = await AppointmentModel.findOne({
       employeeId: data.employeeId,
       date: data.date,
@@ -148,6 +164,14 @@ export class AppointmentService {
 
     const svc = await ServiceModel.findById(serviceId);
     if (!svc) throw new AppError('Service not found', 404);
+
+    const today = new Date();
+    const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const nowTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
+    
+    if (date < todayISO || (date === todayISO && startTime < nowTime)) {
+      throw new AppError('Cannot book in the past', 400);
+    }
 
     const endTime = calcEndTime(startTime, svc.durationMinutes);
     const cleanPhone = guestPhone.replace(/\D/g, '');

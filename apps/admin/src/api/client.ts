@@ -38,13 +38,21 @@ apiClient.interceptors.response.use(
       if (refreshToken) {
         try {
           const { data } = await axios.post(`${apiBaseUrl}/auth/refresh`, { refreshToken });
-          localStorage.setItem('accessToken', data.data.accessToken);
-          error.config.headers.Authorization = `Bearer ${data.data.accessToken}`;
-          return axios(error.config);
+          const newAccessToken = data.data.accessToken;
+          localStorage.setItem('accessToken', newAccessToken);
+          
+          // Retry original request with new token
+          error.config.headers.Authorization = `Bearer ${newAccessToken}`;
+          return apiClient(error.config);
         } catch {
           localStorage.clear();
-          window.location.href = `${import.meta.env.BASE_URL}login`;
+          const loginUrl = `${import.meta.env.BASE_URL}login`.replace('//', '/');
+          window.location.href = loginUrl;
         }
+      } else {
+        localStorage.clear();
+        const loginUrl = `${import.meta.env.BASE_URL}login`.replace('//', '/');
+        window.location.href = loginUrl;
       }
     }
     return Promise.reject(error);
