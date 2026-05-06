@@ -9,7 +9,7 @@ export class FinanceService {
     userId: string,
     role: string,
     unitId?: string,
-    period: 'month' | 'week' | 'year' = 'month',
+    period: 'day' | 'month' | 'week' | 'year' = 'month',
   ): Promise<FinanceSummary> {
     const unitIds = await this.resolveUnitIds(userId, role, unitId);
     const { startDate, endDate } = this.resolvePeriod(period);
@@ -152,12 +152,15 @@ export class FinanceService {
   }
 
   private resolvePeriod(period: string): { startDate: string; endDate: string } {
-    const now = new Date();
+    // Force Brazil/Sao_Paulo timezone for date calculations
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    
     const pad = (n: number) => n.toString().padStart(2, '0');
     const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
     if (period === 'day') {
-      return { startDate: fmt(now), endDate: fmt(now) };
+      const today = fmt(now);
+      return { startDate: today, endDate: today };
     }
 
     if (period === 'week') {

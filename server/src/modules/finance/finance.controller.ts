@@ -12,7 +12,7 @@ export async function getSummary(req: AuthRequest, res: Response, next: NextFunc
       ? (Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string) || req.user!.unitId)
       : req.user!.unitId;
     const periodRaw = Array.isArray(req.query.period) ? req.query.period[0] : req.query.period;
-    const period = (periodRaw as 'month' | 'week' | 'year') || 'month';
+    const period = (periodRaw as 'day' | 'month' | 'week' | 'year') || 'month';
     const summary = await service.getSummary(req.user!.id, req.user!.role, unitId, period);
     ok(res, summary);
   } catch (e) { next(e); }

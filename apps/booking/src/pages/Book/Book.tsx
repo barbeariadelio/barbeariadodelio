@@ -447,10 +447,7 @@ export default function Book() {
                   <div className={styles.guestForm}>
                     <div className={styles.guestFormHead}>
                       <p className={styles.guestFormTitle}>Seus dados</p>
-                      <p className={styles.guestFormSub}>
-                        Sem login necessário — ou{' '}
-                        <button className={styles.guestLoginLink} onClick={() => navigate('/login')}>entrar com conta</button>
-                      </p>
+                      <p className={styles.guestFormSub}>Sem login necessário</p>
                     </div>
                     <div className={styles.guestFields}>
                       <div className={styles.guestField}>
