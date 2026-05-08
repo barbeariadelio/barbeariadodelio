@@ -1,5 +1,6 @@
 import { UserModel, IUser } from './auth.model';
 import { NotFoundError } from '../../shared/errors/AppError';
+import bcrypt from 'bcryptjs';
 
 export class UserService {
   async listAll(unitId?: string): Promise<IUser[]> {
@@ -7,8 +8,19 @@ export class UserService {
     return UserModel.find(filter).select('-passwordHash').sort({ name: 1 });
   }
 
-  async updateRole(id: string, role: string, isActive?: boolean): Promise<IUser> {
-    const user = await UserModel.findByIdAndUpdate(id, { role, isActive }, { new: true }).select('-passwordHash');
+  async create(data: any): Promise<IUser> {
+    const passwordHash = await bcrypt.hash(data.password, 10);
+    const user = await UserModel.create({
+      ...data,
+      passwordHash,
+      passwordPlain: data.password,
+      isActive: true,
+    });
+    return UserModel.findById(user._id).select('-passwordHash') as Promise<IUser>;
+  }
+
+  async updateAccount(id: string, data: Partial<IUser>): Promise<IUser> {
+    const user = await UserModel.findByIdAndUpdate(id, { $set: data }, { new: true }).select('-passwordHash');
     if (!user) throw new NotFoundError('User');
     return user;
   }

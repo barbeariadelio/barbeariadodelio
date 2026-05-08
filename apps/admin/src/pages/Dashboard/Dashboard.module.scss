@@ -1,14 +1,7 @@
-$text-main:  #F5F5F5;
-$text-dim:   #A3A3A3;
-$text-muted: #5A5A5A;
-$gold:       #1565C0;
-
 .page {
   max-width: 1400px;
   animation: dashIn 0.35s ease both;
 }
-
-
 
 /* ── Header ── */
 
@@ -18,7 +11,7 @@ $gold:       #1565C0;
   font-family: 'Inter', sans-serif;
   font-size: 0.6875rem;
   font-weight: 600;
-  color: $text-muted;
+  color: var(--text-muted);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   margin-bottom: 0.4rem;
@@ -29,7 +22,7 @@ $gold:       #1565C0;
   font-style: italic;
   font-size: clamp(2rem, 4vw, 3rem);
   font-weight: 600;
-  color: $text-main;
+  color: var(--text-primary);
   line-height: 1.05;
   letter-spacing: -0.01em;
   margin: 0 0 0.4rem;
@@ -43,7 +36,7 @@ $gold:       #1565C0;
 .subtitle {
   font-family: 'Inter', sans-serif;
   font-size: 0.9rem;
-  color: $text-dim;
+  color: var(--text-secondary);
   margin: 0;
 
   @media (max-width: 640px) {
@@ -52,8 +45,6 @@ $gold:       #1565C0;
 }
 
 /* ── Calendar section ── */
-
-
 
 .calendarMeta {
   display: flex;
@@ -78,14 +69,14 @@ $gold:       #1565C0;
   font-family: 'Inter', sans-serif;
   font-size: 0.9375rem;
   font-weight: 600;
-  color: $text-main;
+  color: var(--text-primary);
   text-transform: capitalize;
 }
 
 .calendarCount {
   font-family: 'Inter', sans-serif;
   font-size: 0.8125rem;
-  color: $text-muted;
+  color: var(--text-muted);
 }
 
 .newApptBtn {
@@ -93,19 +84,19 @@ $gold:       #1565C0;
   align-items: center;
   gap: 6px;
   padding: 6px 14px;
-  border-radius: 2px;
-  border: 1px solid rgba(21, 101, 192, 0.35);
-  background: rgba(21,101,192,.08);
-  color: $gold;
+  border-radius: 8px;
+  border: 1px solid var(--gold);
+  background: var(--gold-dim);
+  color: var(--gold);
   font-family: 'Inter', sans-serif;
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
   letter-spacing: 0.02em;
-  transition: all 0.12s;
+  transition: all 0.2s;
 
   &:hover {
-    background: rgba(21, 101, 192, 0.14);
-    border-color: rgba(21, 101, 192, 0.6);
+    background: var(--gold);
+    color: white;
   }
 }

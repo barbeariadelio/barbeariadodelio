@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../api/client';
 import styles from './Login.module.scss';
+import logo from '../../assets/logo.png';
 
 export default function Login() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -39,7 +40,9 @@ export default function Login() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <div className={styles.brand}><span className={styles.w}>BARBEARIA</span> <span className={styles.b}>DÉLIO</span></div>
+        <div className={styles.brand}>
+          <img src={logo} alt="Barbearia Délio" className={styles.logoImg} />
+        </div>
         <div className={styles.modeTabs}>
           <button className={`${styles.modeTab} ${mode === 'login' ? styles.active : ''}`} onClick={() => setMode('login')}>Entrar</button>
           <button className={`${styles.modeTab} ${mode === 'register' ? styles.active : ''}`} onClick={() => setMode('register')}>Criar Conta</button>

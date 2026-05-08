@@ -1,181 +1,470 @@
-import { useState } from 'react';
+import { useState, useMemo, FormEvent, useEffect, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import styles from './Permissions.module.scss';
 
-interface User {
+type AppUser = {
   _id: string;
   name: string;
   email: string;
-  role: string;
-  status?: string;
-}
-
-const PERMISSION_GROUPS = [
-  {
-    id: 'gestao',
-    title: 'Gestão e Unidades',
-    keys: ['manage_units', 'view_reports', 'manage_finances', 'manage_employees']
-  },
-  {
-    id: 'operacoes',
-    title: 'Operações Diárias',
-    keys: ['manage_appointments', 'manage_inventory', 'view_clients', 'manage_services']
-  },
-  {
-    id: 'sistema',
-    title: 'Configurações e Sistema',
-    keys: ['manage_settings', 'view_logs', 'manage_permissions', 'api_access']
-  }
-];
-
-const PERMISSION_LABELS: Record<string, string> = {
-  manage_units: 'Gerenciar Unidades',
-  view_reports: 'Visualizar Relatórios',
-  manage_finances: 'Fluxo Financeiro',
-  manage_employees: 'Gestão de Equipe',
-  manage_appointments: 'Agenda e Reservas',
-  manage_inventory: 'Controle de Estoque',
-  view_clients: 'Base de Clientes',
-  manage_services: 'Menu de Serviços',
-  manage_settings: 'Configurações Gerais',
-  view_logs: 'Logs de Atividade',
-  manage_permissions: 'Controle de Acessos',
-  api_access: 'Chaves de API'
+  role: 'owner' | 'cashier' | 'employee' | 'client';
+  password?: string;
+  passwordPlain?: string;
+  isActive: boolean;
+  unitId?: string | { name: string; _id: string };
+  allowedApps?: string[];
 };
 
-export default function Permissions() {
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const qc = useQueryClient();
+const ROLE_LABELS: Record<string, string> = {
+  owner: 'Admin',
+  cashier: 'Caixa',
+  employee: 'Funcionário',
+};
 
-  const { data: users = [], isLoading } = useQuery<User[]>({
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  owner: ['Todos os Sistemas', 'Gestão Total', 'Configurações', 'Permissões'],
+  cashier: ['Agenda', 'Vendas', 'Clientes', 'Atendimento', 'Agendamento'],
+  employee: ['Própria Agenda', 'Salário', 'Comissões'],
+};
+
+function normalizeRole(role: string): string {
+  if (role === 'staff' || role === 'employee' || role === 'funcionario' || role === 'funcionário') return 'employee';
+  return role;
+}
+
+export default function Permissions() {
+  const qc = useQueryClient();
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+  const [pendingRole, setPendingRole] = useState<string>('');
+  const [pendingAllowedApps, setPendingAllowedApps] = useState<string[]>([]);
+  const [showModal, setShowModal] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{ show: boolean; userId: string; userName: string; isActive: boolean } | null>(null);
+  
+  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'employee', allowedApps: ['admin'] });
+
+  const { data: users = [], isLoading } = useQuery<AppUser[]>({
     queryKey: ['users'],
-    queryFn: async () => {
-      const { data } = await api.get('/users');
-      return Array.isArray(data) ? data : data.users ?? [];
-    }
+    queryFn: () => api.get('/users').then(res => {
+      const data = res.data;
+      const allUsers = Array.isArray(data) ? data : data.users ?? [];
+      return allUsers.filter((u: AppUser) => u.role !== 'client');
+    }),
   });
 
-  const selectedUser = users.find(u => u._id === selectedUserId);
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    if (expandedRow) {
+      const u = users.find(x => x._id === expandedRow);
+      if (u) {
+        const role = normalizeRole(u.role);
+        setPendingRole(role);
+        const initialApps = u.allowedApps && u.allowedApps.length > 0 
+          ? u.allowedApps 
+          : (role === 'franchisor' || role === 'franchisee' ? ['franchise'] : ['admin']);
+        setPendingAllowedApps(initialApps);
+      }
+    }
+  }, [expandedRow, users]);
+
+  const createMutation = useMutation({
+    mutationFn: (data: any) => api.post('/users/register', { ...data }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] });
+      setShowModal(false);
+      setNewUser({ name: '', email: '', password: '', role: 'employee', allowedApps: ['admin'] });
+      setToast({ message: 'Usuário criado com sucesso!', type: 'success' });
+    },
+    onError: () => setToast({ message: 'Erro ao criar usuário. Verifique os dados.', type: 'error' })
+  });
 
   const updateMutation = useMutation({
-    mutationFn: (data: { id: string, role: string }) => api.put(`/users/${data.id}`, { role: data.role }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] })
+    mutationFn: ({ id, ...payload }: Partial<AppUser> & { id: string }) => api.put(`/users/${id}`, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] });
+      setToast({ message: 'Usuário atualizado com sucesso!', type: 'success' });
+      setExpandedRow(null);
+    },
+    onError: () => setToast({ message: 'Erro ao salvar alterações.', type: 'error' })
   });
 
-  function handleRoleChange(role: string) {
-    if (!selectedUserId) return;
-    updateMutation.mutate({ id: selectedUserId, role });
-  }
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/users/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['users'] });
+      setToast({ message: 'Usuário removido com sucesso!', type: 'success' });
+    },
+    onError: () => setToast({ message: 'Erro ao remover usuário.', type: 'error' })
+  });
+
+  const togglePassword = (id: string) => {
+    const next = new Set(visiblePasswords);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setVisiblePasswords(next);
+  };
+
+  const toggleApp = (app: string) => {
+    setPendingAllowedApps(prev => 
+      prev.includes(app) ? prev.filter(a => a !== app) : [...prev, app]
+    );
+  };
+
+  const toggleNewUserApp = (app: string) => {
+    setNewUser(prev => ({
+      ...prev,
+      allowedApps: prev.allowedApps.includes(app)
+        ? prev.allowedApps.filter(a => a !== app)
+        : [...prev.allowedApps, app]
+    }));
+  };
+
+  const generatePassword = () => {
+    const pass = Math.floor(100000 + Math.random() * 900000).toString();
+    setNewUser(prev => ({ ...prev, password: pass }));
+  };
+
+  const initials = (name?: string) =>
+    (name || '??').split(' ').map(w => w[0] || '').join('').toUpperCase().slice(0, 2) || '??';
+
+  const IconPlus = (props: React.SVGProps<SVGSVGElement>) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
+  const IconEye = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
+  const IconEyeOff = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
+  const IconTrash = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>;
+  const IconShield = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
+  const IconUsers = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+  const IconChevron = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>;
+  const IconAlert = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
 
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
+      {toast && (
+        <div className={`${styles.toast} ${styles[toast.type]}`}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            {toast.type === 'success' ? (
+              <polyline points="20 6 9 17 4 12"/>
+            ) : (
+              <>
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </>
+            )}
+          </svg>
+          {toast.message}
+        </div>
+      )}
+
+      <div className={styles.header}>
         <div>
           <h1 className={styles.title}>Permissões</h1>
-          <p className={styles.subtitle}>Gerencie níveis de acesso e responsabilidades da equipe</p>
+          <p className={styles.subtitle}>Gerencie usuários e controle o acesso às funcionalidades</p>
         </div>
-      </header>
-
-      <div className={styles.splitView}>
-        <aside className={styles.sidebar}>
-          <div className={styles.sidebarHead}>
-            <span>Usuários ({users.length})</span>
-          </div>
-          <div className={styles.userList}>
-            {isLoading && <div className={styles.loading}>Carregando...</div>}
-            {users.map(user => (
-              <button
-                key={user._id}
-                className={`${styles.userCard} ${selectedUserId === user._id ? styles.active : ''}`}
-                onClick={() => setSelectedUserId(user._id)}
-              >
-                <div className={styles.userAvatar}>
-                  {user.name[0].toUpperCase()}
-                </div>
-                <div className={styles.userInfo}>
-                  <span className={styles.userName}>{user.name}</span>
-                  <span className={styles.userEmail}>{user.email}</span>
-                </div>
-                <span className={`${styles.roleBadge} ${styles[user.role]}`}>
-                  {user.role}
-                </span>
-              </button>
-            ))}
-          </div>
-        </aside>
-
-        <main className={styles.content}>
-          {selectedUser ? (
-            <div className={styles.details}>
-              <div className={styles.detailsHeader}>
-                <div className={styles.detailsUser}>
-                  <h2>{selectedUser.name}</h2>
-                  <span>{selectedUser.email}</span>
-                </div>
-                <div className={styles.statusToggle}>
-                  <span className={styles.statusLabel}>Acesso ao Sistema</span>
-                  <div className={styles.toggleActive}>Ativo</div>
-                </div>
-              </div>
-
-              <div className={styles.section}>
-                <h3 className={styles.sectionTitle}>Papel no Sistema</h3>
-                <div className={styles.roleGrid}>
-                  {['admin', 'manager', 'owner', 'employee'].map(role => (
-                    <button
-                      key={role}
-                      className={`${styles.roleOption} ${selectedUser.role === role ? styles.roleActive : ''}`}
-                      onClick={() => handleRoleChange(role)}
-                    >
-                      <span className={styles.roleName}>{role}</span>
-                      <span className={styles.roleDesc}>
-                        {role === 'admin' ? 'Acesso total e configurações' :
-                         role === 'manager' ? 'Gestão de unidade e equipe' :
-                         role === 'owner' ? 'Dono da unidade / Franqueado' :
-                         'Operador e agendamentos'}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className={styles.section}>
-                <h3 className={styles.sectionTitle}>Chaves de Acesso Específicas</h3>
-                <div className={styles.permissionGroups}>
-                  {PERMISSION_GROUPS.map(group => (
-                    <div key={group.id} className={styles.group}>
-                      <h4 className={styles.groupTitle}>{group.title}</h4>
-                      <div className={styles.keysList}>
-                        {group.keys.map(key => (
-                          <label key={key} className={styles.keyItem}>
-                            <input
-                              type="checkbox"
-                              checked={selectedUser.role === 'admin' || (selectedUser.role === 'owner' && group.id !== 'sistema')}
-                              readOnly
-                            />
-                            <span className={styles.keyLabel}>{PERMISSION_LABELS[key]}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className={styles.emptyState}>
-              <div className={styles.emptyIcon}>
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-              </div>
-              <h3>Selecione um usuário</h3>
-              <p>Escolha um membro da equipe na lista ao lado para gerenciar suas permissões de acesso.</p>
-            </div>
-          )}
-        </main>
+        <button className={styles.btnPrimary} onClick={() => setShowModal(true)}>
+          <IconPlus /> Novo Usuário
+        </button>
       </div>
+
+      <div className={styles.summaryGrid}>
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <span className={styles.cardTitle}><IconShield /> Administrador</span>
+            <span className={styles.cardSub}>Acesso completo ao sistema</span>
+          </div>
+          <div className={styles.permList}>
+            {ROLE_PERMISSIONS.owner.slice(0, 6).map(p => <span key={p} className={`${styles.badge} ${styles.badgeGold}`}>{p}</span>)}
+            {ROLE_PERMISSIONS.owner.length > 6 && <span className={styles.cardSub}>+ {ROLE_PERMISSIONS.owner.length - 6} módulos</span>}
+          </div>
+        </div>
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <span className={styles.cardTitle} style={{ color: '#3b82f6' }}><IconUsers /> Caixa</span>
+            <span className={styles.cardSub}>Operações e vendas</span>
+          </div>
+          <div className={styles.permList}>
+            {ROLE_PERMISSIONS.cashier.map(p => <span key={p} className={`${styles.badge} ${styles.badgeBlue}`}>{p}</span>)}
+          </div>
+        </div>
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <span className={styles.cardTitle} style={{ color: 'var(--text-muted)' }}><IconUsers /> Funcionário</span>
+            <span className={styles.cardSub}>Agenda e comissões</span>
+          </div>
+          <div className={styles.permList}>
+            {ROLE_PERMISSIONS.employee.map(p => <span key={p} className={`${styles.badge} ${styles.badgeGray}`}>{p}</span>)}
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.tableCard}>
+        <div className={styles.tableHeader}>
+          <h3 className={styles.cardTitle}>Usuários Cadastrados</h3>
+        </div>
+        <div className={styles.tableWrapper}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th className={styles.th}>Usuário</th>
+                <th className={styles.th}>Papel</th>
+                <th className={styles.th}>E-mail</th>
+                <th className={styles.th}>Senha</th>
+                <th className={styles.th}>Status</th>
+                <th className={styles.th}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map(u => {
+                const role = normalizeRole(u.role);
+                const isPassVisible = visiblePasswords.has(u._id);
+                const isExpanded = expandedRow === u._id;
+                const hasChanges = pendingRole !== role || JSON.stringify(u.allowedApps || []) !== JSON.stringify(pendingAllowedApps);
+
+                return (
+                  <Fragment key={u._id}>
+                    <tr className={`${styles.tr} ${isExpanded ? styles.trActive : ''}`} onClick={() => setExpandedRow(isExpanded ? null : u._id)}>
+                      <td className={styles.td}>
+                        <div className={styles.userCell}>
+                          <div className={styles.avatarSmall}>{initials(u.name)}</div>
+                          <strong>{u.name}</strong>
+                        </div>
+                      </td>
+                      <td className={styles.td}>
+                        <span className={`${styles.badge} ${
+                          role === 'owner' ? styles.badgeGold : 
+                          role === 'cashier' ? styles.badgeBlue : 
+                          styles.badgeGray
+                        }`}>
+                          {ROLE_LABELS[role] || role}
+                        </span>
+                      </td>
+                      <td className={styles.td}>{u.email}</td>
+                      <td className={styles.td}>
+                        <div className={styles.passCell}>
+                          <span>{isPassVisible ? (u.passwordPlain || '••••••') : '••••••••'}</span>
+                          <button className={styles.btnAction} onClick={(e) => { e.stopPropagation(); togglePassword(u._id); }}>
+                            {isPassVisible ? <IconEyeOff /> : <IconEye />}
+                          </button>
+                        </div>
+                      </td>
+                      <td className={styles.td}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: u.isActive !== false ? '#10b981' : '#ef4444' }} />
+                          {u.isActive !== false ? 'Ativo' : 'Inativo'}
+                        </div>
+                      </td>
+                      <td className={styles.td}>
+                        <div className={styles.actions}>
+                          <div className={`${styles.btnAction} ${isExpanded ? styles.expanded : ''}`}>
+                            <IconChevron />
+                          </div>
+                          <button className={`${styles.btnAction} ${styles.btnActionDanger}`} title="Excluir" onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm(`Excluir ${u.name}?`)) deleteMutation.mutate(u._id);
+                          }}>
+                            <IconTrash />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr className={styles.accordionRow}>
+                        <td colSpan={6} className={styles.accordionTd}>
+                          <div className={styles.accordionContent}>
+                            <div className={styles.accordionGrid}>
+                              <div className={styles.accordionCol}>
+                                <label className={styles.label}>Nível de Acesso</label>
+                                <div className={styles.roleActionRow}>
+                                  <select 
+                                    className={styles.select}
+                                    value={pendingRole}
+                                    onChange={(e) => setPendingRole(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {Object.entries(ROLE_LABELS).map(([val, label]) => (
+                                      <option key={val} value={val}>{label}</option>
+                                    ))}
+                                  </select>
+                                  {hasChanges && (
+                                    <div className={styles.editActions}>
+                                      <button 
+                                        className={styles.btnSave}
+                                        onClick={(e) => { 
+                                          e.stopPropagation(); 
+                                          updateMutation.mutate({ id: u._id, role: pendingRole as any, allowedApps: pendingAllowedApps }); 
+                                        }}
+                                        disabled={updateMutation.isPending}
+                                      >
+                                        {updateMutation.isPending ? 'Salvando...' : 'Salvar'}
+                                      </button>
+                                      <button 
+                                        className={styles.btnCancel}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setPendingRole(role);
+                                          const initialApps = u.allowedApps && u.allowedApps.length > 0 
+                                            ? u.allowedApps 
+                                            : (role === 'franchisor' || role === 'franchisee' ? ['franchise'] : ['admin']);
+                                          setPendingAllowedApps(initialApps);
+                                        }}
+                                      >
+                                        Não salvar
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <div className={styles.accordionCol}>
+                                <label className={styles.label}>Acesso ao Sistema</label>
+                                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem' }}>
+                                    <input type="checkbox" checked={pendingAllowedApps.includes('admin')} onChange={() => toggleApp('admin')} /> Jd Morada do Sol
+                                  </label>
+                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem' }}>
+                                    <input type="checkbox" checked={pendingAllowedApps.includes('franchise')} onChange={() => toggleApp('franchise')} /> Jd Nova Veneza
+                                  </label>
+                                </div>
+                              </div>
+                              <div className={styles.accordionCol}>
+                                <label className={styles.label}>Status da Conta</label>
+                                <button 
+                                  className={u.isActive !== false ? styles.btnActionDanger : styles.btnPrimary}
+                                  style={{ padding: '0.625rem 1rem', width: 'fit-content' }}
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    setConfirmModal({ show: true, userId: u._id, userName: u.name, isActive: u.isActive !== false });
+                                  }}
+                                >
+                                  {u.isActive !== false ? 'Desativar Usuário' : 'Reativar Usuário'}
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <div className={styles.includedModules}>
+                              <label className={styles.label}>Módulos Inclusos ({pendingRole})</label>
+                              <div className={styles.permList} style={{ marginTop: '0.5rem' }}>
+                                {ROLE_PERMISSIONS[pendingRole]?.map(p => <span key={p} className={styles.badge}>{p}</span>)}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+          {isLoading && <div className={styles.empty}>Carregando usuários...</div>}
+          {!isLoading && users.length === 0 && <div className={styles.empty}>Nenhum usuário encontrado.</div>}
+        </div>
+      </div>
+
+      {confirmModal?.show && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal} style={{ maxWidth: '380px' }}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>{confirmModal.isActive ? 'Desativar Usuário' : 'Reativar Usuário'}</h2>
+              <button className={styles.btnClose} onClick={() => setConfirmModal(null)}>
+                <span style={{ display: 'flex', transform: 'rotate(45deg)' }}><IconPlus /></span>
+              </button>
+            </div>
+            <div className={styles.modalBody} style={{ textAlign: 'center', padding: '2rem 1.5rem' }}>
+              <div style={{ marginBottom: '1rem' }}><IconAlert /></div>
+              <p style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '1rem', margin: 0 }}>
+                Tem certeza que deseja {confirmModal.isActive ? 'desativar' : 'reativar'} o acesso de <strong>{confirmModal.userName}</strong>?
+              </p>
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', marginTop: '0.5rem' }}>
+                {confirmModal.isActive ? 'O usuário não conseguirá mais realizar login no sistema.' : 'O usuário voltará a ter acesso normal ao sistema.'}
+              </p>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.btnSecondary} onClick={() => setConfirmModal(null)}>Cancelar</button>
+              <button 
+                className={confirmModal.isActive ? styles.btnDanger : styles.btnPrimary} 
+                onClick={() => {
+                  updateMutation.mutate({ id: confirmModal.userId, isActive: !confirmModal.isActive });
+                  setConfirmModal(null);
+                }}
+              >
+                Sim, {confirmModal.isActive ? 'Desativar' : 'Reativar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showModal && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modal}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Novo Usuário</h2>
+              <button className={styles.btnClose} onClick={() => setShowModal(false)}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); createMutation.mutate(newUser); }}>
+              <div className={styles.modalBody}>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Nome Completo</label>
+                  <input className={styles.input} type="text" required value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} placeholder="Ex: João Silva" />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>E-mail de Login</label>
+                  <input className={styles.input} type="email" required value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} placeholder="exemplo@email.com" />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Senha (6 dígitos)</label>
+                  <div className={styles.inputGroup}>
+                    <input 
+                      className={styles.input} 
+                      type="text" 
+                      required 
+                      maxLength={6}
+                      value={newUser.password} 
+                      onChange={e => setNewUser({...newUser, password: e.target.value.replace(/\D/g, '')})} 
+                      placeholder="123456" 
+                    />
+                    <button type="button" className={styles.btnSecondary} onClick={generatePassword}>Gerar</button>
+                  </div>
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Nível de Acesso</label>
+                  <select className={styles.select} value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value as any})}>
+                    {Object.entries(ROLE_LABELS).map(([val, label]) => (
+                      <option key={val} value={val}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Sistemas Autorizados</label>
+                  <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={newUser.allowedApps.includes('admin')} onChange={() => toggleNewUserApp('admin')} /> Jd Morada do Sol
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={newUser.allowedApps.includes('franchise')} onChange={() => toggleNewUserApp('franchise')} /> Jd Nova Veneza
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <div className={styles.modalFooter}>
+                <button type="button" className={styles.btnSecondary} onClick={() => setShowModal(false)}>Cancelar</button>
+                <button type="submit" className={styles.btnPrimary} disabled={createMutation.isPending}>
+                  {createMutation.isPending ? 'Criando...' : 'Criar Usuário'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

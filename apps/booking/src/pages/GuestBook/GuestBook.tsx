@@ -1,12 +1,21 @@
+import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import styles from './GuestBook.module.scss';
+import logo from '../../assets/logo.png';
 
 interface Unit { _id: string; name: string; address: string; phone: string; }
 
 export default function GuestBook() {
   const navigate = useNavigate();
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', 'light');
+    return () => {
+      // Optional: restore dark if needed, but for now just force light
+    };
+  }, []);
 
   const { data: units = [], isLoading } = useQuery<Unit[]>({
     queryKey: ['public-units'],
@@ -23,8 +32,7 @@ export default function GuestBook() {
 
       <header className={styles.header}>
         <button className={styles.logoBtn} onClick={() => navigate('/')}>
-          <span className={styles.logoW}>BARBEARIA</span>
-          <span className={styles.logoB}>DÉLIO</span>
+          <img src={logo} alt="Barbearia Délio" className={styles.logoImg} />
         </button>
       </header>
 

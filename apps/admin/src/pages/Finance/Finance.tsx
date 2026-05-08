@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend, Cell, PieChart, Pie } from 'recharts';
 import TransactionForm from './TransactionForm';
+import { useAuth } from '../../contexts/AuthContext';
 import styles from './Finance.module.scss';
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -109,9 +110,12 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function Finance() {
+  const { user } = useAuth();
+  const isStaff = user?.role === 'employee';
+  const userId = (user as any)?.id || (user as any)?._id;
   const [unitId, setUnitId] = useState('all');
   const [period, setPeriod] = useState('month');
-  const [activeTab, setActiveTab] = useState('geral');
+  const [activeTab, setActiveTab] = useState(isStaff ? 'geral' : 'geral'); // Still 'geral' for layout but we filter inside
   const [showForm, setShowForm] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [deletingTxId, setDeletingTxId] = useState<string | null>(null);
@@ -125,6 +129,7 @@ export default function Finance() {
       const { data } = await api.get('/units');
       return Array.isArray(data) ? data : data.units ?? [];
     },
+    enabled: !isStaff,
   });
 
   const { data: summary, isLoading: summaryLoading } = useQuery<FinanceSummary>({
@@ -178,188 +183,207 @@ export default function Finance() {
           <h1 className={styles.pageTitle}>FINANCEIRO</h1>
           <p className={styles.subtitle}>Gestão de fluxo de caixa e indicadores de desempenho</p>
         </div>
-        <button className={styles.newBtn} onClick={() => setShowForm(true)}>
-          + Novo Lançamento
-        </button>
+        {!isStaff && (
+          <button className={styles.newBtn} onClick={() => setShowForm(true)}>
+            + Novo Lançamento
+          </button>
+        )}
       </div>
 
-      <div className={styles.filters}>
-        <select
-          className={styles.select}
-          value={unitId}
-          onChange={e => setUnitId(e.target.value)}
-        >
-          <option value="all">Todas as Unidades</option>
-          {units.map(u => (
-            <option key={u._id} value={u._id}>{u.name}</option>
-          ))}
-        </select>
+      {!isStaff && (
+        <div className={styles.filters}>
+          <select
+            className={styles.select}
+            value={unitId}
+            onChange={e => setUnitId(e.target.value)}
+          >
+            <option value="all">Todas as Unidades</option>
+            {units.map(u => (
+              <option key={u._id} value={u._id}>{u.name}</option>
+            ))}
+          </select>
 
-        <div className={styles.periodTabs}>
-          {PERIOD_OPTIONS.map(opt => (
-            <button
-              key={opt.value}
-              className={`${styles.periodBtn} ${period === opt.value ? styles.periodBtnActive : ''}`}
-              onClick={() => setPeriod(opt.value)}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+          <div className={styles.periodTabs}>
+            {PERIOD_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                className={`${styles.periodBtn} ${period === opt.value ? styles.periodBtnActive : ''}`}
+                onClick={() => setPeriod(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
 
-        <div className={styles.tabs}>
-          {['geral', 'mensal', 'despesas', 'lancamentos'].map(tab => (
-            <button
-              key={tab}
-              className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ''}`}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab === 'geral' ? 'Visão Geral' : tab === 'mensal' ? 'Painel Mensal' : tab === 'despesas' ? 'Painel Despesas' : 'Lançamentos'}
-            </button>
-          ))}
+          <div className={styles.tabs}>
+            {['geral', 'mensal', 'despesas', 'lancamentos'].map(tab => (
+              <button
+                key={tab}
+                className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ''}`}
+                onClick={() => setActiveTab(tab)}
+              >
+                {tab === 'geral' ? 'Visão Geral' : tab === 'mensal' ? 'Painel Mensal' : tab === 'despesas' ? 'Painel Despesas' : 'Lançamentos'}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+
+      {isStaff && (
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 className={styles.sectionTitle}>Meu Salário e Comissões</h3>
+          <p className={styles.subtitle}>Acompanhe seus rendimentos no período selecionado</p>
+        </div>
+      )}
 
       {activeTab === 'geral' && (
         <>
-          <div className={styles.summaryBar}>
-            <div className={styles.summaryItem}>
-              <span className={styles.summaryLabel}>Receita Total</span>
-              <span className={`${styles.summaryValue} ${styles.green}`}>{formatCurrency(summary?.totalIncome ?? 0)}</span>
+          {!isStaff && (
+            <div className={styles.summaryBar}>
+              <div className={styles.summaryItem}>
+                <span className={styles.summaryLabel}>Receita Total</span>
+                <span className={`${styles.summaryValue} ${styles.green}`}>{formatCurrency(summary?.totalIncome ?? 0)}</span>
+              </div>
+              <div className={styles.summaryDivider} />
+              <div className={styles.summaryItem}>
+                <span className={styles.summaryLabel}>Despesa Total</span>
+                <span className={`${styles.summaryValue} ${styles.red}`}>{formatCurrency(summary?.totalExpense ?? 0)}</span>
+              </div>
+              <div className={styles.summaryDivider} />
+              <div className={styles.summaryItem}>
+                <span className={styles.summaryLabel}>Lucro Líquido</span>
+                <span className={`${styles.summaryValue} ${styles.blue}`}>{formatCurrency(summary?.netProfit ?? 0)}</span>
+              </div>
+              <div className={styles.summaryDivider} />
+              <div className={styles.summaryItem}>
+                <span className={styles.summaryLabel}>Margem</span>
+                <span className={`${styles.summaryValue} ${styles.amber}`}>
+                  {summary?.totalIncome ? ((summary.netProfit / summary.totalIncome) * 100).toFixed(1) : '0'}%
+                </span>
+              </div>
             </div>
-            <div className={styles.summaryDivider} />
-            <div className={styles.summaryItem}>
-              <span className={styles.summaryLabel}>Despesa Total</span>
-              <span className={`${styles.summaryValue} ${styles.red}`}>{formatCurrency(summary?.totalExpense ?? 0)}</span>
-            </div>
-            <div className={styles.summaryDivider} />
-            <div className={styles.summaryItem}>
-              <span className={styles.summaryLabel}>Lucro Líquido</span>
-              <span className={`${styles.summaryValue} ${styles.blue}`}>{formatCurrency(summary?.netProfit ?? 0)}</span>
-            </div>
-            <div className={styles.summaryDivider} />
-            <div className={styles.summaryItem}>
-              <span className={styles.summaryLabel}>Margem</span>
-              <span className={`${styles.summaryValue} ${styles.amber}`}>
-                {summary?.totalIncome ? ((summary.netProfit / summary.totalIncome) * 100).toFixed(1) : '0'}%
-              </span>
-            </div>
-          </div>
+          )}
 
-          <div className={styles.chartSection}>
-            <h3 className={styles.sectionTitle}>Tendência de Receita x Despesa</h3>
-            <div className={styles.mainChart}>
-              <ResponsiveContainer width="100%" height={320}>
-                <AreaChart data={summary?.chart ?? []}>
-                  <defs>
-                    <linearGradient id="colorInc" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#4ade80" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#4ade80" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorExp" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f87171" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#f87171" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                  <XAxis 
-                    dataKey="date" 
-                    tickFormatter={d => d.split('-').slice(2).join('/')}
-                    stroke="#5A5448" fontSize={11} tickLine={false} axisLine={false}
-                  />
-                  <YAxis hide />
-                  <Tooltip 
-                    contentStyle={{ background: '#1A1A1A', border: '1px solid #2C2C2C', borderRadius: '8px' }}
-                    formatter={(v: any) => [formatCurrency(Number(v) || 0), '']}
-                  />
-                  <Area type="monotone" dataKey="income" name="Receita" stroke="#4ade80" strokeWidth={2} fill="url(#colorInc)" />
-                  <Area type="monotone" dataKey="expense" name="Despesa" stroke="#f87171" strokeWidth={2} fill="url(#colorExp)" />
-                </AreaChart>
-              </ResponsiveContainer>
+          {!isStaff && (
+            <div className={styles.chartSection}>
+              <h3 className={styles.sectionTitle}>Tendência de Receita x Despesa</h3>
+              <div className={styles.mainChart}>
+                <ResponsiveContainer width="100%" height={320}>
+                  <AreaChart data={summary?.chart ?? []}>
+                    <defs>
+                      <linearGradient id="colorInc" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#4ade80" stopOpacity={0.1}/>
+                        <stop offset="95%" stopColor="#4ade80" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorExp" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f87171" stopOpacity={0.1}/>
+                        <stop offset="95%" stopColor="#f87171" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                    <XAxis 
+                      dataKey="date" 
+                      tickFormatter={d => d.split('-').slice(2).join('/')}
+                      stroke="#5A5448" fontSize={11} tickLine={false} axisLine={false}
+                    />
+                    <YAxis hide />
+                    <Tooltip 
+                      contentStyle={{ background: '#1A1A1A', border: '1px solid #2C2C2C', borderRadius: '8px' }}
+                      formatter={(v: any) => [formatCurrency(Number(v) || 0), '']}
+                    />
+                    <Area type="monotone" dataKey="income" name="Receita" stroke="#4ade80" strokeWidth={2} fill="url(#colorInc)" />
+                    <Area type="monotone" dataKey="expense" name="Despesa" stroke="#f87171" strokeWidth={2} fill="url(#colorExp)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className={styles.section}>
-            <h3 className={styles.sectionTitle}>Receita por Serviço Atendido</h3>
-            {(summary?.byService ?? []).length === 0 && <p className={styles.empty}>Nenhum agendamento confirmado ou concluído no período.</p>}
-            
-            {(summary?.byService ?? []).length > 0 && (() => {
-              type Svc = { name: string; revenue: number; count: number; unitId: string; unitName: string };
-              const svcList = summary!.byService as Svc[];
+          {!isStaff && (
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>Receita por Serviço Atendido</h3>
+              {(summary?.byService ?? []).length === 0 && <p className={styles.empty}>Nenhum agendamento confirmado ou concluído no período.</p>}
+              
+              {(summary?.byService ?? []).length > 0 && (() => {
+                type Svc = { name: string; revenue: number; count: number; unitId: string; unitName: string };
+                const svcList = summary!.byService as Svc[];
 
-              // Group by unit
-              const byUnit = new Map<string, Svc[]>();
-              for (const svc of svcList) {
-                const key = svc.unitId || 'sem-unidade';
-                if (!byUnit.has(key)) byUnit.set(key, []);
-                byUnit.get(key)!.push(svc);
-              }
+                // Group by unit
+                const byUnit = new Map<string, Svc[]>();
+                for (const svc of svcList) {
+                  const key = svc.unitId || 'sem-unidade';
+                  if (!byUnit.has(key)) byUnit.set(key, []);
+                  byUnit.get(key)!.push(svc);
+                }
 
-              return Array.from(byUnit.entries()).map(([, services]) => {
-                const unitName = services[0]?.unitName || 'Sem unidade';
-                return (
-                  <div key={services[0]?.unitId || 'none'} className={styles.serviceUnitGroup}>
-                    <div className={styles.serviceUnitHeader}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                      {unitName}
+                return Array.from(byUnit.entries()).map(([, services]) => {
+                  const unitName = services[0]?.unitName || 'Sem unidade';
+                  return (
+                    <div key={services[0]?.unitId || 'none'} className={styles.serviceUnitGroup}>
+                      <div className={styles.serviceUnitHeader}>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                        {unitName}
+                      </div>
+                      <div className={styles.serviceGrid}>
+                        {services.map(svc => (
+                          <div key={svc.name} className={styles.serviceCard}>
+                            <div className={styles.svcHead}>
+                              <span className={styles.svcName}>{svc.name}</span>
+                              <span className={styles.svcCount}>{svc.count} atendimentos</span>
+                            </div>
+                            <div className={styles.svcBody}>
+                              <span className={styles.svcLabel}>Total Gerado</span>
+                              <span className={styles.svcValue}>{formatCurrency(svc.revenue)}</span>
+                            </div>
+                            <div className={styles.svcTrack}>
+                              <div className={styles.svcFill} style={{ width: `${Math.min((svc.revenue / (summary?.totalIncome || 1)) * 200, 100)}%` }} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className={styles.serviceGrid}>
-                      {services.map(svc => (
-                        <div key={svc.name} className={styles.serviceCard}>
-                          <div className={styles.svcHead}>
-                            <span className={styles.svcName}>{svc.name}</span>
-                            <span className={styles.svcCount}>{svc.count} atendimentos</span>
-                          </div>
-                          <div className={styles.svcBody}>
-                            <span className={styles.svcLabel}>Total Gerado</span>
-                            <span className={styles.svcValue}>{formatCurrency(svc.revenue)}</span>
-                          </div>
-                          <div className={styles.svcTrack}>
-                            <div className={styles.svcFill} style={{ width: `${Math.min((svc.revenue / (summary?.totalIncome || 1)) * 200, 100)}%` }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              });
-            })()}
-          </div>
+                  );
+                });
+              })()}
+            </div>
+          )}
 
           <div className={styles.section}>
             <div className={styles.commissionSectionHead}>
               <div>
-                <h3 className={styles.sectionTitle}>Comissões por Profissional</h3>
-                <p className={styles.commissionSubtitle}>Agrupado por unidade de trabalho</p>
+                <h3 className={styles.sectionTitle}>{isStaff ? 'Detalhamento de Ganhos' : 'Comissões por Profissional'}</h3>
+                <p className={styles.commissionSubtitle}>{isStaff ? 'Resumo de seus rendimentos acumulados' : 'Agrupado por unidade de trabalho'}</p>
               </div>
-              <div className={styles.rateControls}>
-                <div className={styles.rateField}>
-                  <label className={styles.rateLabel}>Comissão</label>
-                  <div className={styles.rateInputWrap}>
-                    <input
-                      type="number"
-                      className={styles.rateInput}
-                      value={commissionRate}
-                      min={0} max={100} step={0.5}
-                      onChange={e => setCommissionRate(Number(e.target.value))}
-                    />
-                    <span className={styles.rateSuffix}>%</span>
+              {!isStaff && (
+                <div className={styles.rateControls}>
+                  <div className={styles.rateField}>
+                    <label className={styles.rateLabel}>Comissão</label>
+                    <div className={styles.rateInputWrap}>
+                      <input
+                        type="number"
+                        className={styles.rateInput}
+                        value={commissionRate}
+                        min={0} max={100} step={0.5}
+                        onChange={e => setCommissionRate(Number(e.target.value))}
+                      />
+                      <span className={styles.rateSuffix}>%</span>
+                    </div>
+                  </div>
+                  <div className={styles.rateField}>
+                    <label className={styles.rateLabel}>Dedução (IRRF)</label>
+                    <div className={styles.rateInputWrap}>
+                      <input
+                        type="number"
+                        className={styles.rateInput}
+                        value={taxRate}
+                        min={0} max={100} step={0.5}
+                        onChange={e => setTaxRate(Number(e.target.value))}
+                      />
+                      <span className={styles.rateSuffix}>%</span>
+                    </div>
                   </div>
                 </div>
-                <div className={styles.rateField}>
-                  <label className={styles.rateLabel}>Dedução (IRRF)</label>
-                  <div className={styles.rateInputWrap}>
-                    <input
-                      type="number"
-                      className={styles.rateInput}
-                      value={taxRate}
-                      min={0} max={100} step={0.5}
-                      onChange={e => setTaxRate(Number(e.target.value))}
-                    />
-                    <span className={styles.rateSuffix}>%</span>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
 
             {(summary?.byEmployee ?? []).length === 0 && (
@@ -369,7 +393,11 @@ export default function Finance() {
             )}
             {(summary?.byEmployee ?? []).length > 0 && (() => {
               type Emp = { id: string; name: string; unitId: string; unitName: string; appointments: number; grossRevenue: number };
-              const empList: Emp[] = summary!.byEmployee as Emp[];
+              let empList: Emp[] = (summary!.byEmployee as Emp[]) || [];
+
+              if (isStaff && userId) {
+                empList = empList.filter(e => (e.id || (e as any)._id) === userId);
+              }
 
               // Group by unit
               const byUnit = new Map<string, Emp[]>();
@@ -411,13 +439,15 @@ export default function Finance() {
                           </div>
                         );
                       })}
-                      <div className={styles.commissionFooter}>
-                        <span>SUBTOTAL</span>
-                        <span>{employees.reduce((s, e) => s + e.appointments, 0)}</span>
-                        <span>{formatCurrency(employees.reduce((s, e) => s + e.grossRevenue, 0))}</span>
-                        <span>{formatCurrency(employees.reduce((s, e) => s + e.grossRevenue * (commissionRate / 100), 0))}</span>
-                        <span>{formatCurrency(employees.reduce((s, e) => s + e.grossRevenue * (commissionRate / 100) * (1 - taxRate / 100), 0))}</span>
-                      </div>
+                      {!isStaff && (
+                        <div className={styles.commissionFooter}>
+                          <span>SUBTOTAL</span>
+                          <span>{employees.reduce((s, e) => s + e.appointments, 0)}</span>
+                          <span>{formatCurrency(employees.reduce((s, e) => s + e.grossRevenue, 0))}</span>
+                          <span>{formatCurrency(employees.reduce((s, e) => s + e.grossRevenue * (commissionRate / 100), 0))}</span>
+                          <span>{formatCurrency(employees.reduce((s, e) => s + e.grossRevenue * (commissionRate / 100) * (1 - taxRate / 100), 0))}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

@@ -12,6 +12,14 @@ interface Employee {
   phone?: string;
   role: string;
   avatar?: string;
+  workSchedule?: {
+    start: string;
+    end: string;
+    lunchStart?: string;
+    lunchEnd?: string;
+  };
+  vacations?: { start: string; end: string }[];
+  blockedDays?: string[];
   isActive: boolean;
 }
 
@@ -45,7 +53,7 @@ interface DetailProps {
 function EmployeeDetail({ emp, onClose, onEdit, onToggle, isToggling }: DetailProps) {
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className={styles.panel}>
+      <div className={styles.panel} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
 
         <div className={styles.panelTop}>
           <div className={styles.panelAvatar}>
@@ -81,6 +89,30 @@ function EmployeeDetail({ emp, onClose, onEdit, onToggle, isToggling }: DetailPr
               <div className={styles.infoItem}>
                 <span className={styles.infoLabel}>Telefone</span>
                 <span className={styles.infoValue}>{emp.phone}</span>
+              </div>
+            )}
+            <div className={styles.infoItem}>
+              <span className={styles.infoLabel}>Expediente</span>
+              <span className={styles.infoValue}>
+                {emp.workSchedule ? `${emp.workSchedule.start} às ${emp.workSchedule.end}` : 'Não definido'}
+              </span>
+            </div>
+            {emp.vacations && emp.vacations.length > 0 && (
+              <div className={styles.infoItem}>
+                <span className={styles.infoLabel}>Férias</span>
+                <span className={styles.infoValue}>
+                  {emp.vacations.map((v, i) => (
+                    <div key={i}>{v.start.split('-').reverse().join('/')} até {v.end.split('-').reverse().join('/')}</div>
+                  ))}
+                </span>
+              </div>
+            )}
+            {emp.blockedDays && emp.blockedDays.length > 0 && (
+              <div className={styles.infoItem}>
+                <span className={styles.infoLabel}>Bloqueios Avulsos</span>
+                <span className={styles.infoValue}>
+                  {emp.blockedDays.map(d => d.split('-').reverse().join('/')).join(', ')}
+                </span>
               </div>
             )}
           </div>

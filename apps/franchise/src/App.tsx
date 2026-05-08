@@ -12,7 +12,6 @@ const Clients = lazy(() => import('./pages/Clients/Clients'));
 const Settings = lazy(() => import('./pages/Settings/Settings'));
 const Inventory = lazy(() => import('./pages/Inventory/Inventory'));
 const Permissions = lazy(() => import('./pages/Permissions/Permissions'));
-const Tasks = lazy(() => import('./pages/Tasks/Tasks'));
 
 function Loader() {
   return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: '#A3A3A3', fontFamily: 'Inter, sans-serif' }}>Carregando...</div>;
@@ -31,7 +30,6 @@ export default function App() {
           <Route path="/clients" element={<Clients />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/permissions" element={<Permissions />} />
-          <Route path="/tasks" element={<Tasks />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -1,12 +1,8 @@
-$text-main:  #F5F5F5;
-$text-dim:   #A3A3A3;
-$text-muted: #5A5A5A;
-$gold:       #1565C0;
-$border:     rgba(255,255,255,.06);
-
 .page {
   max-width: 1400px;
   animation: fadeIn 0.4s ease;
+  background: var(--bg-base);
+  color: var(--text-primary);
 }
 
 @keyframes fadeIn {
@@ -26,12 +22,12 @@ $border:     rgba(255,255,255,.06);
   font-style: italic;
   font-size: 2.5rem;
   font-weight: 600;
-  color: $text-main;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .newBtn {
-  background: $gold;
+  background: var(--gold);
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
@@ -41,7 +37,7 @@ $border:     rgba(255,255,255,.06);
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.2s;
-  &:hover { background: #1976D2; transform: translateY(-1px); }
+  &:hover { background: var(--gold-light); transform: translateY(-1px); }
 }
 
 .layout {
@@ -53,8 +49,8 @@ $border:     rgba(255,255,255,.06);
 }
 
 .listPanel {
-  background: #111;
-  border: 1px solid $border;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 1.5rem;
   display: flex;
@@ -63,14 +59,16 @@ $border:     rgba(255,255,255,.06);
 }
 
 .searchInput {
-  background: #1A1A1A;
-  border: 1px solid #2C2C2C;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 0.75rem 1rem;
-  color: white;
+  color: var(--text-primary);
   font-size: 0.875rem;
   outline: none;
-  &:focus { border-color: $gold; }
+  transition: border-color 0.15s;
+  &:focus { border-color: var(--gold); }
+  &::placeholder { color: var(--text-muted); }
 }
 
 .clientList {
@@ -89,21 +87,21 @@ $border:     rgba(255,255,255,.06);
   transition: all 0.2s;
   border: 1px solid transparent;
 
-  &:hover { background: rgba(255,255,255,0.03); }
-  &.selected { background: rgba(21,101,192,0.1); border-color: rgba(21,101,192,0.3); }
+  &:hover { background: var(--bg-overlay); }
+  &.selected { background: var(--gold-dim); border-color: var(--gold); }
 }
 
 .avatar {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: #1A1A1A;
-  color: $gold;
+  background: var(--bg-elevated);
+  color: var(--gold);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  border: 1px solid $border;
+  border: 1px solid var(--border-subtle);
 }
 
 .clientInfo {
@@ -113,15 +111,15 @@ $border:     rgba(255,255,255,.06);
   min-width: 0;
 }
 
-.clientName { font-size: 0.9375rem; font-weight: 700; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.clientSub { font-size: 0.75rem; color: $text-dim; margin-top: 2px; }
+.clientName { font-size: 0.9375rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.clientSub { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
 
-.arrow { color: $text-muted; font-size: 1.25rem; }
+.arrow { color: var(--text-muted); font-size: 1.25rem; }
 
 // Detail Panel
 .detailPanel {
-  background: #111;
-  border: 1px solid $border;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 2.5rem;
   animation: slideIn 0.3s ease;
@@ -143,28 +141,28 @@ $border:     rgba(255,255,255,.06);
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: #1A1A1A;
-  color: $gold;
+  background: var(--bg-elevated);
+  color: var(--gold);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 2rem;
   font-weight: 700;
-  border: 2px solid $gold;
+  border: 2px solid var(--gold);
 }
 
-.detailName { font-family: 'Playfair Display', serif; font-size: 2.5rem; font-weight: 700; margin: 0 0 0.5rem; color: white; }
-.detailMeta { font-size: 0.875rem; color: $text-dim; margin: 0; }
-.detailNotes { font-size: 0.8125rem; color: $text-muted; margin-top: 1rem; font-style: italic; }
+.detailName { font-family: 'Playfair Display', serif; font-size: 2.5rem; font-weight: 700; margin: 0 0 0.5rem; color: var(--text-primary); }
+.detailMeta { font-size: 0.875rem; color: var(--text-secondary); margin: 0; }
+.detailNotes { font-size: 0.8125rem; color: var(--text-muted); margin-top: 1rem; font-style: italic; }
 
 .historyTitle {
   font-size: 0.75rem;
   font-weight: 700;
-  color: $text-muted;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   margin-bottom: 1.5rem;
-  border-bottom: 1px solid $border;
+  border-bottom: 1px solid var(--border-subtle);
   padding-bottom: 0.75rem;
 }
 
@@ -172,11 +170,11 @@ $border:     rgba(255,255,255,.06);
   display: flex;
   flex-direction: column;
   gap: 1px;
-  background: $border;
+  background: var(--border-subtle);
 }
 
 .historyRow {
-  background: #111;
+  background: var(--bg-surface);
   padding: 1.25rem;
   display: flex;
   justify-content: space-between;
@@ -190,8 +188,8 @@ $border:     rgba(255,255,255,.06);
   gap: 4px;
 }
 
-.historyDate { font-size: 0.8125rem; font-weight: 700; color: white; }
-.historySub { font-size: 0.75rem; color: $text-dim; }
+.historyDate { font-size: 0.8125rem; font-weight: 700; color: var(--text-primary); }
+.historySub { font-size: 0.75rem; color: var(--text-secondary); }
 
 .historyRight {
   display: flex;
@@ -203,10 +201,10 @@ $border:     rgba(255,255,255,.06);
   padding: 2px 8px;
   border-radius: 2px;
   font-size: 0.625rem;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
 }
 
-.historyPrice { font-size: 0.9375rem; font-weight: 700; color: #22C55E; }
+.historyPrice { font-size: 0.9375rem; font-weight: 700; color: #22c55e; }
 
-.empty { padding: 3rem; text-align: center; color: $text-muted; font-size: 0.875rem; }
+.empty { padding: 3rem; text-align: center; color: var(--text-muted); font-size: 0.875rem; }

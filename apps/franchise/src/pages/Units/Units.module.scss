@@ -1,14 +1,9 @@
-$bg-card:    #111111;
-$bg-surface: #1A1A1A;
-$gold:       #1565C0;
-$text-main:  #F5F5F5;
-$text-dim:   #A0A0A0;
-$border:     rgba(255,255,255,0.06);
-
 .page {
   padding: 2rem;
   max-width: 1400px;
   animation: fadeIn 0.4s ease;
+  background: var(--bg-base);
+  color: var(--text-primary);
   @media (max-width: 640px) { padding: 1rem; }
 }
 
@@ -26,13 +21,13 @@ $border:     rgba(255,255,255,0.06);
   font-style: italic;
   font-size: 2.5rem;
   font-weight: 700;
-  color: $text-main;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .subtitle {
   font-size: 0.875rem;
-  color: $text-dim;
+  color: var(--text-secondary);
   margin-top: 4px;
 }
 
@@ -44,15 +39,15 @@ $border:     rgba(255,255,255,0.06);
 }
 
 .unitCard {
-  background: $bg-card;
-  border: 1px solid $border;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 2rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
   transition: all 0.2s;
-  &:hover { border-color: rgba(255,255,255,0.12); transform: translateY(-2px); }
+  &:hover { border-color: var(--gold); transform: translateY(-2px); }
   &.inactive { opacity: 0.6; }
 }
 
@@ -72,22 +67,22 @@ $border:     rgba(255,255,255,0.06);
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #5A5A5A;
-  &.active { background: #22C55E; box-shadow: 0 0 10px rgba(34, 197, 94, 0.4); }
+  background: var(--text-muted);
+  &.active { background: #22c55e; box-shadow: 0 0 10px rgba(34, 197, 94, 0.4); }
 }
 
 .statusText {
   font-size: 0.6875rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: #A0A0A0;
+  color: var(--text-muted);
   letter-spacing: 0.05em;
 }
 
 .unitCode {
   font-size: 0.75rem;
   font-weight: 700;
-  color: $border;
+  color: var(--gold-dim);
 }
 
 .unitBody {
@@ -100,7 +95,7 @@ $border:     rgba(255,255,255,0.06);
   font-family: 'Playfair Display', serif;
   font-size: 1.75rem;
   font-weight: 700;
-  color: white;
+  color: var(--text-primary);
   margin: 0;
 }
 
@@ -109,20 +104,20 @@ $border:     rgba(255,255,255,0.06);
   align-items: center;
   gap: 8px;
   font-size: 0.8125rem;
-  color: $text-dim;
-  svg { opacity: 0.5; }
+  color: var(--text-secondary);
+  svg { color: var(--gold); opacity: 0.6; }
 }
 
 .unitFooter {
   padding-top: 1.5rem;
-  border-top: 1px solid $border;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .enterBtn {
   width: 100%;
-  background: #1A1A1A;
-  border: 1px solid $border;
-  color: white;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
   padding: 0.875rem;
   border-radius: 4px;
   font-weight: 700;
@@ -130,7 +125,7 @@ $border:     rgba(255,255,255,0.06);
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.2s;
-  &:hover { background: #222; border-color: white; }
+  &:hover { background: var(--bg-overlay); border-color: var(--gold); }
 }
 
-.empty { padding: 4rem; text-align: center; color: #5A5A5A; font-size: 1rem; }
+.empty { padding: 4rem; text-align: center; color: var(--text-muted); font-size: 1rem; }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -22,11 +22,18 @@ function getGreeting(name?: string | null) {
   return `Boa noite${suffix}`;
 }
 
+interface UnitConfig {
+  workingDays?: number[];
+  workingHours?: { start: string; end: string; lunchStart?: string; lunchEnd?: string };
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const unitId = (user as unknown as { unitId?: string })?.unitId;
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
+  const isStaff = user?.role === 'employee';
+  const userId = (user as any)?.id || (user as any)?._id;
 
   const [view, setView] = useState<'calendar' | 'schedule'>('calendar');
   const [calendarMonth, setCalendarMonth] = useState(new Date());
@@ -37,7 +44,7 @@ export default function Dashboard() {
   const monthStart = dateISO(startOfMonth(calendarMonth));
   const monthEnd   = dateISO(endOfMonth(calendarMonth));
 
-  const { data: monthAppointments = [] } = useQuery<CalendarAppointment[]>({
+  const { data: monthAppointmentsRaw = [] } = useQuery<CalendarAppointment[]>({
     queryKey: ['appointments-month', monthStart, monthEnd],
     queryFn: () =>
       api.get(`/appointments?start=${monthStart}&end=${monthEnd}`)
@@ -45,10 +52,18 @@ export default function Dashboard() {
     enabled: !!user,
   });
 
+  const monthAppointments = useMemo(() => {
+    if (!isStaff || !userId) return monthAppointmentsRaw;
+    return monthAppointmentsRaw.filter(a => {
+      const empId = a.employeeId?._id || a.employeeId;
+      return empId === userId;
+    });
+  }, [monthAppointmentsRaw, isStaff, userId]);
+
   /* ── Day appointments + employees (schedule view) ── */
   const dayISO = dateISO(selectedDay);
 
-  const { data: dayAppointments = [] } = useQuery<ScheduleAppointment[]>({
+  const { data: dayAppointmentsRaw = [] } = useQuery<ScheduleAppointment[]>({
     queryKey: ['appointments-day', dayISO],
     queryFn: () =>
       api.get(`/appointments?date=${dayISO}`)
@@ -56,12 +71,36 @@ export default function Dashboard() {
     enabled: view === 'schedule' && !!user,
   });
 
-  const { data: employees = [] } = useQuery<ScheduleEmployee[]>({
+  const dayAppointments = useMemo(() => {
+    if (!isStaff || !userId) return dayAppointmentsRaw;
+    return dayAppointmentsRaw.filter(a => {
+      const empId = a.employeeId?._id || a.employeeId;
+      return empId === userId;
+    });
+  }, [dayAppointmentsRaw, isStaff, userId]);
+
+  const { data: employeesRaw = [] } = useQuery<ScheduleEmployee[]>({
     queryKey: ['employees', unitId],
     queryFn: () =>
       api.get(`/employees${unitId ? `?unitId=${unitId}` : ''}`)
          .then(r => Array.isArray(r.data) ? r.data : r.data?.employees ?? []),
-    enabled: view === 'schedule' && !!user,
+    enabled: !!user,
+  });
+
+  const employees = useMemo(() => {
+    if (!isStaff || !userId) return employeesRaw;
+    return employeesRaw.filter(e => {
+      const empId = e._id || e.id;
+      return empId === userId;
+    });
+  }, [employeesRaw, isStaff, userId]);
+
+  const { data: unitConfig } = useQuery<UnitConfig>({
+    queryKey: ['unit-config', unitId],
+    queryFn: () => api.get(`/units/${unitId}`).then(r => r.data as UnitConfig),
+    enabled: !!unitId,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
   });
 
   function handleDayClick(day: Date) {
@@ -71,6 +110,7 @@ export default function Dashboard() {
 
   function handleScheduleUpdate() {
     qc.invalidateQueries({ queryKey: ['appointments-day'] });
+    qc.invalidateQueries({ queryKey: ['unit-config', unitId] });
   }
 
   function handleMonthUpdate() {
@@ -111,6 +151,7 @@ export default function Dashboard() {
           </div>
           <CalendarView
             appointments={monthAppointments}
+            employees={employees}
             month={calendarMonth}
             onMonthChange={setCalendarMonth}
             onUpdate={handleMonthUpdate}
@@ -128,6 +169,9 @@ export default function Dashboard() {
           onUpdate={handleScheduleUpdate}
           onNewAppt={() => setShowForm(true)}
           onBack={() => setView('calendar')}
+          unitId={unitId}
+          workingDays={unitConfig?.workingDays}
+          workingHours={unitConfig?.workingHours}
         />
       )}
 

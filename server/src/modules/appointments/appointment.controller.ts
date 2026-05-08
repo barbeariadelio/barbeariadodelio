@@ -35,7 +35,14 @@ export async function getSlots(req: Request, res: Response, next: NextFunction):
 export async function createAppointment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const data = req.body;
-    if (!data.clientId && req.user) {
+
+    // If unitId not in body, use the authenticated user's unitId
+    if (!data.unitId && req.user?.unitId) {
+      data.unitId = req.user.unitId;
+    }
+
+    // For blocked slots, no client lookup needed
+    if (data.status !== 'blocked' && !data.clientId && req.user) {
       let client = await ClientModel.findOne({ userId: req.user.id, unitId: data.unitId });
       if (!client) {
         client = await ClientModel.findOne({ userId: req.user.id });

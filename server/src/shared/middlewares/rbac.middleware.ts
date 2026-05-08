@@ -20,7 +20,8 @@ export function requireSameUnit() {
       return;
     }
     const { role, unitId } = req.user;
-    const requestedUnit = req.query.unitId as string | undefined;
+    const rawUnit = req.query.unitId;
+    const requestedUnit = Array.isArray(rawUnit) ? rawUnit[0] : rawUnit as string | undefined;
 
     if (role === 'owner' || role === 'franchisor') {
       next();

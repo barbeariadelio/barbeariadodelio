@@ -1,7 +1,25 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import styles from './Layout.module.scss';
+import logo from '../../assets/logo.png';
+
+function IconSun() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+    </svg>
+  );
+}
+
+function IconMoon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+    </svg>
+  );
+}
 
 function IconTrendingUp() {
   return (
@@ -114,24 +132,35 @@ function IconMenu() {
 }
 
 const NAV_ITEMS = [
-  { path: '/',            label: 'Portal de Acesso', icon: <IconHome />, external: true },
-  { path: '/dashboard',   label: 'Dashboard',      icon: <IconGrid /> },
-  { path: '/inventory',   label: 'Estoque',        icon: <IconBox /> },
-  { path: '/clients',     label: 'Clientes',        icon: <IconUsers /> },
-  { path: '/employees',   label: 'Funcionários',    icon: <IconScissors /> },
-  { path: '/tasks',       label: 'Tarefas',         icon: <IconCheckSquare /> },
-  { path: '/services',    label: 'Serviços',        icon: <IconStar /> },
-  { path: '/finance',     label: 'Financeiro',      icon: <IconDollarSign /> },
-  { path: '/permissions', label: 'Permissões',      icon: <IconShield /> },
-  { path: '/units',       label: 'Unidades',         icon: <IconGrid /> },
-  { path: '/settings',    label: 'Configurações',   icon: <IconSettings /> },
+  { path: '/',            label: 'Portal de Acesso', icon: <IconHome />, external: true, roles: ['owner', 'cashier', 'employee'] },
+  { path: '/dashboard',   label: 'Dashboard',      icon: <IconGrid />, roles: ['owner', 'cashier', 'employee'] },
+  { path: '/inventory',   label: 'Estoque',        icon: <IconBox />, roles: ['owner', 'cashier'] },
+  { path: '/clients',     label: 'Clientes',        icon: <IconUsers />, roles: ['owner', 'cashier'] },
+  { path: '/employees',   label: 'Funcionários',    icon: <IconScissors />, roles: ['owner'] },
+  { path: '/services',    label: 'Serviços',        icon: <IconStar />, roles: ['owner'] },
+  { path: '/finance',     label: 'Financeiro',      icon: <IconDollarSign />, roles: ['owner', 'cashier', 'employee'] },
+  { path: '/permissions', label: 'Permissões',      icon: <IconShield />, roles: ['owner'] },
+  { path: '/units',       label: 'Unidades',         icon: <IconGrid />, roles: ['owner'] },
+  { path: '/settings',    label: 'Configurações',   icon: <IconSettings />, roles: ['owner'] },
 ];
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme, updateTheme } = useTheme();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const lastUserId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (user && user._id !== lastUserId.current) {
+      if (user.theme && user.theme !== theme) {
+        updateTheme(user.theme as any);
+      }
+      lastUserId.current = user._id;
+    }
+  }, [user, theme, updateTheme]);
 
   function handleLogout() {
     logout();
@@ -176,13 +205,11 @@ export default function Layout() {
 
       <aside className={styles.sidebar}>
         <div className={styles.logo}>
-          <span className={styles.logoText}>
-            {collapsed ? 'BD' : 'BARBEARIA DÉLIO'}
-          </span>
+          <img src={logo} alt="Barbearia Délio" className={styles.logoImg} />
         </div>
 
         <nav className={styles.nav}>
-          {NAV_ITEMS.map(item => (
+          {NAV_ITEMS.filter(item => item.roles.includes(user?.role || '')).map(item => (
             item.external ? (
               <a
                 key={item.path}
@@ -240,6 +267,14 @@ export default function Layout() {
             aria-label="Toggle sidebar"
           >
             <IconMenu />
+          </button>
+
+          <button 
+            className={styles.themeToggle} 
+            onClick={() => toggleTheme()}
+            title={`Alternar para modo ${theme === 'dark' ? 'claro' : 'escuro'}`}
+          >
+            {theme === 'dark' ? <IconSun /> : <IconMoon />}
           </button>
         </header>
         <main className={styles.content}>

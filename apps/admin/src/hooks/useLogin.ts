@@ -7,6 +7,7 @@ import type { User } from '@barber/types';
 interface LoginForm {
   email: string;
   password: string;
+  appId?: string;
 }
 
 interface AuthResponse {
@@ -38,8 +39,14 @@ export function useLogin() {
       localStorage.setItem('refreshToken', auth.refreshToken);
 
       const { data: me } = await api.get<MeResponse>('/auth/me');
-      setUser(me as unknown as User);
+      
+      if (me.role === 'client') {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        throw new Error('Acesso restrito. Use o aplicativo de agendamento.');
+      }
 
+      setUser(me as unknown as User);
       navigate('/dashboard');
     } catch (err: unknown) {
       const message =

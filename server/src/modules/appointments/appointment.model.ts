@@ -16,20 +16,20 @@ export interface IAppointment extends Document {
 
 const appointmentSchema = new Schema<IAppointment>(
   {
-    clientId:   { type: Schema.Types.ObjectId, ref: 'Client',  required: true },
+    clientId:   { type: Schema.Types.ObjectId, ref: 'Client' },
     employeeId: { type: Schema.Types.ObjectId, ref: 'User',    required: true },
-    serviceId:  { type: Schema.Types.ObjectId, ref: 'Service', required: true },
+    serviceId:  { type: Schema.Types.ObjectId, ref: 'Service' },
     unitId:     { type: Schema.Types.ObjectId, ref: 'Unit',    required: true },
     date:       { type: String, required: true },
     startTime:  { type: String, required: true },
     endTime:    { type: String, required: true },
     status:     {
       type: String,
-      enum: ['pending', 'confirmed', 'completed', 'cancelled'],
+      enum: ['pending', 'confirmed', 'completed', 'cancelled', 'blocked'],
       default: 'confirmed',
     },
     notes: String,
-    price: { type: Number, required: true, min: 0 },
+    price: { type: Number, required: true, min: 0, default: 0 },
   },
   { timestamps: true },
 );

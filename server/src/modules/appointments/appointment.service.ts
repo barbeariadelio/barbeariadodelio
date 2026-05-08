@@ -67,8 +67,12 @@ export class AppointmentService {
     date: string,
     durationMinutes: number,
   ): Promise<string[]> {
-    const employee = await UserModel.findById(employeeId).select('workSchedule');
+    const employee = await UserModel.findById(employeeId).select('workSchedule vacations blockedDays');
     if (!employee) throw new NotFoundError('Employee');
+
+    // Se o dia estiver bloqueado ou o profissional estiver de férias, retorna zero horários
+    if (employee.blockedDays?.includes(date)) return [];
+    if (employee.vacations?.some(v => date >= v.start && date <= v.end)) return [];
 
     const schedule = employee.workSchedule || { start: '08:00', end: '18:00' };
 
@@ -122,19 +126,38 @@ export class AppointmentService {
   }
 
   async create(data: Partial<IAppointment>): Promise<IAppointment> {
+    if (data.status !== 'blocked') {
+      if (!data.clientId || !data.serviceId) {
+        throw new AppError('Cliente e Serviço são obrigatórios para agendamentos.', 400);
+      }
+    }
+
     if (!data.endTime && data.serviceId && data.startTime) {
       const svc = await ServiceModel.findById(data.serviceId);
       if (svc) data.endTime = calcEndTime(data.startTime, svc.durationMinutes);
     }
 
-    // Past date/time validation
-    const today = new Date();
-    const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const nowTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
-    
-    if (data.date! < todayISO || (data.date === todayISO && data.startTime! < nowTime)) {
-      throw new AppError('Cannot book in the past', 400);
+    // Past date/time validation — skip for admin-created blocks
+    if (data.status !== 'blocked') {
+      const today = new Date();
+      const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const nowTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
+      
+      if (data.date! < todayISO || (data.date === todayISO && data.startTime! < nowTime)) {
+        throw new AppError('Cannot book in the past', 400);
+      }
     }
+    
+    const employee = await UserModel.findById(data.employeeId).select('vacations blockedDays');
+    if (!employee) throw new NotFoundError('Employee');
+
+    if (employee.blockedDays?.includes(data.date!)) {
+      throw new AppError('Profissional indisponível: Dia bloqueado.', 400);
+    }
+    if (employee.vacations?.some(v => data.date! >= v.start && data.date! <= v.end)) {
+      throw new AppError('Profissional indisponível: Em período de férias.', 400);
+    }
+
     const conflict = await AppointmentModel.findOne({
       employeeId: data.employeeId,
       date: data.date,
@@ -146,7 +169,8 @@ export class AppointmentService {
       ],
     });
     if (conflict) throw new AppError('Time slot already booked', 409);
-    const apptData = { status: 'confirmed', ...data };
+    
+    const apptData = { ...data, status: data.status || 'confirmed' };
     return AppointmentModel.create(apptData);
   }
 
@@ -217,6 +241,16 @@ export class AppointmentService {
       ],
     });
     if (conflict) throw new AppError('Time slot already booked', 409);
+    
+    const employee = await UserModel.findById(employeeId).select('vacations blockedDays');
+    if (!employee) throw new NotFoundError('Employee');
+
+    if (employee.blockedDays?.includes(date)) {
+      throw new AppError('Profissional indisponível: Dia bloqueado.', 400);
+    }
+    if (employee.vacations?.some(v => date >= v.start && date <= v.end)) {
+      throw new AppError('Profissional indisponível: Em período de férias.', 400);
+    }
 
     const appointment = await AppointmentModel.create({ clientId: client._id, employeeId, serviceId, unitId, date, startTime, endTime, price, status: 'confirmed' });
 

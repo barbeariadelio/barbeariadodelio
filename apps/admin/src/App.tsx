@@ -13,7 +13,6 @@ const Settings = lazy(() => import('./pages/Settings/Settings'));
 const Inventory = lazy(() => import('./pages/Inventory/Inventory'));
 const Permissions = lazy(() => import('./pages/Permissions/Permissions'));
 const Units = lazy(() => import('./pages/Units/Units'));
-const Tasks = lazy(() => import('./pages/Tasks/Tasks'));
 
 const spinnerStyle: React.CSSProperties = {
   width: '40px',
@@ -68,7 +67,6 @@ export default function App() {
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/permissions" element={<Permissions />} />
           <Route path="/units" element={<Units />} />
-          <Route path="/tasks" element={<Tasks />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
 

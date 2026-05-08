@@ -5,7 +5,7 @@ import { requireRoles, requireSameUnit } from '../../shared/middlewares/rbac.mid
 
 export const financeRoutes = Router();
 
-financeRoutes.get('/summary', authenticate, requireRoles('owner', 'franchisor', 'franchisee'), getSummary);
+financeRoutes.get('/summary', authenticate, requireRoles('owner', 'franchisor', 'franchisee', 'employee'), getSummary);
 financeRoutes.get('/transactions', authenticate, requireRoles('owner', 'franchisee', 'franchisor', 'employee'), requireSameUnit(), listTransactions);
 financeRoutes.post('/transactions', authenticate, requireRoles('owner', 'employee'), createTransaction);
 financeRoutes.patch('/transactions/:id', authenticate, requireRoles('owner', 'employee'), updateTransaction);

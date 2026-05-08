@@ -16,7 +16,13 @@ export interface IUser extends Document {
     lunchStart?: string;
     lunchEnd?: string;
   };
+  vacations?: {
+    start: string;
+    end: string;
+  }[];
+  blockedDays?: string[];
   isActive: boolean;
+  allowedApps?: string[];
 }
 
 const userSchema = new Schema<IUser>(
@@ -39,7 +45,14 @@ const userSchema = new Schema<IUser>(
       lunchStart: String,
       lunchEnd: String,
     },
+    vacations: [{
+      start: String,
+      end: String,
+    }],
+    blockedDays: [String],
     isActive: { type: Boolean, default: true },
+    allowedApps: { type: [String], default: [] },
+    theme: { type: String, enum: ['light', 'dark'], default: 'light' },
   },
   { timestamps: true },
 );

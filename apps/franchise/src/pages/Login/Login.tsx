@@ -1,8 +1,10 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { api } from '../../api/client';
 import styles from './Login.module.scss';
+import logo from '../../assets/logo.png';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -11,20 +13,33 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [showPw, setShowPw] = useState(false);
   const { setUser } = useAuth();
+  const { updateTheme } = useTheme();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    updateTheme('light');
+  }, [updateTheme]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setLoading(true); setError(null);
     try {
-      const { data: auth } = await api.post('/auth/login', { email, password });
+      const { data: auth } = await api.post('/auth/login', { email, password, appId: 'franchise' });
       localStorage.setItem('accessToken', auth.accessToken);
       localStorage.setItem('refreshToken', auth.refreshToken);
       const { data: me } = await api.get('/auth/me');
+      
+      if (me.role === 'client') {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        setError('Acesso restrito. Use o aplicativo de agendamento.');
+        return;
+      }
+
       setUser(me);
       navigate('/dashboard');
-    } catch {
-      setError('E-mail ou senha inválidos.');
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'E-mail ou senha inválidos.');
     } finally {
       setLoading(false);
     }
@@ -33,7 +48,9 @@ export default function Login() {
   return (
     <div className={styles.page}>
       <div className={styles.card}>
-        <div className={styles.brand}><span className={styles.w}>BARBEARIA</span> <span className={styles.b}>DÉLIO</span></div>
+        <div className={styles.brand}>
+          <img src={logo} alt="Barbearia Délio" className={styles.logoImg} />
+        </div>
         <p className={styles.sub}>Unidade Nova Veneza</p>
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.field}><label className={styles.label}>E-mail</label><input type="email" className={styles.input} value={email} onChange={e => setEmail(e.target.value)} required /></div>

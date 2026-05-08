@@ -17,6 +17,8 @@ interface Employee {
     lunchStart?: string;
     lunchEnd?: string;
   };
+  vacations?: { start: string; end: string }[];
+  blockedDays?: string[];
   isActive: boolean;
 }
 
@@ -37,6 +39,7 @@ interface Props {
 export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
   const isEdit = !!employee;
   const [name, setName] = useState(employee?.name ?? '');
+  const [email, setEmail] = useState(employee?.email ?? '');
   const [phone, setPhone] = useState(employee?.phone ?? '');
   const [avatar, setAvatar] = useState(employee?.avatar ?? '');
   const [password, setPassword] = useState('');
@@ -45,6 +48,13 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
   const [schedEnd, setSchedEnd] = useState(employee?.workSchedule?.end ?? '18:00');
   const [lunchStart, setLunchStart] = useState(employee?.workSchedule?.lunchStart ?? '');
   const [lunchEnd, setLunchEnd] = useState(employee?.workSchedule?.lunchEnd ?? '');
+  
+  const [vacationStart, setVacationStart] = useState(employee?.vacations?.[0]?.start ?? '');
+  const [vacationEnd, setVacationEnd] = useState(employee?.vacations?.[0]?.end ?? '');
+  
+  const [blockedDays, setBlockedDays] = useState<string[]>(employee?.blockedDays ?? []);
+  const [newBlockedDay, setNewBlockedDay] = useState('');
+  
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
@@ -66,13 +76,31 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
     reader.readAsDataURL(file);
   }
 
+  function addBlockedDay() {
+    if (newBlockedDay && !blockedDays.includes(newBlockedDay)) {
+      setBlockedDays([...blockedDays, newBlockedDay].sort());
+      setNewBlockedDay('');
+    }
+  }
+
+  function removeBlockedDay(day: string) {
+    setBlockedDays(blockedDays.filter(d => d !== day));
+  }
+
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const fakeEmail = employee?.email || `${name.replace(/\s+/g, '').toLowerCase()}_${Date.now()}@delio.staff`;
+    const finalEmail = email || `${name.replace(/\s+/g, '').toLowerCase()}_${Date.now()}@delio.staff`;
     
+    const vacations = (vacationStart && vacationEnd) ? [{ start: vacationStart, end: vacationEnd }] : [];
+
+    const finalBlockedDays = [...blockedDays];
+    if (newBlockedDay && !finalBlockedDays.includes(newBlockedDay)) {
+      finalBlockedDays.push(newBlockedDay);
+    }
+
     const payload: any = {
       name,
-      email: fakeEmail,
+      email: finalEmail,
       phone,
       role: 'employee',
       avatar,
@@ -81,7 +109,9 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
         end: schedEnd,
         lunchStart: lunchStart || undefined,
         lunchEnd: lunchEnd || undefined,
-      }
+      },
+      vacations,
+      blockedDays: finalBlockedDays.sort()
     };
     if (!isEdit || password) payload.password = password;
     mutation.mutate(payload);
@@ -89,7 +119,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
 
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className={styles.modal}>
+      <div className={styles.modal} style={{ maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto' }}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>
             {isEdit ? 'EDITAR FUNCIONÁRIO' : 'NOVO FUNCIONÁRIO'}
@@ -114,9 +144,15 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
             </div>
           </div>
 
-          <div className={styles.field}>
-            <label className={styles.label}>Nome *</label>
-            <input className={styles.input} value={name} onChange={e => setName(e.target.value)} required />
+          <div className={styles.schedGrid}>
+            <div className={styles.field}>
+              <label className={styles.label}>Nome *</label>
+              <input className={styles.input} value={name} onChange={e => setName(e.target.value)} required />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>Email</label>
+              <input type="email" className={styles.input} value={email} onChange={e => setEmail(e.target.value)} placeholder="email@exemplo.com" />
+            </div>
           </div>
 
           <div className={styles.field}>
@@ -150,6 +186,50 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
               <input type="time" className={styles.input} value={lunchEnd} onChange={e => setLunchEnd(e.target.value)} />
             </div>
           </div>
+
+          <hr style={{ borderColor: 'var(--border-subtle)', margin: '0.5rem 0' }} />
+
+          <div className={styles.schedGrid}>
+            <div className={styles.field}>
+              <label className={styles.label}>Início Férias</label>
+              <input type="date" className={styles.input} value={vacationStart} onChange={e => setVacationStart(e.target.value)} />
+            </div>
+            <div className={styles.field}>
+              <label className={styles.label}>Fim Férias</label>
+              <input type="date" className={styles.input} value={vacationEnd} onChange={e => setVacationEnd(e.target.value)} />
+            </div>
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Bloqueios Específicos (Dias inativos)</label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <input 
+                type="date" 
+                className={styles.input} 
+                value={newBlockedDay} 
+                onChange={e => setNewBlockedDay(e.target.value)} 
+              />
+              <button 
+                type="button" 
+                onClick={addBlockedDay}
+                style={{ padding: '0 1rem', background: 'var(--gold)', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+              >
+                +
+              </button>
+            </div>
+            {blockedDays.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+                {blockedDays.map(day => (
+                  <div key={day} style={{ background: '#374151', padding: '4px 10px', borderRadius: '20px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', color: '#E5E7EB', fontWeight: 500 }}>
+                    <span>{day.split('-').reverse().join('/')}</span>
+                    <button type="button" onClick={() => removeBlockedDay(day)} style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: 0, lineHeight: 1, fontSize: '1rem' }}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <hr style={{ borderColor: 'var(--border-subtle)', margin: '0.5rem 0' }} />
 
           <div className={styles.field}>
             <label className={styles.label}>{isEdit ? 'Nova Senha (deixe em branco para não alterar)' : 'Senha *'}</label>

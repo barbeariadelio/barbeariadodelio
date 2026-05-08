@@ -7,5 +7,6 @@ export default function ProtectedRoute({ children }: Props) {
   const { user, loading } = useAuth();
   if (loading) return null; // or a spinner
   if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'client') return <Navigate to="/login" replace />;
   return <>{children}</>;
 }

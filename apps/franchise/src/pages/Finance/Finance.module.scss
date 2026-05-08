@@ -6,7 +6,8 @@
 
 .page {
   padding: 2rem;
-  color: #F5F5F5;
+  color: var(--text-primary);
+  background: var(--bg-base);
   @media (max-width: 640px) { padding: 1.25rem; }
 }
 
@@ -24,20 +25,22 @@
 }
 
 .pageTitle {
+  font-family: 'Playfair Display', serif;
   font-size: 1.5rem;
   font-weight: 800;
   letter-spacing: -0.02em;
   margin: 0;
+  color: var(--text-primary);
 }
 
 .subtitle {
   font-size: 0.875rem;
-  color: #A0A0A0;
+  color: var(--text-secondary);
   margin: 0.25rem 0 0;
 }
 
 .newBtn {
-  background: #1565C0;
+  background: var(--gold);
   color: white;
   border: none;
   padding: 0.75rem 1.25rem;
@@ -45,7 +48,7 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  &:hover { background: #1976D2; transform: translateY(-1px); }
+  &:hover { background: var(--gold-light); transform: translateY(-1px); }
 }
 
 .filters {
@@ -60,62 +63,62 @@
 .tabs {
   display: flex;
   gap: 4px;
-  background: #1A1A1A;
+  background: var(--bg-surface);
   padding: 4px;
   border-radius: 4px;
-  border: 1px solid #2C2C2C;
+  border: 1px solid var(--border-default);
 }
 
 .tab {
   background: none;
   border: none;
-  color: #A0A0A0;
+  color: var(--text-secondary);
   padding: 0.5rem 1rem;
   border-radius: 2px;
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
-  &:hover { color: white; background: rgba(255,255,255,0.05); }
+  &:hover { color: var(--text-primary); background: var(--bg-elevated); }
 }
 
 .tabActive {
-  background: #1565C0 !important;
+  background: var(--gold) !important;
   color: white !important;
 }
 
 .periodTabs {
   display: flex;
   gap: 4px;
-  background: #1A1A1A;
+  background: var(--bg-surface);
   padding: 4px;
   border-radius: 4px;
-  border: 1px solid #2C2C2C;
+  border: 1px solid var(--border-default);
 }
 
 .periodBtn {
   background: none;
   border: none;
-  color: #A0A0A0;
+  color: var(--text-secondary);
   padding: 0.4rem 0.8rem;
   border-radius: 2px;
   font-size: 0.75rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
-  &:hover { color: white; background: rgba(255,255,255,0.05); }
+  &:hover { color: var(--text-primary); background: var(--bg-elevated); }
 }
 
 .periodBtnActive {
-  background: #2C2C2C !important;
-  color: #1565C0 !important;
+  background: var(--bg-elevated) !important;
+  color: var(--gold) !important;
   font-weight: 700;
 }
 
 // Summary Bar
 .summaryBar {
-  background: #1A1A1A;
-  border: 1px solid #2C2C2C;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 1.5rem 2rem;
   display: flex;
@@ -145,7 +148,7 @@
 .summaryLabel {
   font-size: 0.6875rem;
   font-weight: 600;
-  color: #A0A0A0;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -153,27 +156,28 @@
 .summaryValue {
   font-size: 1.5rem;
   font-weight: 700;
+  color: var(--text-primary);
 }
 
 .summaryDivider {
   width: 1px;
   height: 40px;
-  background: #2C2C2C;
+  background: var(--border-subtle);
 
   @media (max-width: 1024px) {
     display: none;
   }
 }
 
-.green { color: #4ade80; }
-.red { color: #f87171; }
-.blue { color: #60a5fa; }
-.amber { color: #fbbf24; }
+.green { color: #22c55e; }
+.red { color: #ef4444; }
+.blue { color: #3b82f6; }
+.amber { color: #f59e0b; }
 
 // Charts
 .chartSection {
-  background: #1A1A1A;
-  border: 1px solid #2C2C2C;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 1.5rem;
   margin-bottom: 2rem;
@@ -182,7 +186,7 @@
 .sectionTitle {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #A0A0A0;
+  color: var(--text-muted);
   margin-bottom: 1.5rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -192,23 +196,16 @@
   height: 320px;
 }
 
-// Service Grid
-.serviceGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.5rem;
-}
-
 .serviceCard {
-  background: rgba(255,255,255,0.02);
-  border: 1px solid #2C2C2C;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   transition: transform 0.2s;
-  &:hover { transform: translateY(-2px); border-color: #3C3C3C; }
+  &:hover { transform: translateY(-2px); border-color: var(--border-strong); }
 }
 
 .svcHead {
@@ -220,13 +217,13 @@
 .svcName {
   font-size: 0.875rem;
   font-weight: 700;
-  color: #F5F5F5;
+  color: var(--text-primary);
 }
 
 .svcCount {
   font-size: 0.6875rem;
-  color: #A0A0A0;
-  background: rgba(255,255,255,0.05);
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
   padding: 2px 8px;
   border-radius: 10px;
 }
@@ -239,27 +236,27 @@
 
 .svcLabel {
   font-size: 0.6875rem;
-  color: #A0A0A0;
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .svcValue {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #4ade80;
+  color: #22c55e;
 }
 
 .svcTrack {
   width: 100%;
   height: 4px;
-  background: rgba(255,255,255,0.05);
+  background: var(--bg-elevated);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .svcFill {
   height: 100%;
-  background: #1565C0;
+  background: var(--gold);
   border-radius: 2px;
 }
 
@@ -287,23 +284,24 @@
 .rateLabel {
   font-size: 0.625rem;
   font-weight: 700;
-  color: #A0A0A0;
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .rateInputWrap {
   display: flex;
   align-items: center;
-  background: #111;
-  border: 1px solid #2C2C2C;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 0 0.5rem;
+  &:focus-within { border-color: var(--gold); }
 }
 
 .rateInput {
   background: none;
   border: none;
-  color: white;
+  color: var(--text-primary);
   font-size: 0.8125rem;
   font-weight: 700;
   padding: 0.4rem 0;
@@ -314,12 +312,12 @@
 
 .rateSuffix {
   font-size: 0.75rem;
-  color: #60a5fa;
+  color: var(--gold);
   font-weight: 700;
 }
 
 .commissionTable {
-  border: 1px solid #2C2C2C;
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   overflow-x: auto;
 }
@@ -328,11 +326,11 @@
   display: grid;
   grid-template-columns: 2fr 0.5fr 1fr 1fr 1fr;
   padding: 0.75rem 1.25rem;
-  background: rgba(255,255,255,0.03);
-  border-bottom: 1px solid #2C2C2C;
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-default);
   font-size: 0.625rem;
   font-weight: 700;
-  color: #A0A0A0;
+  color: var(--text-muted);
   text-transform: uppercase;
   gap: 1rem;
   min-width: 700px;
@@ -343,10 +341,11 @@
   display: grid;
   grid-template-columns: 2fr 0.5fr 1fr 1fr 1fr;
   padding: 0.875rem 1.25rem;
-  border-bottom: 1px solid rgba(255,255,255,0.03);
+  border-bottom: 1px solid var(--border-subtle);
   align-items: center;
   gap: 1rem;
   min-width: 700px;
+  &:hover { background: var(--bg-overlay); }
   &:last-child { border-bottom: none; }
 }
 
@@ -354,19 +353,21 @@
   font-size: 0.8125rem;
   font-weight: 600;
   text-align: right;
+  color: var(--text-primary);
 }
 
 .empName {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  color: var(--text-primary);
 }
 
 .empAvatar {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #1565C0;
+  background: var(--gold);
   color: white;
   font-size: 0.6875rem;
   font-weight: 700;
@@ -377,8 +378,8 @@
 
 // Chart Card
 .chartCard {
-  background: #1A1A1A;
-  border: 1px solid #2C2C2C;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 1.5rem;
   margin-bottom: 2rem;
@@ -387,7 +388,7 @@
 .chartTitle {
   font-size: 0.8125rem;
   font-weight: 700;
-  color: #A0A0A0;
+  color: var(--text-muted);
   margin-bottom: 1.5rem;
   text-transform: uppercase;
 }
@@ -408,20 +409,20 @@
 .hBarLabel {
   width: 100px;
   font-size: 0.75rem;
-  color: #A0A0A0;
+  color: var(--text-secondary);
   @include text-ellipsis;
 }
 
 .hBarTrack {
   flex: 1;
   height: 4px;
-  background: rgba(255,255,255,0.05);
+  background: var(--bg-elevated);
   border-radius: 2px;
 }
 
 .hBarFill {
   height: 100%;
-  background: #1565C0;
+  background: var(--gold);
   border-radius: 2px;
 }
 
@@ -434,8 +435,8 @@
 
 // Section
 .section {
-  background: #1A1A1A;
-  border: 1px solid #2C2C2C;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 1.5rem;
   margin-bottom: 2rem;
@@ -450,13 +451,13 @@
 
 .reportBtn {
   background: transparent;
-  border: 1px solid #2C2C2C;
-  color: #A0A0A0;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
   padding: 0.4rem 0.8rem;
   border-radius: 4px;
   font-size: 0.75rem;
   cursor: pointer;
-  &:hover { color: white; background: #2C2C2C; }
+  &:hover { color: var(--text-primary); background: var(--bg-elevated); }
 }
 
 // Transaction List
@@ -470,7 +471,8 @@
   align-items: center;
   padding: 1rem;
   gap: 1rem;
-  border-bottom: 1px solid #2C2C2C;
+  border-bottom: 1px solid var(--border-subtle);
+  &:hover { background: var(--bg-overlay); }
   &:last-child { border: none; }
 }
 
@@ -490,14 +492,14 @@
   flex-direction: column;
 }
 
-.txDesc { font-size: 0.875rem; font-weight: 600; }
-.txMeta { font-size: 0.6875rem; color: #A0A0A0; }
-.txAmount { font-size: 0.875rem; font-weight: 700; }
+.txDesc { font-size: 0.875rem; font-weight: 600; color: var(--text-primary); }
+.txMeta { font-size: 0.6875rem; color: var(--text-muted); }
+.txAmount { font-size: 0.875rem; font-weight: 700; color: var(--text-primary); }
 
 .empty {
   padding: 2rem;
   text-align: center;
-  color: #5A5A5A;
+  color: var(--text-muted);
   font-size: 0.875rem;
 }
 
@@ -508,15 +510,15 @@
   justify-content: center;
   min-height: 400px;
   gap: 1.5rem;
-  color: #A0A0A0;
+  color: var(--text-muted);
   font-size: 0.9375rem;
 }
 
 .spinner {
   width: 40px;
   height: 40px;
-  border: 3px solid rgba(21, 101, 192, 0.1);
-  border-top-color: #1565C0;
+  border: 3px solid var(--gold-dim);
+  border-top-color: var(--gold);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

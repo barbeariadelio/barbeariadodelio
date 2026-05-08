@@ -1,15 +1,28 @@
 // ─── Navalha Theme — Barbearia do Délio ───────────────────────────────────
 
-// Gold accent (primary) — replaces all blue
-$gold:        #C49A2C;
-$gold-light:  #E5B53C;
-$gold-dark:   #9C7A1E;
-$gold-dim:    rgba(196, 154, 44, 0.10);
-$gold-glow:   0 0 24px rgba(196, 154, 44, 0.18);
-$gold-shadow: 0 4px 20px rgba(196, 154, 44, 0.25);
+// Blue Palette (Classic & Modern)
+$blue-50:  #EFF6FF;
+$blue-100: #DBEAFE;
+$blue-200: #BFDBFE;
+$blue-300: #93C5FD;
+$blue-400: #60A5FA;
+$blue-500: #3B82F6;
+$blue-600: #2563EB;
+$blue-700: #1D4ED8;
+$blue-800: #1E40AF;
+$blue-900: #1E3A8A;
+$blue-950: #172554;
+
+// Repurposed legacy variables to use the new blue palette
+$gold:        $blue-600; 
+$gold-light:  $blue-400;
+$gold-dark:   $blue-700;
+$gold-dim:    rgba(37, 99, 235, 0.10);
+$gold-glow:   0 0 24px rgba(37, 99, 235, 0.18);
+$gold-shadow: 0 4px 20px rgba(37, 99, 235, 0.25);
 
 // Red (danger/expense)
-$red:        #A83232;
+$red:        #DC2626;
 $red-light:  #DC4040;
 $red-dark:   #7A1E1E;
 $red-dim:    rgba(168, 50, 50, 0.10);
@@ -72,12 +85,27 @@ $transition-normal: 250ms ease;
 
 // ─── CSS Custom Properties ─────────────────────────────────────────────────
 :root {
+  --blue-50:  #{$blue-50};
+  --blue-100: #{$blue-100};
+  --blue-200: #{$blue-200};
+  --blue-300: #{$blue-300};
+  --blue-400: #{$blue-400};
+  --blue-500: #{$blue-500};
+  --blue-600: #{$blue-600};
+  --blue-700: #{$blue-700};
+  --blue-800: #{$blue-800};
+  --blue-900: #{$blue-900};
+  --blue-950: #{$blue-950};
+
   --gold:           #{$gold};
   --gold-light:     #{$gold-light};
   --gold-dark:      #{$gold-dark};
   --gold-dim:       #{$gold-dim};
+  
   --red:            #{$red};
   --red-light:      #{$red-light};
+  
+  // Default Dark Theme
   --bg-base:        #{$bg-base};
   --bg-surface:     #{$bg-surface};
   --bg-elevated:    #{$bg-elevated};
@@ -88,10 +116,30 @@ $transition-normal: 250ms ease;
   --text-primary:   #{$text-primary};
   --text-secondary: #{$text-secondary};
   --text-muted:     #{$text-muted};
+  
   --color-success:  #{$color-success};
   --color-warning:  #{$color-warning};
   --color-error:    #{$color-error};
   --font-display:   #{$font-display};
   --font-serif:     #{$font-serif};
   --font-body:      #{$font-body};
+}
+
+[data-theme='light'] {
+  --bg-base:        #F8F7F4;
+  --bg-surface:     #FFFFFF;
+  --bg-elevated:    #F2F0E9;
+  --bg-overlay:     #EBE8DD;
+  
+  --border-subtle:  #E8E4D9;
+  --border-default: #D8D2C2;
+  --border-strong:  #C2B9A3;
+  
+  --text-primary:   #1A1714;
+  --text-secondary: #5C5448;
+  --gold-dim:       rgba(37, 99, 235, 0.08);
+  
+  // Adjusted shadows for light mode
+  --shadow-sm:      0 2px 8px rgba(0,0,0,0.06);
+  --shadow-md:      0 4px 16px rgba(0,0,0,0.08);
 }

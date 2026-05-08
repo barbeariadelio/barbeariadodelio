@@ -40,8 +40,16 @@ const MONTHS_PT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set'
 
 type ViewMode = 'month' | 'day';
 
+export interface CalendarEmployee {
+  _id: string;
+  name: string;
+  blockedDays?: string[];
+  vacations?: { start: string; end: string }[];
+}
+
 interface Props {
   appointments: CalendarAppointment[];
+  employees?: CalendarEmployee[];
   month?: Date;
   onMonthChange?: (m: Date) => void;
   onUpdate?: () => void;
@@ -181,7 +189,7 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
   );
 }
 
-export default function CalendarView({ appointments, month: controlledMonth, onMonthChange, onUpdate, onDayClick }: Props) {
+export default function CalendarView({ appointments, employees = [], month: controlledMonth, onMonthChange, onUpdate, onDayClick }: Props) {
   const [view, setView] = useState<ViewMode>('month');
   const [internalMonth, setInternalMonth] = useState(new Date());
   const currentMonth = controlledMonth ?? internalMonth;
@@ -293,9 +301,20 @@ export default function CalendarView({ appointments, month: controlledMonth, onM
 
           <div className={styles.grid}>
             {days.map(day => {
+              const isoDay = format(day, 'yyyy-MM-dd');
+              const blockedStaff = employees.filter(emp => {
+                if (emp.blockedDays?.includes(isoDay)) return true;
+                if (emp.vacations?.some(v => isoDay >= v.start && isoDay <= v.end)) return true;
+                return false;
+              });
+
               const da = apptForDay(day);
               const inMonth = isSameMonth(day, currentMonth);
               const todayCell = isToday(day);
+              
+              const MAX_PILLS = 3;
+              const totalItems = blockedStaff.length + da.length;
+              
               return (
                 <div
                   key={day.toISOString()}
@@ -306,7 +325,17 @@ export default function CalendarView({ appointments, month: controlledMonth, onM
                     {format(day, 'd')}
                   </span>
                   <div className={styles.pills}>
-                    {da.slice(0, 3).map(a => {
+                    {blockedStaff.slice(0, MAX_PILLS).map(emp => (
+                      <div
+                        key={`block-${emp._id}`}
+                        className={styles.pill}
+                        style={{ background: 'var(--bg-elevated)', color: 'var(--text-muted)', border: '1px dashed var(--text-muted)', opacity: 0.8 }}
+                        title={`Bloqueado / Férias: ${emp.name}`}
+                      >
+                        Folga: {emp.name.split(' ')[0]}
+                      </div>
+                    ))}
+                    {da.slice(0, MAX_PILLS - Math.min(blockedStaff.length, MAX_PILLS)).map(a => {
                       const c = STATUS_COLORS[a.status];
                       return (
                         <div
@@ -320,7 +349,7 @@ export default function CalendarView({ appointments, month: controlledMonth, onM
                         </div>
                       );
                     })}
-                    {da.length > 3 && <div className={styles.pillMore}>+{da.length - 3}</div>}
+                    {totalItems > MAX_PILLS && <div className={styles.pillMore}>+{totalItems - MAX_PILLS}</div>}
                   </div>
                 </div>
               );

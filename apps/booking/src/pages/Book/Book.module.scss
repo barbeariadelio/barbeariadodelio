@@ -1,28 +1,16 @@
-$bg:      #0D0B09;
-$surf:    #141210;
-$surf2:   #1D1A15;
-$surf3:   #2A261E;
-$gold:    #C49A2C;
-$goldL:   #E5B53C;
-$text:    #F2EDE6;
-$text2:   #9A9080;
-$text3:   #5A5448;
-$border:  #1D1A15;
-$border2: #2A261E;
-$green:   #22C55E;
-
 // ── Page ─────────────────────────────────────────────────────────────────────
 .page {
   min-height: 100vh;
-  background: $bg;
+  background: var(--bg-base);
   display: flex;
   flex-direction: column;
+  color: var(--text-primary);
 }
 
 // ── Success ───────────────────────────────────────────────────────────────────
 .successPage {
   min-height: 100vh;
-  background: $bg;
+  background: var(--bg-base);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -36,7 +24,7 @@ $green:   #22C55E;
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse 60% 40% at 50% 30%, rgba(196,154,44,.06) 0%, transparent 70%);
+    background: radial-gradient(ellipse 60% 40% at 50% 30%, var(--gold-dim) 0%, transparent 70%);
     pointer-events: none;
   }
 }
@@ -45,22 +33,22 @@ $green:   #22C55E;
   width: 88px;
   height: 88px;
   border-radius: 50%;
-  background: rgba(196,154,44,.08);
-  border: 1px solid rgba(196,154,44,.25);
-  color: $gold;
+  background: var(--gold-dim);
+  border: 1px solid var(--gold);
+  color: var(--gold);
   display: flex;
   align-items: center;
   justify-content: center;
   margin-bottom: 1.75rem;
-  box-shadow: 0 0 40px rgba(196,154,44,.12);
+  box-shadow: var(--shadow-lg);
 }
 
 .successTitle {
   font-family: 'Playfair Display', serif;
   font-style: italic;
   font-size: clamp(2.5rem, 6vw, 3.5rem);
-  font-weight: 600;
-  color: $text;
+  font-weight: 700;
+  color: var(--text-primary);
   margin: 0 0 1.5rem;
   line-height: 1.05;
   letter-spacing: -0.01em;
@@ -73,18 +61,19 @@ $green:   #22C55E;
   margin-bottom: 2.5rem;
 
   span {
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
     font-size: 1rem;
-    color: $text2;
+    color: var(--text-secondary);
   }
 }
 
 .successPrice {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: 'Playfair Display', serif;
   font-style: italic;
   font-size: 1.625rem !important;
-  color: $gold !important;
+  color: var(--gold) !important;
   margin-top: 0.25rem;
+  font-weight: 700;
 }
 
 .successActions {
@@ -96,30 +85,30 @@ $green:   #22C55E;
 }
 
 .successPrimary {
-  background: $gold;
-  color: $bg;
+  background: var(--gold);
+  color: white;
   border: none;
   border-radius: 8px;
   padding: 0.875rem;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
-  &:hover { background: $goldL; }
+  transition: all 0.2s;
+  &:hover { background: var(--gold-light); transform: translateY(-1px); }
 }
 
 .successSecondary {
-  background: none;
-  border: 1px solid $border2;
+  background: transparent;
+  border: 1px solid var(--border-default);
   border-radius: 8px;
   padding: 0.75rem;
-  color: $text2;
-  font-family: 'DM Sans', sans-serif;
+  color: var(--text-secondary);
+  font-family: 'Inter', sans-serif;
   font-size: 0.9375rem;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-  &:hover { color: $text; border-color: $surf3; }
+  transition: all 0.2s;
+  &:hover { color: var(--text-primary); border-color: var(--border-strong); background: var(--bg-overlay); }
 }
 
 // ── Top bar ───────────────────────────────────────────────────────────────────
@@ -128,8 +117,8 @@ $green:   #22C55E;
   align-items: center;
   justify-content: space-between;
   padding: 0.875rem 1.5rem;
-  border-bottom: 1px solid $border;
-  background: rgba(13,11,9,.96);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
   backdrop-filter: blur(16px);
   position: sticky;
   top: 0;
@@ -143,15 +132,15 @@ $green:   #22C55E;
   gap: 0.375rem;
   background: none;
   border: none;
-  color: $text2;
-  font-family: 'DM Sans', sans-serif;
+  color: var(--text-muted);
+  font-family: 'Inter', sans-serif;
   font-size: 0.8125rem;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
   transition: color 0.15s;
   padding: 0;
-  &:hover { color: $text; }
+  &:hover { color: var(--text-primary); }
 }
 
 // ── Step indicator ────────────────────────────────────────────────────────────
@@ -170,29 +159,29 @@ $green:   #22C55E;
   top: 50%;
   left: 13px;
   right: 13px;
-  height: 1px;
-  background: $border2;
+  height: 2px;
+  background: var(--border-subtle);
   transform: translateY(-50%);
-  border-radius: 1px;
+  border-radius: 2px;
   z-index: 0;
   overflow: hidden;
 }
 
 .stepTrackFill {
   height: 100%;
-  background: $gold;
+  background: var(--gold);
   transition: width 0.45s cubic-bezier(.4,0,.2,1);
-  border-radius: 1px;
+  border-radius: 2px;
 }
 
 .stepNode {
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: $surf2;
-  border: 1px solid $border2;
-  color: $text3;
-  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  color: var(--text-muted);
+  font-family: 'Inter', sans-serif;
   font-size: 0.6875rem;
   font-weight: 700;
   display: flex;
@@ -201,19 +190,19 @@ $green:   #22C55E;
   position: relative;
   z-index: 1;
   flex-shrink: 0;
-  transition: background 0.25s, border-color 0.25s, color 0.25s, box-shadow 0.25s;
+  transition: all 0.3s;
 
   &.stepActive {
-    background: $gold;
-    border-color: $gold;
-    color: $bg;
-    box-shadow: 0 0 0 4px rgba(196,154,44,.16);
+    background: var(--gold);
+    border-color: var(--gold);
+    color: white;
+    box-shadow: 0 0 0 4px var(--gold-dim);
   }
 
   &.stepDone {
-    background: $green;
-    border-color: $green;
-    color: #fff;
+    background: #22c55e;
+    border-color: #22c55e;
+    color: white;
   }
 }
 
@@ -222,17 +211,18 @@ $green:   #22C55E;
   bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  background: $surf2;
-  border: 1px solid $border2;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 0.25rem 0.5rem;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.6875rem;
-  color: $text2;
+  color: var(--text-secondary);
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s;
+  box-shadow: var(--shadow-sm);
 
   .stepNode:hover & { opacity: 1; }
 }
@@ -241,10 +231,10 @@ $green:   #22C55E;
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: $surf2;
-  border: 1px solid $border2;
-  color: $text2;
-  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  color: var(--text-muted);
+  font-family: 'Inter', sans-serif;
   font-size: 0.6875rem;
   font-weight: 700;
   cursor: pointer;
@@ -252,8 +242,8 @@ $green:   #22C55E;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.15s, color 0.15s;
-  &:hover { border-color: $gold; color: $text; }
+  transition: all 0.2s;
+  &:hover { border-color: var(--gold); color: var(--text-primary); background: var(--bg-overlay); }
 }
 
 // ── Body ──────────────────────────────────────────────────────────────────────
@@ -271,21 +261,22 @@ $green:   #22C55E;
 
 .stepCounter {
   display: block;
-  font-family: 'Cormorant Garamond', serif;
+  font-family: 'Playfair Display', serif;
   font-style: italic;
   font-size: 0.875rem;
-  color: $gold;
+  color: var(--gold);
   margin-bottom: 0.375rem;
   letter-spacing: 0.03em;
+  font-weight: 600;
 }
 
 .stepHeading {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Playfair Display', serif;
   font-size: clamp(1.75rem, 4vw, 2.25rem);
-  letter-spacing: 0.06em;
-  color: $text;
+  color: var(--text-primary);
   margin: 0;
-  line-height: 1;
+  line-height: 1.2;
+  font-weight: 700;
 }
 
 // ── Layout ────────────────────────────────────────────────────────────────────
@@ -305,12 +296,13 @@ $green:   #22C55E;
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 .sidebar {
   display: none;
-  background: $surf;
-  border: 1px solid $border;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
   padding: 1.25rem;
   position: sticky;
   top: calc(56px + 2rem);
+  box-shadow: var(--shadow-sm);
 
   @media (min-width: 860px) {
     display: block;
@@ -318,51 +310,51 @@ $green:   #22C55E;
 }
 
 .sidebarLabel {
-  font-family: 'Bebas Neue', sans-serif;
-  font-size: 1rem;
-  letter-spacing: 0.08em;
-  color: $text;
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem;
+  color: var(--text-primary);
   margin: 0 0 1.125rem;
+  font-weight: 700;
 }
 
 .sidebarEmpty {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.8125rem;
-  color: $text3;
+  color: var(--text-muted);
   margin: 0;
   padding: 0.5rem 0 0.75rem;
 }
 
 .sidebarBlock {
   padding: 0.75rem 0;
-  border-bottom: 1px solid $border;
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
 
-  &:first-of-type { border-top: 1px solid $border; }
+  &:first-of-type { border-top: 1px solid var(--border-subtle); }
 }
 
 .sidebarKey {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.625rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: $text3;
+  color: var(--text-muted);
 }
 
 .sidebarVal {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.9375rem;
-  font-weight: 500;
-  color: $text;
+  font-weight: 600;
+  color: var(--text-primary);
 }
 
 .sidebarMeta {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.75rem;
-  color: $text2;
+  color: var(--text-secondary);
 }
 
 .sidebarTotal {
@@ -371,21 +363,22 @@ $green:   #22C55E;
   justify-content: space-between;
   margin-top: 1.125rem;
   padding-top: 1rem;
-  border-top: 1px solid $border2;
+  border-top: 1px solid var(--border-default);
 }
 
 .sidebarTotalLabel {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.8125rem;
-  color: $text2;
+  color: var(--text-secondary);
 }
 
 .sidebarTotalVal {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: 'Playfair Display', serif;
   font-style: italic;
   font-size: 1.625rem;
-  color: $gold;
+  color: var(--gold);
   line-height: 1;
+  font-weight: 700;
 }
 
 // ── Service list ──────────────────────────────────────────────────────────────
@@ -400,24 +393,25 @@ $green:   #22C55E;
   grid-template-columns: 42px 1fr auto 16px;
   align-items: center;
   gap: 0.875rem;
-  background: $surf;
-  border: 1px solid $border;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
   padding: 1.0625rem 1.125rem;
   cursor: pointer;
   text-align: left;
   width: 100%;
-  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  transition: all 0.2s;
 
   &:hover {
-    border-color: $border2;
-    box-shadow: 0 4px 24px rgba(0,0,0,.3);
+    border-color: var(--border-strong);
+    background: var(--bg-overlay);
+    box-shadow: var(--shadow-md);
   }
 
   &.svcRowSel {
-    border-color: $gold;
-    background: rgba(196,154,44,.04);
-    box-shadow: 0 0 0 1px rgba(196,154,44,.2), 0 4px 24px rgba(0,0,0,.2);
+    border-color: var(--gold);
+    background: var(--gold-dim);
+    box-shadow: 0 0 0 1px var(--gold);
   }
 }
 
@@ -425,14 +419,15 @@ $green:   #22C55E;
   width: 42px;
   height: 42px;
   border-radius: 10px;
-  background: $surf2;
-  color: $gold;
+  background: var(--bg-elevated);
+  color: var(--gold);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   transition: background 0.15s;
   overflow: hidden;
+  border: 1px solid var(--border-subtle);
 
   .svcImg {
     width: 100%;
@@ -441,7 +436,7 @@ $green:   #22C55E;
   }
 
   .svcRow:hover &,
-  .svcRowSel & { background: rgba(196,154,44,.1); }
+  .svcRowSel & { background: var(--bg-overlay); }
 }
 
 .svcInfo {
@@ -452,16 +447,16 @@ $green:   #22C55E;
 }
 
 .svcName {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.9375rem;
-  font-weight: 600;
-  color: $text;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .svcDesc {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.8rem;
-  color: $text2;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -476,29 +471,30 @@ $green:   #22C55E;
 }
 
 .svcPrice {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: 'Playfair Display', serif;
   font-style: italic;
   font-size: 1.125rem;
-  color: $gold;
+  color: var(--gold);
   line-height: 1;
+  font-weight: 700;
 }
 
 .svcDur {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.6875rem;
-  color: $text3;
-  background: $surf2;
+  color: var(--text-muted);
+  background: var(--bg-elevated);
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
   white-space: nowrap;
 }
 
 .svcArrow {
-  color: $text3;
+  color: var(--text-muted);
   flex-shrink: 0;
-  transition: color 0.15s, transform 0.15s;
-  .svcRow:hover & { color: $gold; transform: translateX(2px); }
-  .svcRowSel & { color: $gold; }
+  transition: all 0.2s;
+  .svcRow:hover & { color: var(--gold); transform: translateX(2px); }
+  .svcRowSel & { color: var(--gold); }
 }
 
 // ── Employee grid ─────────────────────────────────────────────────────────────
@@ -509,8 +505,8 @@ $green:   #22C55E;
 }
 
 .empCard {
-  background: $surf;
-  border: 1px solid $border;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
   padding: 1.5rem 1rem 1.25rem;
   display: flex;
@@ -519,13 +515,13 @@ $green:   #22C55E;
   gap: 0.5rem;
   cursor: pointer;
   width: 100%;
-  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  transition: all 0.2s;
 
-  &:hover { border-color: $border2; box-shadow: 0 4px 20px rgba(0,0,0,.3); }
+  &:hover { border-color: var(--border-strong); background: var(--bg-overlay); box-shadow: var(--shadow-md); }
   &.empCardSel {
-    border-color: $gold;
-    background: rgba(196,154,44,.04);
-    box-shadow: 0 0 0 1px rgba(196,154,44,.2);
+    border-color: var(--gold);
+    background: var(--gold-dim);
+    box-shadow: 0 0 0 1px var(--gold);
   }
 }
 
@@ -538,38 +534,38 @@ $green:   #22C55E;
   width: 58px;
   height: 58px;
   border-radius: 50%;
-  background: $surf2;
-  border: 2px solid $border2;
-  color: $text2;
-  font-family: 'DM Sans', sans-serif;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-default);
+  color: var(--text-muted);
+  font-family: 'Inter', sans-serif;
   font-size: 1.1875rem;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.15s, color 0.15s;
+  transition: all 0.2s;
   overflow: hidden;
 
   img { width: 100%; height: 100%; object-fit: cover; }
 
   .empCardSel & {
-    border-color: $gold;
-    color: $gold;
+    border-color: var(--gold);
+    color: var(--gold);
   }
 }
 
 .empName {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.9375rem;
-  font-weight: 600;
-  color: $text;
+  font-weight: 700;
+  color: var(--text-primary);
   text-align: center;
 }
 
 .empRole {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.75rem;
-  color: $text3;
+  color: var(--text-muted);
   text-align: center;
 }
 
@@ -586,10 +582,11 @@ $green:   #22C55E;
 }
 
 .cal {
-  background: $surf;
-  border: 1px solid $border;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
   padding: 1.125rem;
+  box-shadow: var(--shadow-sm);
 }
 
 .calHead {
@@ -604,23 +601,23 @@ $green:   #22C55E;
   height: 30px;
   border-radius: 7px;
   background: none;
-  border: 1px solid $border2;
-  color: $text2;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: border-color 0.12s, color 0.12s;
+  transition: all 0.2s;
 
-  &:hover:not(:disabled) { border-color: $gold; color: $text; }
+  &:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); background: var(--bg-overlay); }
   &:disabled { opacity: 0.3; cursor: not-allowed; }
 }
 
 .calTitle {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.9375rem;
-  font-weight: 600;
-  color: $text;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .calDow {
@@ -630,10 +627,10 @@ $green:   #22C55E;
 
   span {
     text-align: center;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
     font-size: 0.6rem;
-    font-weight: 700;
-    color: $text3;
+    font-weight: 800;
+    color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     padding: 0.25rem 0;
@@ -646,12 +643,11 @@ $green:   #22C55E;
   gap: 2px;
 }
 
-// Shared base for cal cells
-@mixin calCell {
+.calCellBase {
   aspect-ratio: 1;
   border: none;
   border-radius: 7px;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.8125rem;
   display: flex;
   align-items: center;
@@ -659,11 +655,11 @@ $green:   #22C55E;
   width: 100%;
 }
 
-.calEmpty { @include calCell; background: none; cursor: default; }
-.calPast  { @include calCell; background: none; color: $text3; cursor: not-allowed; opacity: 0.45; }
-.calCell  { @include calCell; background: none; color: $text; cursor: pointer; &:hover { background: $surf2; } }
-.calToday { @include calCell; background: none; color: $gold; border: 1px solid rgba(196,154,44,.3); font-weight: 600; cursor: pointer; &:hover { background: rgba(196,154,44,.08); } }
-.calSel   { @include calCell; background: $gold; color: $bg; font-weight: 700; cursor: pointer; &:hover { background: $goldL; } }
+.calEmpty { @extend .calCellBase; background: none; cursor: default; }
+.calPast  { @extend .calCellBase; background: none; color: var(--text-muted); cursor: not-allowed; opacity: 0.45; }
+.calCell  { @extend .calCellBase; background: none; color: var(--text-primary); cursor: pointer; transition: all 0.2s; &:hover { background: var(--bg-overlay); } }
+.calToday { @extend .calCellBase; background: none; color: var(--gold); border: 1px solid var(--gold-dim); font-weight: 700; cursor: pointer; &:hover { background: var(--gold-dim); } }
+.calSel   { @extend .calCellBase; background: var(--gold); color: white; font-weight: 700; cursor: pointer; &:hover { background: var(--gold-light); } }
 
 // ── Slots ─────────────────────────────────────────────────────────────────────
 .slotsWrap {
@@ -673,21 +669,21 @@ $green:   #22C55E;
 }
 
 .slotsLabel {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.8125rem;
-  font-weight: 600;
-  color: $text2;
+  font-weight: 700;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.07em;
   margin: 0;
 
-  span { font-style: normal; font-weight: 400; text-transform: none; letter-spacing: 0; color: $text3; }
+  span { font-style: normal; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text-muted); }
 }
 
 .slotsEmpty {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.9375rem;
-  color: $text3;
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -698,17 +694,18 @@ $green:   #22C55E;
 }
 
 .slot {
-  background: $surf;
-  border: 1px solid $border;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 8px;
   padding: 0.625rem 0.25rem;
-  color: $text2;
-  font-family: 'DM Sans', sans-serif;
+  color: var(--text-secondary);
+  font-family: 'Inter', sans-serif;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
-  &:hover { background: $surf2; color: $text; border-color: $border2; }
-  &.slotSel { background: $gold; border-color: $gold; color: $bg; font-weight: 600; }
+  transition: all 0.2s;
+  text-align: center;
+  &:hover { background: var(--bg-overlay); color: var(--text-primary); border-color: var(--border-strong); }
+  &.slotSel { background: var(--gold); border-color: var(--gold); color: white; font-weight: 700; }
 }
 
 .continueBtn {
@@ -716,18 +713,18 @@ $green:   #22C55E;
   align-items: center;
   gap: 0.5rem;
   align-self: flex-start;
-  background: $gold;
-  color: $bg;
+  background: var(--gold);
+  color: white;
   border: none;
   border-radius: 8px;
   padding: 0.75rem 1.5rem;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.2s;
   margin-top: 0.5rem;
-  &:hover { background: $goldL; }
+  &:hover { background: var(--gold-light); transform: translateY(-1px); }
 }
 
 // ── Confirm ───────────────────────────────────────────────────────────────────
@@ -739,8 +736,8 @@ $green:   #22C55E;
 }
 
 .authBanner {
-  background: rgba(196,154,44,.06);
-  border: 1px solid rgba(196,154,44,.18);
+  background: var(--gold-dim);
+  border: 1px solid var(--gold);
   border-radius: 10px;
   padding: 1rem 1.125rem;
   display: flex;
@@ -751,54 +748,55 @@ $green:   #22C55E;
 }
 
 .authBannerTitle {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.9375rem;
-  font-weight: 600;
-  color: $text;
+  font-weight: 700;
+  color: var(--text-primary);
   margin: 0 0 0.25rem;
 }
 
 .authBannerSub {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.8125rem;
-  color: $text2;
+  color: var(--text-secondary);
   margin: 0;
 }
 
 .authBannerBtn {
-  background: $gold;
-  color: $bg;
+  background: var(--gold);
+  color: white;
   border: none;
   border-radius: 8px;
   padding: 0.5625rem 1.125rem;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  transition: background 0.15s;
-  &:hover { background: $goldL; }
+  transition: all 0.2s;
+  &:hover { background: var(--gold-light); }
 }
 
 .confirmCard {
-  background: $surf;
-  border: 1px solid $border;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .confirmCardHead {
   padding: 0.875rem 1.25rem;
-  border-bottom: 1px solid $border;
+  border-bottom: 1px solid var(--border-subtle);
 
   span {
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Inter', sans-serif;
     font-size: 0.6875rem;
-    font-weight: 600;
+    font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    color: $text3;
+    color: var(--text-muted);
   }
 }
 
@@ -807,20 +805,20 @@ $green:   #22C55E;
   align-items: center;
   justify-content: space-between;
   padding: 0.875rem 1.25rem;
-  border-bottom: 1px solid $border;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .confirmLabel {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.875rem;
-  color: $text2;
+  color: var(--text-secondary);
 }
 
 .confirmVal {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.9375rem;
-  font-weight: 600;
-  color: $text;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .confirmTotal {
@@ -828,51 +826,53 @@ $green:   #22C55E;
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem;
-  background: $surf2;
+  background: var(--bg-elevated);
 }
 
 .confirmTotalLabel {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.875rem;
-  color: $text2;
+  color: var(--text-secondary);
 }
 
 .confirmTotalVal {
-  font-family: 'Cormorant Garamond', serif;
+  font-family: 'Playfair Display', serif;
   font-style: italic;
   font-size: 1.75rem;
-  color: $gold;
+  color: var(--gold);
   line-height: 1;
+  font-weight: 700;
 }
 
 .confirmBtn {
-  background: $gold;
-  color: $bg;
+  background: var(--gold);
+  color: white;
   border: none;
   border-radius: 8px;
   padding: 0.9375rem 2rem;
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
   width: 100%;
-  transition: background 0.15s, opacity 0.15s;
+  transition: all 0.2s;
 
-  &:hover:not(:disabled) { background: $goldL; }
+  &:hover:not(:disabled) { background: var(--gold-light); transform: translateY(-1px); }
   &:disabled { opacity: 0.45; cursor: not-allowed; }
 }
 
 // ── Guest form ────────────────────────────────────────────────────────────────
 .guestForm {
-  background: $surf;
-  border: 1px solid $border;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 12px;
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .guestFormHead {
   padding: 0.875rem 1.25rem;
-  border-bottom: 1px solid $border;
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   align-items: baseline;
   justify-content: space-between;
@@ -881,30 +881,31 @@ $green:   #22C55E;
 }
 
 .guestFormTitle {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.875rem;
-  font-weight: 600;
-  color: $text;
+  font-weight: 700;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .guestFormSub {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.75rem;
-  color: $text3;
+  color: var(--text-muted);
   margin: 0;
 }
 
 .guestLoginLink {
   background: none;
   border: none;
-  color: $gold;
-  font-family: 'DM Sans', sans-serif;
+  color: var(--gold);
+  font-family: 'Inter', sans-serif;
   font-size: 0.75rem;
   cursor: pointer;
   padding: 0;
   transition: color 0.12s;
-  &:hover { color: $goldL; }
+  font-weight: 600;
+  &:hover { color: var(--gold-light); }
 }
 
 .guestFields {
@@ -921,52 +922,54 @@ $green:   #22C55E;
 }
 
 .guestLabel {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.75rem;
   font-weight: 500;
-  color: $text2;
+  color: var(--text-secondary);
 }
 
 .guestInput {
-  background: $surf2;
-  border: 1px solid $border2;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 8px;
   padding: 0.6875rem 0.875rem;
-  color: $text;
-  font-family: 'DM Sans', sans-serif;
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
   font-size: 0.9375rem;
   width: 100%;
   box-sizing: border-box;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  transition: all 0.2s;
 
-  &::placeholder { color: $text3; }
-  &:focus { outline: none; border-color: $gold; box-shadow: 0 0 0 3px rgba(196,154,44,.12); }
+  &::placeholder { color: var(--text-muted); }
+  &:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); }
 }
 
 .loggedAsNote {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.8125rem;
-  color: $text3;
+  color: var(--text-muted);
   margin: 0;
   text-align: center;
 
-  strong { color: $text2; font-weight: 500; }
+  strong { color: var(--text-secondary); font-weight: 600; }
 }
 
 // ── Shared ────────────────────────────────────────────────────────────────────
 .loading {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.9375rem;
-  color: $text3;
+  color: var(--text-muted);
   margin: 0;
+  text-align: center;
+  padding: 2rem;
 }
 
 .error {
-  background: rgba(198,40,40,.1);
-  border: 1px solid rgba(198,40,40,.25);
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
   border-radius: 8px;
   padding: 0.75rem 1rem;
-  color: #EF5350;
-  font-family: 'DM Sans', sans-serif;
+  color: #ef4444;
+  font-family: 'Inter', sans-serif;
   font-size: 0.875rem;
 }

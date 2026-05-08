@@ -9,6 +9,8 @@ export interface User {
   phone: string;
   avatar?: string;
   isActive: boolean;
+  allowedApps?: string[];
+  theme?: 'light' | 'dark';
   createdAt: string;
 }
 
@@ -20,4 +22,5 @@ export interface AuthTokens {
 export interface LoginPayload {
   email: string;
   password: string;
+  appId?: string;
 }

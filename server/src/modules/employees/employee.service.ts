@@ -21,13 +21,7 @@ export class EmployeeService {
     return emp;
   }
 
-  async create(data: {
-    name: string;
-    email: string;
-    password: string;
-    phone: string;
-    unitId: string;
-  }): Promise<IUser> {
+  async create(data: any): Promise<IUser> {
     const passwordHash = await bcrypt.hash(data.password, 10);
     const emp = await UserModel.create({
       name: data.name,
@@ -37,7 +31,12 @@ export class EmployeeService {
       phone: data.phone,
       unitId: data.unitId,
       role: 'employee',
+      avatar: data.avatar,
+      workSchedule: data.workSchedule,
+      vacations: data.vacations,
+      blockedDays: data.blockedDays,
       isActive: true,
+      allowedApps: ['admin'],
     });
     return UserModel.findById(emp._id).select('-passwordHash') as Promise<IUser>;
   }

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../api/client';
 import styles from './Landing.module.scss';
+import logo from '../../assets/logo.png';
 
 interface Unit { _id: string; name: string; address: string; phone: string; }
 
@@ -24,8 +25,7 @@ export default function Landing() {
     <div className={styles.page}>
       <header className={styles.header}>
         <div className={styles.logo}>
-          <span className={styles.w}>BARBEARIA</span>
-          <span className={styles.b}>DÉLIO</span>
+          <img src={logo} alt="Barbearia Délio" className={styles.logoImg} />
         </div>
         <div className={styles.headerRight}>
           {user ? (

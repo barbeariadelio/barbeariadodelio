@@ -7,7 +7,7 @@ const service = new AuthService();
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const tokens = await service.login(req.body.email, req.body.password);
+    const tokens = await service.login(req.body.email, req.body.password, req.body.appId);
     ok(res, tokens);
   } catch (e) {
     next(e);
@@ -35,6 +35,15 @@ export async function me(req: AuthRequest, res: Response, next: NextFunction): P
 export async function updateMe(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const user = await service.updateMe(req.user!.id, req.body);
+    ok(res, user);
+  } catch (e) {
+    next(e);
+  }
+}
+
+export async function updateTheme(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const user = await service.updateTheme(req.user!.id, req.body.theme);
     ok(res, user);
   } catch (e) {
     next(e);

@@ -60,7 +60,7 @@ export default function Dashboard() {
     queryFn: () =>
       api.get(`/employees${unitId ? `?unitId=${unitId}` : ''}`)
          .then(r => Array.isArray(r.data) ? r.data : r.data?.employees ?? []),
-    enabled: view === 'schedule',
+    enabled: true,
   });
 
   function handleDayClick(day: Date) {
@@ -110,6 +110,7 @@ export default function Dashboard() {
           </div>
           <CalendarView
             appointments={monthAppointments}
+            employees={employees}
             month={calendarMonth}
             onMonthChange={setCalendarMonth}
             onUpdate={handleMonthUpdate}
@@ -127,6 +128,7 @@ export default function Dashboard() {
           onUpdate={handleScheduleUpdate}
           onNewAppt={() => setShowForm(true)}
           onBack={() => setView('calendar')}
+          unitId={unitId}
         />
       )}
 

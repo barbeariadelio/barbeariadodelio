@@ -1,12 +1,7 @@
-$text-main:  #F5F5F5;
-$text-dim:   #A3A3A3;
-$text-muted: #5A5A5A;
-$gold:       #1565C0;
-$border:     rgba(255,255,255,.06);
-
 .page {
   max-width: 1400px;
   animation: fadeIn 0.4s ease;
+  background: var(--bg-base);
 }
 
 @keyframes fadeIn {
@@ -27,12 +22,12 @@ $border:     rgba(255,255,255,.06);
   font-style: italic;
   font-size: 2.5rem;
   font-weight: 600;
-  color: $text-main;
+  color: var(--text-primary);
   margin: 0;
 }
 
 .newBtn {
-  background: $gold;
+  background: var(--gold);
   color: white;
   border: none;
   padding: 0.75rem 1.5rem;
@@ -42,7 +37,7 @@ $border:     rgba(255,255,255,.06);
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.2s;
-  &:hover { background: #1976D2; transform: translateY(-1px); }
+  &:hover { background: var(--gold-light); transform: translateY(-1px); }
 }
 
 .grid {
@@ -53,13 +48,13 @@ $border:     rgba(255,255,255,.06);
 }
 
 .card {
-  background: #111;
-  border: 1px solid $border;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 1.5rem;
   cursor: pointer;
   transition: all 0.2s;
-  &:hover { border-color: rgba(255,255,255,0.15); transform: translateY(-2px); }
+  &:hover { border-color: var(--gold); transform: translateY(-2px); }
   &.inactive { opacity: 0.6; }
 }
 
@@ -74,15 +69,15 @@ $border:     rgba(255,255,255,.06);
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: #1A1A1A;
-  color: $gold;
+  background: var(--bg-elevated);
+  color: var(--gold);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
   font-size: 1.125rem;
   flex-shrink: 0;
-  border: 1px solid $border;
+  border: 1px solid var(--border-subtle);
   overflow: hidden;
 }
 
@@ -99,9 +94,9 @@ $border:     rgba(255,255,255,.06);
   min-width: 0;
 }
 
-.name { font-size: 1.125rem; font-weight: 700; color: $text-main; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.email { font-size: 0.8125rem; color: $text-dim; margin-top: 2px; }
-.phone { font-size: 0.8125rem; color: $text-dim; margin-top: 1px; }
+.name { font-size: 1.125rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.email { font-size: 0.8125rem; color: var(--text-secondary); margin-top: 2px; }
+.phone { font-size: 0.8125rem; color: var(--text-secondary); margin-top: 1px; }
 
 .roleBadge {
   position: absolute;
@@ -109,8 +104,8 @@ $border:     rgba(255,255,255,.06);
   font-size: 0.625rem;
   font-weight: 700;
   text-transform: uppercase;
-  color: #1565C0;
-  background: rgba(21,101,192,0.1);
+  color: var(--gold);
+  background: var(--gold-dim);
   padding: 2px 8px;
   border-radius: 4px;
 }
@@ -119,21 +114,21 @@ $border:     rgba(255,255,255,.06);
   display: flex;
   gap: 0.75rem;
   padding-top: 1.25rem;
-  border-top: 1px solid $border;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .editBtn, .toggleBtn {
   flex: 1;
-  background: transparent;
-  border: 1px solid $border;
-  color: $text-dim;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
   padding: 0.5rem;
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s;
-  &:hover { color: white; border-color: white; }
+  &:hover { color: var(--text-primary); border-color: var(--border-strong); background: var(--bg-overlay); }
 }
 
 .deactivate { color: #EF4444; &:hover { border-color: #EF4444; background: rgba(239,68,68,0.05); } }
@@ -143,7 +138,7 @@ $border:     rgba(255,255,255,.06);
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.8);
+  background: rgba(0,0,0,0.6);
   backdrop-filter: blur(8px);
   z-index: 1000;
   display: flex;
@@ -154,8 +149,8 @@ $border:     rgba(255,255,255,.06);
 .panel {
   width: 440px;
   height: 100%;
-  background: #111;
-  border-left: 1px solid $border;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border-default);
   display: flex;
   flex-direction: column;
   animation: panelIn 0.3s ease;
@@ -178,23 +173,23 @@ $border:     rgba(255,255,255,.06);
   width: 96px;
   height: 96px;
   border-radius: 50%;
-  background: #1A1A1A;
-  color: $gold;
+  background: var(--bg-elevated);
+  color: var(--gold);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 2rem;
   font-weight: 700;
-  border: 2px solid $gold;
+  border: 2px solid var(--gold);
   overflow: hidden;
 }
 
 .closeBtn {
   background: none;
   border: none;
-  color: $text-muted;
+  color: var(--text-muted);
   cursor: pointer;
-  &:hover { color: white; }
+  &:hover { color: var(--text-primary); }
 }
 
 .panelBody {
@@ -206,7 +201,7 @@ $border:     rgba(255,255,255,.06);
   font-family: 'Playfair Display', serif;
   font-size: 2rem;
   font-weight: 700;
-  color: white;
+  color: var(--text-primary);
   margin: 0 0 1rem;
 }
 
@@ -225,7 +220,7 @@ $border:     rgba(255,255,255,.06);
   border: 1px solid transparent;
 }
 
-.rolePill { background: rgba(21,101,192,0.1); color: #60a5fa; border-color: rgba(21,101,192,0.3); }
+.rolePill { background: var(--gold-dim); color: var(--gold); border-color: var(--gold-dim); }
 
 .infoGrid {
   display: flex;
@@ -239,12 +234,12 @@ $border:     rgba(255,255,255,.06);
   gap: 4px;
 }
 
-.infoLabel { font-size: 0.6875rem; font-weight: 700; color: $text-muted; text-transform: uppercase; letter-spacing: 0.05em; }
-.infoValue { font-size: 1rem; color: $text-main; }
+.infoLabel { font-size: 0.6875rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.infoValue { font-size: 1rem; color: var(--text-primary); }
 
 .panelFooter {
   padding: 2rem;
-  border-top: 1px solid $border;
+  border-top: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -252,14 +247,14 @@ $border:     rgba(255,255,255,.06);
 
 .editAction {
   width: 100%;
-  background: #1A1A1A;
-  border: 1px solid $border;
-  color: white;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
   padding: 1rem;
   border-radius: 4px;
   font-weight: 700;
   cursor: pointer;
-  &:hover { background: #222; }
+  &:hover { background: var(--bg-overlay); border-color: var(--border-strong); }
 }
 
 .toggleAction {
@@ -274,4 +269,4 @@ $border:     rgba(255,255,255,.06);
 .deactivateAction { border: 1px solid rgba(239, 68, 68, 0.3); color: #EF4444; &:hover { background: rgba(239, 68, 68, 0.05); } }
 .activateAction { border: 1px solid rgba(34, 197, 94, 0.3); color: #22C55E; &:hover { background: rgba(34, 197, 94, 0.05); } }
 
-.empty { padding: 4rem; text-align: center; color: $text-muted; font-size: 1rem; }
+.empty { padding: 4rem; text-align: center; color: var(--text-muted); font-size: 1rem; }

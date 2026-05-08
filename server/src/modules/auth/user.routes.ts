@@ -7,6 +7,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/',    controller.listUsers);
-router.put('/:id', controller.updateUserRole);
+router.post('/register', controller.registerUser);
+router.put('/:id', controller.updateAccount);
 
 export { router as userRoutes };

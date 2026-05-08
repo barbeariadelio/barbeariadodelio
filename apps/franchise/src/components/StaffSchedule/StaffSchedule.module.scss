@@ -213,10 +213,11 @@ $blue:      #1565C0;
   align-items: flex-start;
   justify-content: flex-end;
   padding-right: 7px;
-  border-bottom: 1px solid $border-hr;
+  padding-top: 3px;
+  border-top: 1px solid $border-hr;
 
   &.timeCellHour {
-    border-bottom-color: rgba(255,255,255,.07);
+    border-top-color: rgba(255,255,255,.07);
   }
 }
 
@@ -225,7 +226,6 @@ $blue:      #1565C0;
   font-size: 0.6rem;
   color: $muted;
   letter-spacing: 0.03em;
-  transform: translateY(-50%);
   display: inline-block;
   white-space: nowrap;
   line-height: 1;
@@ -241,10 +241,29 @@ $blue:      #1565C0;
 }
 
 .slot {
-  border-bottom: 1px solid $border-hr;
+  border-top: 1px solid $border-hr;
+  transition: background 0.15s;
+  position: relative;
 
   &.slotHour {
-    border-bottom-color: rgba(255,255,255,.07);
+    border-top-color: rgba(255,255,255,.07);
+  }
+
+  &:hover {
+    background: rgba(21, 101, 192, 0.1);
+
+    &::after {
+      content: attr(data-time);
+      position: absolute;
+      left: 6px;
+      top: 4px;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.6rem;
+      font-weight: 700;
+      color: rgba(144, 202, 249, 0.6);
+      letter-spacing: 0.04em;
+      pointer-events: none;
+    }
   }
 }
 

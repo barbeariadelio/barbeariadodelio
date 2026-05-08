@@ -1,24 +1,30 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, useEffect } from 'react';
 import { useLogin } from '../../hooks/useLogin';
+import { useTheme } from '../../contexts/ThemeContext';
 import styles from './Login.module.scss';
+import logo from '../../assets/logo.png';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const { login, loading, error } = useLogin();
+  const { updateTheme } = useTheme();
+
+  useEffect(() => {
+    updateTheme('light');
+  }, [updateTheme]);
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    login({ email, password });
+    login({ email, password, appId: 'admin' });
   }
 
   return (
     <div className={styles.page}>
       <div className={styles.card}>
         <div className={styles.brand}>
-          <span className={styles.brandName}>BARBEARIA</span>
-          <span className={styles.brandHighlight}>DÉLIO</span>
+          <img src={logo} alt="Barbearia Délio" className={styles.logoImg} />
         </div>
         <p className={styles.subtitle}>Painel Administrativo</p>
 

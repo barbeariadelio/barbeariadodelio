@@ -1,7 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { UserService } from './user.service';
 import { AuthRequest } from '../../shared/middlewares/auth.middleware';
-import { ok } from '../../shared/utils/responseHelper';
+import { ok, created } from '../../shared/utils/responseHelper';
 import { AppError } from '../../shared/errors/AppError';
 
 const service = new UserService();
@@ -15,11 +15,39 @@ export async function listUsers(req: AuthRequest, res: Response, next: NextFunct
   } catch (e) { next(e); }
 }
 
-export async function updateUserRole(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+export async function registerUser(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    if (req.user!.role !== 'owner') throw new AppError('Only owners can change permissions', 403);
-    const { role, isActive } = req.body;
-    const user = await service.updateRole(req.params.id, role, isActive);
+    if (req.user!.role !== 'owner') throw new AppError('Only owners can register users', 403);
+    const unitId = req.body.unitId || req.user!.unitId;
+    const user = await service.create({ ...req.body, unitId, phone: '000000000' });
+    created(res, user);
+  } catch (e) { next(e); }
+}
+
+export async function updateAccount(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const targetUserId = req.params.id;
+    const authenticatedUserId = req.user!.id;
+    const isSelf = authenticatedUserId.toString() === targetUserId.toString();
+    const isOwner = req.user!.role === 'owner';
+
+    // If not owner and not self, forbidden
+    if (!isOwner && !isSelf) {
+      throw new AppError(`Não autorizado: sua conta (${authenticatedUserId}) não tem permissão para editar este perfil (${targetUserId})`, 403);
+    }
+
+    // If self but not owner, limit fields they can update (e.g. only theme)
+    if (!isOwner && isSelf) {
+      const allowedSelfFields = ['theme', 'name', 'phone', 'avatar'];
+      const bodyKeys = Object.keys(req.body);
+      const invalidKeys = bodyKeys.filter(k => !allowedSelfFields.includes(k));
+      
+      if (invalidKeys.length > 0) {
+        throw new AppError(`Usuários comuns não podem alterar: ${invalidKeys.join(', ')}`, 403);
+      }
+    }
+
+    const user = await service.updateAccount(targetUserId, req.body);
     ok(res, user);
   } catch (e) { next(e); }
 }

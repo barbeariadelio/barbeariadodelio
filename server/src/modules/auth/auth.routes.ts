@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { login, refresh, me, updateMe } from './auth.controller';
+import { login, refresh, me, updateMe, updateTheme } from './auth.controller';
 import { validate } from '../../shared/utils/validate';
 import { authenticate } from '../../shared/middlewares/auth.middleware';
 import { loginSchema, refreshSchema } from './auth.schema';
@@ -10,3 +10,4 @@ authRoutes.post('/login', validate(loginSchema), login);
 authRoutes.post('/refresh', validate(refreshSchema), refresh);
 authRoutes.get('/me', authenticate, me);
 authRoutes.patch('/me', authenticate, updateMe);
+authRoutes.put('/theme', authenticate, updateTheme);
