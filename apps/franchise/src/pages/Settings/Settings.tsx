@@ -10,6 +10,7 @@ interface Unit {
   address: string;
   phone: string;
   cnpj?: string;
+  slotInterval?: number;
 }
 
 type Tab = 'profile' | 'unit';
@@ -28,6 +29,7 @@ export default function Settings() {
   const [unitAddress, setUnitAddress] = useState('');
   const [unitPhone, setUnitPhone] = useState('');
   const [unitCnpj, setUnitCnpj] = useState('');
+  const [slotInterval, setSlotInterval] = useState<number>(0);
   const [unitSuccess, setUnitSuccess] = useState(false);
   const [unitError, setUnitError] = useState<string | null>(null);
 
@@ -48,6 +50,7 @@ export default function Settings() {
       setUnitAddress(unit.address);
       setUnitPhone(unit.phone);
       setUnitCnpj(unit.cnpj ?? '');
+      setSlotInterval(unit.slotInterval ?? 0);
     }
   }, [unit]);
 
@@ -83,7 +86,7 @@ export default function Settings() {
 
   function handleUnitSubmit(e: FormEvent) {
     e.preventDefault();
-    unitMutation.mutate({ name: unitName, address: unitAddress, phone: unitPhone, cnpj: unitCnpj });
+    unitMutation.mutate({ name: unitName, address: unitAddress, phone: unitPhone, cnpj: unitCnpj, slotInterval });
   }
 
   return (
@@ -148,6 +151,23 @@ export default function Settings() {
               <label className={styles.label}>CNPJ</label>
               <input className={styles.input} value={unitCnpj} onChange={e => setUnitCnpj(e.target.value)} placeholder="XX.XXX.XXX/XXXX-XX" />
             </div>
+
+            {/* ── Slot Interval ── */}
+            <div className={styles.field}>
+              <label className={styles.label}>Intervalo entre agendamentos</label>
+              <select 
+                className={styles.input} 
+                value={slotInterval} 
+                onChange={e => setSlotInterval(Number(e.target.value))}
+              >
+                <option value={0}>Nenhum intervalo</option>
+                <option value={15}>15 minutos</option>
+                <option value={30}>30 minutos</option>
+                <option value={45}>45 minutos</option>
+                <option value={60}>1 hora</option>
+              </select>
+            </div>
+
             {unitSuccess && <p className={styles.success}>Dados salvos com sucesso!</p>}
             {unitError && <p className={styles.error}>{unitError}</p>}
             <button type="submit" className={styles.saveBtn} disabled={unitMutation.isPending || !unit}>

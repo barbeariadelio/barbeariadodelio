@@ -16,6 +16,7 @@ export interface IUnit extends Document {
     lunchStart?: string;
     lunchEnd?: string;
   };
+  slotInterval?: number; // Minutes between appointments
 }
 
 const unitSchema = new Schema<IUnit>(
@@ -38,6 +39,7 @@ const unitSchema = new Schema<IUnit>(
       }, { _id: false }),
       default: () => ({ start: '08:00', end: '20:00' }),
     },
+    slotInterval: { type: Number, default: 0 },
   },
   { timestamps: true },
 );

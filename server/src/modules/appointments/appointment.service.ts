@@ -70,6 +70,9 @@ export class AppointmentService {
     const employee = await UserModel.findById(employeeId).select('workSchedule vacations blockedDays');
     if (!employee) throw new NotFoundError('Employee');
 
+    const unit = await UnitModel.findById(unitId).select('slotInterval');
+    const slotInterval = Number(unit?.slotInterval) || 0;
+
     // Se o dia estiver bloqueado ou o profissional estiver de férias, retorna zero horários
     if (employee.blockedDays?.includes(date)) return [];
     if (employee.vacations?.some(v => date >= v.start && date <= v.end)) return [];
@@ -83,7 +86,10 @@ export class AppointmentService {
       status: { $nin: ['cancelled'] },
     }).select('startTime endTime');
 
-    const allSlots = this.generateSlots(schedule.start, schedule.end, 15);
+    // Intervalo de geração do grid pode ser 15min ou 30min
+    const gridStep = slotInterval > 0 ? slotInterval : 15;
+    const allSlots = this.generateSlots(schedule.start, schedule.end, gridStep);
+    
     const today = new Date();
     const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const nowMins = today.getHours() * 60 + today.getMinutes();
@@ -91,7 +97,7 @@ export class AppointmentService {
     return allSlots.filter(slot => {
       const [sh, sm] = slot.split(':').map(Number);
       const slotStart = sh * 60 + sm;
-      const slotEnd = slotStart + durationMinutes;
+      const slotEnd = slotStart + Number(durationMinutes);
 
       // 0. Prevent past time for today
       if (date === todayISO && slotStart < nowMins) return false;
@@ -114,13 +120,24 @@ export class AppointmentService {
         if (slotStart < lunchEnd && slotEnd > lunchStart) return false;
       }
 
-      // 3. Check bookings
+      // 3. Check bookings considering buffer time
       return !booked.some(b => {
         const [bsh, bsm] = b.startTime.split(':').map(Number);
         const [beh, bem] = b.endTime.split(':').map(Number);
+        
         const bookedStart = bsh * 60 + bsm;
-        const bookedEnd = beh * 60 + bem;
-        return slotStart < bookedEnd && slotEnd > bookedStart;
+        // Extend booked End Time by the interval buffer
+        const bookedEndWithBuffer = (beh * 60 + bem) + slotInterval;
+        
+        // Similarly, ensure that our proposed slot doesn't infringe on a booking's start time
+        // (i.e. our end time + buffer shouldn't exceed their start time if we are before them)
+        const slotEndWithBuffer = slotEnd + slotInterval;
+
+        return (
+          (slotStart >= bookedStart && slotStart < bookedEndWithBuffer) ||
+          (slotEnd > bookedStart && slotEnd <= bookedEndWithBuffer) ||
+          (slotStart <= bookedStart && slotEndWithBuffer > bookedStart)
+        );
       });
     });
   }

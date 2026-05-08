@@ -10,13 +10,6 @@ interface Unit { _id: string; name: string; address: string; phone: string; }
 export default function GuestBook() {
   const navigate = useNavigate();
 
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', 'light');
-    return () => {
-      // Optional: restore dark if needed, but for now just force light
-    };
-  }, []);
-
   const { data: units = [], isLoading } = useQuery<Unit[]>({
     queryKey: ['public-units'],
     queryFn: async () => {
@@ -33,6 +26,13 @@ export default function GuestBook() {
       <header className={styles.header}>
         <button className={styles.logoBtn} onClick={() => navigate('/')}>
           <img src={logo} alt="Barbearia Délio" className={styles.logoImg} />
+        </button>
+
+        <button className={styles.profileLink} onClick={() => navigate('/profile')}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
+          <span>Meus agendamentos</span>
         </button>
       </header>
 

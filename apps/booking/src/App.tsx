@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 
 const Landing = lazy(() => import('./pages/Landing/Landing'));
 const Book = lazy(() => import('./pages/Book/Book'));
@@ -8,10 +8,14 @@ const Login = lazy(() => import('./pages/Login/Login'));
 const Profile = lazy(() => import('./pages/Profile/Profile'));
 
 function Loader() {
-  return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#080808', color: '#A3A3A3', fontFamily: 'Inter, sans-serif' }}>Carregando...</div>;
+  return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F8F7F4', color: '#5C5448', fontFamily: 'Inter, sans-serif' }}>Carregando...</div>;
 }
 
 export default function App() {
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }, []);
+
   return (
     <Suspense fallback={<Loader />}>
       <Routes>

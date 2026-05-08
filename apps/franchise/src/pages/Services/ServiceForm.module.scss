@@ -1,9 +1,9 @@
-$bg-card:    #111111;
-$bg-surface: #1A1A1A;
-$gold:       #1565C0;
-$text-main:  #F5F5F5;
-$text-dim:   #A0A0A0;
-$border:     rgba(255,255,255,0.06);
+$bg-card:    var(--bg-elevated);
+$bg-surface: var(--bg-surface);
+$gold:       var(--blue-600);
+$text-main:  var(--text-primary);
+$text-dim:   var(--text-secondary);
+$border:     var(--border-subtle);
 
 .overlay {
   position: fixed;
@@ -54,10 +54,10 @@ $border:     rgba(255,255,255,0.06);
 .closeBtn {
   background: none;
   border: none;
-  color: #5A5A5A;
+  color: $text-dim;
   font-size: 1.125rem;
   cursor: pointer;
-  &:hover { color: white; }
+  &:hover { color: $text-main; }
 }
 
 .form {
@@ -84,7 +84,7 @@ $border:     rgba(255,255,255,0.06);
   width: 120px;
   height: 80px;
   border-radius: 4px;
-  background: #1A1A1A;
+  background: $bg-surface;
   color: $gold;
   display: flex;
   align-items: center;
@@ -110,20 +110,22 @@ $border:     rgba(255,255,255,0.06);
 .label {
   font-size: 0.625rem;
   font-weight: 700;
-  color: #A0A0A0;
+  color: $text-dim;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .input, .textarea {
-  background: #1A1A1A;
-  border: 1px solid #2C2C2C;
+  background: $bg-surface;
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   padding: 0.75rem 1rem;
-  color: white;
+  color: $text-main;
   font-family: inherit;
   font-size: 0.875rem;
   outline: none;
+  width: 100%;
+  box-sizing: border-box;
   &:focus { border-color: $gold; }
 }
 
@@ -138,8 +140,8 @@ $border:     rgba(255,255,255,0.06);
 .currencyWrap {
   display: flex;
   align-items: center;
-  background: #1A1A1A;
-  border: 1px solid #2C2C2C;
+  background: $bg-surface;
+  border: 1px solid var(--border-default);
   border-radius: 4px;
   overflow: hidden;
   &:focus-within { border-color: $gold; }
@@ -147,7 +149,7 @@ $border:     rgba(255,255,255,0.06);
 
 .currencyPrefix {
   padding: 0 0.75rem;
-  color: #5A5A5A;
+  color: $text-dim;
   font-size: 0.8125rem;
   font-weight: 700;
 }
@@ -155,7 +157,7 @@ $border:     rgba(255,255,255,0.06);
 .currencyInput {
   background: none;
   border: none;
-  color: white;
+  color: $text-main;
   padding: 0.75rem 0;
   width: 100%;
   font-size: 1rem;
@@ -176,17 +178,17 @@ $border:     rgba(255,255,255,0.06);
 .cancelBtn {
   background: none;
   border: none;
-  color: #5A5A5A;
+  color: $text-dim;
   font-size: 0.8125rem;
   font-weight: 700;
   text-transform: uppercase;
   cursor: pointer;
-  &:hover { color: white; }
+  &:hover { color: $text-main; }
 }
 
 .submitBtn {
-  background: #1565C0;
-  color: white;
+  background: var(--blue-600);
+  color: #fff;
   border: none;
   padding: 0.75rem 1.5rem;
   border-radius: 4px;
@@ -195,7 +197,7 @@ $border:     rgba(255,255,255,0.06);
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.2s;
-  &:hover { background: #1976D2; transform: translateY(-1px); }
+  &:hover { background: var(--blue-500); transform: translateY(-1px); }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
@@ -203,4 +205,102 @@ $border:     rgba(255,255,255,0.06);
   color: #EF4444;
   font-size: 0.75rem;
   font-weight: 600;
+}
+
+.typeToggle {
+  display: flex;
+  background: $bg-surface;
+  border-radius: 6px;
+  padding: 0.25rem;
+  border: 1px solid var(--border-default);
+}
+
+.typeBtn {
+  flex: 1;
+  padding: 0.625rem;
+  background: none;
+  border: none;
+  color: $text-dim;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  
+  &:hover { color: $text-main; }
+  
+  &.typeActive {
+    background: $gold;
+    color: #fff;
+  }
+}
+
+.select {
+  background: $bg-surface;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  padding: 0.75rem 1rem;
+  color: $text-main;
+  font-family: inherit;
+  font-size: 0.875rem;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  appearance: none;
+  &:focus { border-color: $gold; }
+}
+
+.packageItems {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: var(--bg-surface);
+  padding: 1rem;
+  border-radius: 6px;
+  border: 1px solid $border;
+}
+
+.packageItemRow {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.packageItemCol {
+  flex: 1;
+}
+
+.packageItemNumCol {
+  width: 80px;
+}
+
+.removeItemBtn {
+  background: rgba(239, 68, 68, 0.1);
+  color: #EF4444;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 4px;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover { background: #EF4444; color: #fff; }
+}
+
+.addPackageItemBtn {
+  background: none;
+  border: 1px dashed var(--border-default);
+  color: $gold;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  transition: all 0.2s;
+  &:hover { background: rgba(37, 99, 235, 0.1); border-color: $gold; }
 }

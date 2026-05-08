@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
-import { useAuth } from '../../contexts/AuthContext';
 import ServiceForm from './ServiceForm';
 import ConfirmModal from '../../components/ConfirmModal/ConfirmModal';
 import styles from './Services.module.scss';
+
+interface PackageItem {
+  serviceId: string;
+  quantity: number;
+}
 
 interface Service {
   _id: string;
@@ -14,10 +18,28 @@ interface Service {
   durationMinutes: number;
   image?: string;
   isActive: boolean;
+  type?: 'single' | 'package';
+  packageValidity?: {
+    type: 'none' | 'days' | 'weeks' | 'months' | 'years';
+    value?: number;
+  };
+  packageItems?: PackageItem[];
 }
 
 function formatCurrency(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+}
+
+function formatValidity(validity?: Service['packageValidity']) {
+  if (!validity || validity.type === 'none') return 'Sem prazo de validade';
+  const val = validity.value || 1;
+  const labels: Record<string, string> = {
+    days: val === 1 ? 'Dia' : 'Dias',
+    weeks: val === 1 ? 'Semana' : 'Semanas',
+    months: val === 1 ? 'Mês' : 'Meses',
+    years: val === 1 ? 'Ano' : 'Anos',
+  };
+  return `${val} ${labels[validity.type] || ''}`;
 }
 
 function XIcon() {
@@ -30,13 +52,14 @@ function XIcon() {
 
 interface DetailProps {
   svc: Service;
+  allServices: Service[];
   onClose: () => void;
   onEdit: () => void;
   onToggle: () => void;
   isToggling: boolean;
 }
 
-function ServiceDetail({ svc, onClose, onEdit, onToggle, isToggling }: DetailProps) {
+function ServiceDetail({ svc, allServices, onClose, onEdit, onToggle, isToggling }: DetailProps) {
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className={styles.panel}>
@@ -57,7 +80,9 @@ function ServiceDetail({ svc, onClose, onEdit, onToggle, isToggling }: DetailPro
         <div className={styles.panelBody}>
           <div className={styles.priceRow}>
             <span className={styles.bigPrice}>{formatCurrency(svc.price)}</span>
-            <span className={styles.durationChip}>{svc.durationMinutes} min</span>
+            <span className={styles.durationChip}>
+              {svc.type === 'package' ? 'Pacote' : `${svc.durationMinutes} min`}
+            </span>
           </div>
 
           <span
@@ -71,6 +96,26 @@ function ServiceDetail({ svc, onClose, onEdit, onToggle, isToggling }: DetailPro
 
           {svc.description && (
             <p className={styles.descBlock}>{svc.description}</p>
+          )}
+
+          {svc.type === 'package' && svc.packageItems && svc.packageItems.length > 0 && (
+            <div className={styles.packageDetails}>
+              <h4 className={styles.packageDetailTitle}>Itens do Pacote</h4>
+              <p className={styles.packageValidity}>
+                <strong>Validade:</strong> {formatValidity(svc.packageValidity)}
+              </p>
+              <ul className={styles.packageItemList}>
+                {svc.packageItems.map((item, idx) => {
+                  const child = allServices.find(s => s._id === item.serviceId);
+                  return (
+                    <li key={idx} className={styles.packageItemLi}>
+                      <span className={styles.packageItemQtd}>{item.quantity}x</span>
+                      <span className={styles.packageItemName}>{child?.name || 'Serviço desconhecido'}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           )}
         </div>
 
@@ -97,8 +142,7 @@ export default function Services() {
   const [detailTarget, setDetailTarget]         = useState<Service | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<Service | null>(null);
   const qc = useQueryClient();
-  const { user } = useAuth();
-  const unitId = (user as unknown as { unitId?: string })?.unitId;
+  const unitId = import.meta.env.VITE_UNIT_ID || '';
 
   const { data: services = [], isLoading } = useQuery<Service[]>({
     queryKey: ['services', unitId],
@@ -167,7 +211,9 @@ export default function Services() {
 
             <div className={styles.meta}>
               <span className={styles.price}>{formatCurrency(svc.price)}</span>
-              <span className={styles.duration}>{svc.durationMinutes} min</span>
+              <span className={styles.duration}>
+                {svc.type === 'package' ? 'Pacote' : `${svc.durationMinutes} min`}
+              </span>
             </div>
 
             <div className={styles.cardActions} onClick={e => e.stopPropagation()}>
@@ -189,6 +235,7 @@ export default function Services() {
       {detailTarget && (
         <ServiceDetail
           svc={detailTarget}
+          allServices={services}
           onClose={() => setDetailTarget(null)}
           onEdit={() => setFormTarget(detailTarget)}
           onToggle={() => detailTarget.isActive ? setConfirmDeactivate(detailTarget) : toggleActive.mutate(detailTarget)}

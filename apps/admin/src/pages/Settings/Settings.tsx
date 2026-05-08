@@ -12,6 +12,7 @@ interface Unit {
   cnpj?: string;
   workingDays?: number[];
   workingHours?: { start: string; end: string; lunchStart?: string; lunchEnd?: string };
+  slotInterval?: number;
 }
 
 type Tab = 'profile' | 'unit';
@@ -45,6 +46,7 @@ export default function Settings() {
   const [whEnd, setWhEnd] = useState('20:00');
   const [whLunchStart, setWhLunchStart] = useState('');
   const [whLunchEnd, setWhLunchEnd] = useState('');
+  const [slotInterval, setSlotInterval] = useState<number>(0);
   const [unitSuccess, setUnitSuccess] = useState(false);
   const [unitError, setUnitError] = useState<string | null>(null);
 
@@ -70,6 +72,7 @@ export default function Settings() {
       setWhEnd(unit.workingHours?.end ?? '20:00');
       setWhLunchStart(unit.workingHours?.lunchStart ?? '');
       setWhLunchEnd(unit.workingHours?.lunchEnd ?? '');
+      setSlotInterval(unit.slotInterval ?? 0);
     }
   }, [unit]);
 
@@ -117,6 +120,7 @@ export default function Settings() {
         lunchStart: whLunchStart || undefined,
         lunchEnd: whLunchEnd || undefined,
       },
+      slotInterval,
     });
   }
 
@@ -230,6 +234,22 @@ export default function Settings() {
                   <input type="time" className={styles.timeInput} value={whLunchEnd} onChange={e => setWhLunchEnd(e.target.value)} />
                 </div>
               </div>
+            </div>
+
+            {/* ── Slot Interval ── */}
+            <div className={styles.field}>
+              <label className={styles.label}>Intervalo entre agendamentos</label>
+              <select 
+                className={styles.input} 
+                value={slotInterval} 
+                onChange={e => setSlotInterval(Number(e.target.value))}
+              >
+                <option value={0}>Nenhum intervalo</option>
+                <option value={15}>15 minutos</option>
+                <option value={30}>30 minutos</option>
+                <option value={45}>45 minutos</option>
+                <option value={60}>1 hora</option>
+              </select>
             </div>
 
             {unitSuccess && <p className={styles.success}>Dados salvos com sucesso!</p>}

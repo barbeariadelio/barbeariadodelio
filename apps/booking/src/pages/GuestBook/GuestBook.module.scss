@@ -44,17 +44,35 @@
   &:hover { transform: scale(1.02); }
 }
 
-.loginLink {
-  background: none;
-  border: 1px solid var(--border-default);
-  border-radius: 6px;
-  padding: 0.4375rem 1rem;
-  color: var(--text-secondary);
+.profileLink {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  background: transparent;
+  border: 1px solid var(--blue-700);
+  border-radius: 99px;
+  padding: 0.625rem 1.25rem;
+  color: var(--blue-700);
   font-family: 'Inter', sans-serif;
   font-size: 0.8125rem;
+  font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
-  &:hover { color: var(--text-primary); border-color: var(--gold); background: var(--bg-overlay); }
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.05);
+
+  svg { transition: transform 0.2s; }
+
+  &:hover {
+    background: var(--blue-600);
+    color: white;
+    border-color: var(--blue-600);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+    transform: translateY(-1px);
+
+    svg { transform: scale(1.1); }
+  }
+
+  &:active { transform: translateY(0); }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
