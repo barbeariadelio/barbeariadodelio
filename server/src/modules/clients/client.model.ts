@@ -1,5 +1,15 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export interface IClientPackageSubscription {
+  packageId: mongoose.Types.ObjectId;
+  startDate: Date;
+  active: boolean;
+  itemLimits?: {
+    serviceId: mongoose.Types.ObjectId;
+    quantity: number;
+  }[];
+}
+
 export interface IClient extends Document {
   name: string;
   email: string;
@@ -8,6 +18,7 @@ export interface IClient extends Document {
   unitId: mongoose.Types.ObjectId;
   birthdate?: string;
   notes?: string;
+  packages?: IClientPackageSubscription[];
 }
 
 const clientSchema = new Schema<IClient>(
@@ -19,6 +30,19 @@ const clientSchema = new Schema<IClient>(
     unitId:    { type: Schema.Types.ObjectId, ref: 'Unit', required: true },
     birthdate: String,
     notes:     String,
+    packages: [
+      {
+        packageId: { type: Schema.Types.ObjectId, ref: 'Service', required: true },
+        startDate: { type: Date, required: true, default: Date.now },
+        active:    { type: Boolean, default: true },
+        itemLimits: [
+          {
+            serviceId: { type: Schema.Types.ObjectId, ref: 'Service' },
+            quantity: { type: Number },
+          }
+        ]
+      }
+    ]
   },
   { timestamps: true },
 );

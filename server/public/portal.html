@@ -10,12 +10,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #050505;
-            --card-bg: #111111;
+            --bg: #FAFAFA;
+            --card-bg: #FFFFFF;
             --accent: #1565C0;
-            --accent-glow: rgba(21, 101, 192, 0.4);
-            --text-main: #F5F5F5;
-            --text-dim: #888;
+            --accent-glow: rgba(21, 101, 192, 0.15);
+            --text-main: #111827;
+            --text-dim: #6B7280;
         }
 
         * {
@@ -46,19 +46,19 @@
             height: 800px;
             background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
             filter: blur(100px);
-            opacity: 0.15;
+            opacity: 0.5;
             z-index: -1;
             animation: pulse 10s infinite alternate;
         }
 
         @keyframes pulse {
             from {
-                opacity: 0.1;
+                opacity: 0.3;
                 transform: translate(-50%, -50%) scale(0.8);
             }
 
             to {
-                opacity: 0.2;
+                opacity: 0.6;
                 transform: translate(-50%, -50%) scale(1.2);
             }
         }
@@ -80,7 +80,7 @@
             font-weight: 800;
             letter-spacing: -0.04em;
             text-transform: uppercase;
-            background: linear-gradient(to bottom, #fff 0%, #aaa 100%);
+            background: linear-gradient(to bottom, #111827 0%, #4B5563 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -111,7 +111,7 @@
 
         .card {
             background: var(--card-bg);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 0, 0, 0.08);
             border-radius: 24px;
             padding: 3rem 2rem;
             text-decoration: none;
@@ -122,6 +122,7 @@
             align-items: center;
             position: relative;
             overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.02);
         }
 
         .card::before {
@@ -131,7 +132,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.03), transparent);
+            background: linear-gradient(45deg, transparent, rgba(0, 0, 0, 0.03), transparent);
             transform: translateX(-100%);
             transition: transform 0.6s;
         }
@@ -139,17 +140,17 @@
         .card:hover {
             transform: translateY(-12px);
             border-color: var(--accent);
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px var(--accent-glow);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08), 0 0 20px var(--accent-glow);
         }
 
         .card:hover::before {
             transform: translateX(100%);
         }
 
-        .icon-box {
+        .card-icon {
             width: 80px;
             height: 80px;
-            background: rgba(255, 255, 255, 0.03);
+            background: rgba(0, 0, 0, 0.03);
             border-radius: 20px;
             display: flex;
             align-items: center;
@@ -159,7 +160,7 @@
             color: var(--text-dim);
         }
 
-        .card:hover .icon-box {
+        .card:hover .card-icon {
             background: var(--accent);
             color: white;
             transform: rotate(10deg);
@@ -179,10 +180,10 @@
             margin-bottom: 2rem;
         }
 
-        .btn-enter {
+        .card-button {
             margin-top: auto;
             padding: 0.75rem 1.5rem;
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(0, 0, 0, 0.05);
             border-radius: 12px;
             font-size: 0.875rem;
             font-weight: 600;
@@ -191,9 +192,9 @@
             transition: all 0.3s;
         }
 
-        .card:hover .btn-enter {
-            background: white;
-            color: black;
+        .card:hover .card-button {
+            background: var(--accent);
+            color: white;
         }
 
         @keyframes fadeInDown {

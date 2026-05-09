@@ -40,3 +40,26 @@ export async function updateClient(req: AuthRequest, res: Response, next: NextFu
     ok(res, client);
   } catch (e) { next(e); }
 }
+
+export async function assignPackage(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const client = await service.assignPackage(req.params.id, req.body.packageId);
+    ok(res, client);
+  } catch (e) { next(e); }
+}
+
+export async function removePackage(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const client = await service.removePackage(req.params.id, req.params.packageId);
+    ok(res, client);
+  } catch (e) { next(e); }
+}
+
+export async function updatePackageItemLimit(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id, packageId, serviceId } = req.params;
+    const { quantity } = req.body;
+    const client = await service.updatePackageItemLimit(id, packageId, serviceId, quantity);
+    ok(res, client);
+  } catch (e) { next(e); }
+}

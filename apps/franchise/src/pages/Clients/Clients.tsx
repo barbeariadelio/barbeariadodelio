@@ -4,6 +4,22 @@ import { api } from '../../api/client';
 import ClientForm from './ClientForm';
 import styles from './Clients.module.scss';
 
+interface PackageItem {
+  serviceId: { _id: string; name: string };
+  quantity: number;
+}
+
+interface PackageSubscription {
+  _id: string;
+  packageId: {
+    _id: string;
+    name: string;
+    packageItems: PackageItem[];
+  };
+  startDate: string;
+  active: boolean;
+}
+
 interface Client {
   _id: string;
   name: string;
@@ -11,13 +27,14 @@ interface Client {
   phone?: string;
   birthdate?: string;
   notes?: string;
+  packages?: PackageSubscription[];
 }
 
 interface AppointmentItem {
   _id: string;
   date: string;
   startTime: string;
-  serviceId: { name: string } | null;
+  serviceId: { _id: string; name: string } | null;
   employeeId: { name: string } | null;
   status: string;
   price: number;
@@ -85,6 +102,17 @@ export default function Clients() {
     setSelectedId(prev => (prev === id ? null : id));
   }, []);
 
+  const now = new Date();
+  const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  function calculateMonthlyUsage(serviceId: string) {
+    return appointments.filter(a =>
+      a.status === 'completed' &&
+      a.date.startsWith(currentMonthPrefix) &&
+      a.serviceId?._id === serviceId
+    ).length;
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
@@ -144,6 +172,46 @@ export default function Clients() {
                 {selectedClient.notes && <p className={styles.detailNotes}>{selectedClient.notes}</p>}
               </div>
             </div>
+
+            {selectedClient.packages && selectedClient.packages.filter(p => p.active && p.packageId).length > 0 && (
+              <div className={styles.clientPackages}>
+                <h3 className={styles.historyTitle}>Pacotes e Assinaturas (Uso no mês atual)</h3>
+                <div className={styles.packageList}>
+                  {selectedClient.packages.filter(p => p.active && p.packageId).map(pkg => (
+                    <div key={pkg._id} className={styles.packageCard}>
+                      <div className={styles.packageCardHead}>
+                        <h4 className={styles.packageName}>{pkg.packageId.name}</h4>
+                        <span className={styles.packageBadge}>Ativo</span>
+                      </div>
+                      <div className={styles.packageUsage}>
+                        {pkg.packageId.packageItems.map(item => {
+                          const used = calculateMonthlyUsage(item.serviceId._id);
+                          const total = item.quantity;
+                          const perc = Math.min(100, Math.round((used / total) * 100));
+                          const isExhausted = used >= total;
+                          return (
+                            <div key={item.serviceId._id} className={styles.usageItem}>
+                              <div className={styles.usageRow}>
+                                <span className={styles.usageServiceName}>{item.serviceId.name}</span>
+                                <span className={styles.usageCount} style={{ color: isExhausted ? '#EF4444' : 'var(--blue-600)' }}>
+                                  {used} de {total} {isExhausted && '(Esgotado)'}
+                                </span>
+                              </div>
+                              <div className={styles.usageBar}>
+                                <div 
+                                  className={styles.usageFill} 
+                                  style={{ width: `${perc}%`, background: isExhausted ? '#EF4444' : 'var(--blue-600)' }}
+                                ></div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <h3 className={styles.historyTitle}>Histórico de Atendimentos</h3>
 

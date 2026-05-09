@@ -224,7 +224,7 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
               </div>
 
               <div className={styles.packageItems}>
-                <label className={styles.label}>Itens do Pacote</label>
+                <label className={styles.label}>Itens do Pacote (acesso por mês)</label>
                 {packageItems.map((item, idx) => (
                   <div key={idx} className={styles.packageItemRow}>
                     <div className={styles.packageItemCol}>
@@ -237,10 +237,10 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
                         type="number" 
                         min="1" 
                         className={styles.input} 
-                        placeholder="Qtd." 
-                        value={item.quantity} 
-                        onChange={e => updatePackageItem(idx, 'quantity', parseInt(e.target.value, 10))} 
-                        title="Quantidade"
+                        placeholder="Vezes/mês" 
+                        value={item.quantity || ''} 
+                        onChange={e => updatePackageItem(idx, 'quantity', parseInt(e.target.value, 10) || 0)} 
+                        title="Vezes por mês"
                         required
                       />
                     </div>
