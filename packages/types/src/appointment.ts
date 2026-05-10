@@ -12,6 +12,7 @@ export interface Appointment {
   status: AppointmentStatus;
   notes?: string;
   price: number;
+  isPackage?: boolean;
   client?: { name: string; phone: string };
   employee?: { name: string };
   service?: { name: string; durationMinutes: number };

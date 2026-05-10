@@ -23,6 +23,8 @@ export interface IUser extends Document {
   blockedDays?: string[];
   isActive: boolean;
   allowedApps?: string[];
+  theme?: 'light' | 'dark';
+  commissionRate?: number;
 }
 
 const userSchema = new Schema<IUser>(
@@ -53,6 +55,7 @@ const userSchema = new Schema<IUser>(
     isActive: { type: Boolean, default: true },
     allowedApps: { type: [String], default: [] },
     theme: { type: String, enum: ['light', 'dark'], default: 'light' },
+    commissionRate: { type: Number },
   },
   { timestamps: true },
 );

@@ -109,18 +109,21 @@ const TYPE_LABELS: Record<string, string> = {
   royalty: 'Royalty',
 };
 
+type TabType = 'geral' | 'mensal' | 'despesas' | 'lancamentos';
+
 export default function Finance() {
   const { user } = useAuth();
   const isStaff = user?.role === 'employee';
   const userId = (user as any)?.id || (user as any)?._id;
   const [unitId, setUnitId] = useState('all');
   const [period, setPeriod] = useState('month');
-  const [activeTab, setActiveTab] = useState(isStaff ? 'geral' : 'geral'); // Still 'geral' for layout but we filter inside
+  const [activeTab, setActiveTab] = useState<TabType>('geral');
   const [showForm, setShowForm] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [deletingTxId, setDeletingTxId] = useState<string | null>(null);
+  const [showSaveModal, setShowSaveModal] = useState(false);
   const [commissionRate, setCommissionRate] = useState(55);   // %
-  const [taxRate, setTaxRate] = useState(27.5);               // %
+  const [individualRates, setIndividualRates] = useState<Record<string, number>>({});
   const qc = useQueryClient();
 
   const { data: units = [] } = useQuery<Unit[]>({
@@ -157,13 +160,6 @@ export default function Finance() {
       qc.invalidateQueries({ queryKey: ['finance-transactions'] });
     },
   });
-
-  const kpis = [
-    { label: 'Receita', value: summary?.totalIncome ?? 0, color: '#22C55E' },
-    { label: 'Despesas', value: summary?.totalExpense ?? 0, color: '#EF4444' },
-    { label: 'Lucro Líquido', value: summary?.netProfit ?? 0, color: (summary?.netProfit ?? 0) >= 0 ? '#22C55E' : '#EF4444' },
-    { label: 'Royalties', value: summary?.royaltiesPaid ?? 0, color: '#F59E0B' },
-  ];
 
   if (summaryLoading) {
     return (
@@ -216,7 +212,7 @@ export default function Finance() {
           </div>
 
           <div className={styles.tabs}>
-            {['geral', 'mensal', 'despesas', 'lancamentos'].map(tab => (
+            {(['geral', 'mensal', 'despesas', 'lancamentos'] as TabType[]).map(tab => (
               <button
                 key={tab}
                 className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ''}`}
@@ -288,12 +284,59 @@ export default function Finance() {
                     />
                     <YAxis hide />
                     <Tooltip 
-                      contentStyle={{ background: '#1A1A1A', border: '1px solid #2C2C2C', borderRadius: '8px' }}
+                      contentStyle={{ background: '#1A1A1A', border: '1px solid #2C2C2C', borderRadius: '8px', color: '#fff' }}
+                      itemStyle={{ color: '#fff' }}
                       formatter={(v: any) => [formatCurrency(Number(v) || 0), '']}
                     />
                     <Area type="monotone" dataKey="income" name="Receita" stroke="#4ade80" strokeWidth={2} fill="url(#colorInc)" />
                     <Area type="monotone" dataKey="expense" name="Despesa" stroke="#f87171" strokeWidth={2} fill="url(#colorExp)" />
                   </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+
+          {!isStaff && (
+            <div className={styles.quickStatsGrid}>
+              <div className={styles.chartCard}>
+                <h3 className={styles.chartTitle}>Distribuição de Despesas</h3>
+                <ResponsiveContainer width="100%" height={260}>
+                  <PieChart>
+                    <Pie
+                      data={summary?.byCategory ?? []}
+                      dataKey="amount"
+                      nameKey="category"
+                      cx="50%" cy="50%" innerRadius={45} outerRadius={75}
+                      paddingAngle={4}
+                    >
+                      {(summary?.byCategory ?? []).map((_, i) => (
+                        <Cell key={i} fill={['#F87171', '#F59E0B', '#3B82F6', '#10B981', '#6366F1'][i % 5]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ background: '#1A1A1A', border: '1px solid #2C2C2C', borderRadius: '8px', color: '#fff' }}
+                      itemStyle={{ color: '#fff' }}
+                      formatter={(v: any, name: any) => [formatCurrency(v), CATEGORY_LABELS[name] || name]} 
+                    />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" formatter={(v) => <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{CATEGORY_LABELS[v] || v}</span>} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className={styles.chartCard}>
+                <h3 className={styles.chartTitle}>Receita por Profissional</h3>
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={summary?.byEmployee ?? []} margin={{ top: 10, right: 10, left: 0, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                    <XAxis dataKey="name" stroke="#5A5448" fontSize={10} axisLine={false} tickLine={false} />
+                    <YAxis hide />
+                    <Tooltip 
+                      contentStyle={{ background: '#1A1A1A', border: '1px solid #2C2C2C', borderRadius: '8px', color: '#fff' }}
+                      itemStyle={{ color: '#fff' }}
+                      formatter={(v: any) => [formatCurrency(v), 'Receita']} 
+                    />
+                    <Bar dataKey="grossRevenue" fill="#F59E0B" radius={[4, 4, 0, 0]} barSize={30} />
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
@@ -363,21 +406,10 @@ export default function Finance() {
                         type="number"
                         className={styles.rateInput}
                         value={commissionRate}
-                        min={0} max={100} step={0.5}
+                        min={0} max={100} step={0.1}
                         onChange={e => setCommissionRate(Number(e.target.value))}
-                      />
-                      <span className={styles.rateSuffix}>%</span>
-                    </div>
-                  </div>
-                  <div className={styles.rateField}>
-                    <label className={styles.rateLabel}>Dedução (IRRF)</label>
-                    <div className={styles.rateInputWrap}>
-                      <input
-                        type="number"
-                        className={styles.rateInput}
-                        value={taxRate}
-                        min={0} max={100} step={0.5}
-                        onChange={e => setTaxRate(Number(e.target.value))}
+                        onWheel={e => (e.target as HTMLInputElement).blur()}
+                        onFocus={e => e.target.select()}
                       />
                       <span className={styles.rateSuffix}>%</span>
                     </div>
@@ -420,12 +452,14 @@ export default function Finance() {
                         <span>Profissional</span>
                         <span>Atend.</span>
                         <span>Receita Gerada</span>
-                        <span>Sal. Bruto ({commissionRate}%)</span>
-                        <span>Sal. Líquido (-{taxRate}%)</span>
+                        <span style={{ textAlign: 'center' }}>%</span>
+                        <span>Parte do Barbeiro</span>
+                        <span>Parte Barbearia</span>
                       </div>
                       {employees.map(emp => {
-                        const gross = emp.grossRevenue * (commissionRate / 100);
-                        const net = gross * (1 - taxRate / 100);
+                        const rate = individualRates[emp.id] ?? commissionRate;
+                        const gross = emp.grossRevenue * (rate / 100);
+                        const salonShare = emp.grossRevenue - gross;
                         return (
                           <div key={emp.id} className={styles.commissionRow}>
                             <div className={styles.empName}>
@@ -434,8 +468,19 @@ export default function Finance() {
                             </div>
                             <span className={styles.commissionCell}>{emp.appointments}</span>
                             <span className={`${styles.commissionCell} ${styles.amber}`}>{formatCurrency(emp.grossRevenue)}</span>
+                            <div className={styles.miniRateInputWrap}>
+                              <input
+                                type="number"
+                                className={styles.miniRateInput}
+                                value={rate}
+                                min={0} max={100} step={1}
+                                onChange={e => setIndividualRates(prev => ({ ...prev, [emp.id]: Number(e.target.value) }))}
+                                onWheel={e => (e.target as HTMLInputElement).blur()}
+                              />
+                              <span className={styles.miniRateSuffix}>%</span>
+                            </div>
                             <span className={`${styles.commissionCell} ${styles.blue}`}>{formatCurrency(gross)}</span>
-                            <span className={`${styles.commissionCell} ${styles.green}`}>{formatCurrency(net)}</span>
+                            <span className={`${styles.commissionCell} ${styles.green}`}>{formatCurrency(salonShare)}</span>
                           </div>
                         );
                       })}
@@ -444,8 +489,27 @@ export default function Finance() {
                           <span>SUBTOTAL</span>
                           <span>{employees.reduce((s, e) => s + e.appointments, 0)}</span>
                           <span>{formatCurrency(employees.reduce((s, e) => s + e.grossRevenue, 0))}</span>
-                          <span>{formatCurrency(employees.reduce((s, e) => s + e.grossRevenue * (commissionRate / 100), 0))}</span>
-                          <span>{formatCurrency(employees.reduce((s, e) => s + e.grossRevenue * (commissionRate / 100) * (1 - taxRate / 100), 0))}</span>
+                          <span /> 
+                          <span>{formatCurrency(employees.reduce((s, e) => {
+                            const rate = individualRates[e.id] ?? commissionRate;
+                            return s + (e.grossRevenue * (rate / 100));
+                          }, 0))}</span>
+                          <span>{formatCurrency(employees.reduce((s, e) => {
+                            const rate = individualRates[e.id] ?? commissionRate;
+                            return s + (e.grossRevenue - (e.grossRevenue * (rate / 100)));
+                          }, 0))}</span>
+                        </div>
+                      )}
+
+                      {Object.keys(individualRates).length > 0 && (
+                        <div className={styles.saveBar}>
+                          <p className={styles.saveText}>
+                            Existem alterações de comissão não salvas para {Object.keys(individualRates).length} profissional(is).
+                          </p>
+                          <div className={styles.saveActions}>
+                            <button className={styles.cancelLink} onClick={() => setIndividualRates({})}>Descartar</button>
+                            <button className={styles.saveBtn} onClick={() => setShowSaveModal(true)}>Salvar Alterações</button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -457,9 +521,44 @@ export default function Finance() {
         </>
       )}
 
+      {showSaveModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowSaveModal(false)}>
+          <div className={styles.confirmModal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalIcon} style={{ background: 'rgba(34, 197, 94, 0.1)', color: '#22C55E' }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            </div>
+            <h3>SALVAR COMISSÕES</h3>
+            <p>Você está prestes a atualizar as taxas de comissão permanentes para {Object.keys(individualRates).length} profissional(is). Deseja continuar?</p>
+            
+            <div className={styles.modalActions}>
+              <button className={styles.cancelBtn} onClick={() => setShowSaveModal(false)}>Cancelar</button>
+              <button 
+                className={styles.confirmBtn} 
+                onClick={async () => {
+                  try {
+                    await Promise.all(
+                      Object.entries(individualRates).map(([id, rate]) => 
+                        api.put(`/employees/${id}`, { commissionRate: rate })
+                      )
+                    );
+                    setIndividualRates({});
+                    setShowSaveModal(false);
+                    qc.invalidateQueries({ queryKey: ['finance-summary'] });
+                  } catch (err) {
+                    console.error('Failed to save rates', err);
+                  }
+                }}
+              >
+                Confirmar e Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === 'mensal' && (
         <div className={styles.tabContent}>
-          <div className={styles.monthlyGrid}>
+          <div className={styles.analyticsGrid}>
             <div className={styles.chartCard}>
               <h3 className={styles.chartTitle}>Comparativo de Unidades</h3>
               <div className={styles.chartWrap}>
@@ -468,13 +567,63 @@ export default function Finance() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
                     <XAxis dataKey="name" stroke="#5A5448" fontSize={11} axisLine={false} tickLine={false} />
                     <YAxis hide />
-                    <Tooltip contentStyle={{ background: '#1A1A1A', border: '1px solid #2C2C2C', borderRadius: '8px' }} formatter={(v: any) => [formatCurrency(Number(v) || 0), '']} />
+                    <Tooltip contentStyle={{ background: '#1A1A1A', border: '1px solid #2C2C2C', borderRadius: '8px', color: '#fff' }} itemStyle={{ color: '#fff' }} formatter={(v: any) => [formatCurrency(Number(v) || 0), '']} />
                     <Bar dataKey="income" name="Receita" fill="#4ade80" radius={[4,4,0,0]} />
                     <Bar dataKey="expense" name="Despesa" fill="#f87171" radius={[4,4,0,0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
+
+            <div className={styles.chartCard}>
+              <h3 className={styles.chartTitle}>Distribuição de Receita por Profissional</h3>
+              <div className={styles.chartWrap}>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={summary?.byEmployee ?? []}
+                      dataKey="grossRevenue"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                    >
+                      {(summary?.byEmployee ?? []).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={['#F59E0B', '#3B82F6', '#10B981', '#6366F1', '#EC4899'][index % 5]} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ background: '#1A1A1A', border: '1px solid #2C2C2C', borderRadius: '8px', color: '#fff' }}
+                      itemStyle={{ color: '#fff' }}
+                      formatter={(v: any) => [formatCurrency(Number(v) || 0), '']}
+                    />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className={styles.chartCard}>
+              <h3 className={styles.chartTitle}>Top 5 Serviços (Por Receita)</h3>
+              <div className={styles.chartWrap}>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart 
+                    layout="vertical" 
+                    data={([...(summary?.byService ?? [])].sort((a,b) => b.revenue - a.revenue).slice(0, 5))}
+                    margin={{ left: 20, right: 30, top: 0, bottom: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={false} stroke="rgba(255,255,255,0.05)" />
+                    <XAxis type="number" hide />
+                    <YAxis dataKey="name" type="category" stroke="#5A5448" fontSize={11} axisLine={false} tickLine={false} width={100} />
+                    <Tooltip contentStyle={{ background: '#1A1A1A', border: '1px solid #2C2C2C', borderRadius: '8px', color: '#fff' }} itemStyle={{ color: '#fff' }} formatter={(v: any) => [formatCurrency(Number(v) || 0), '']} />
+                    <Bar dataKey="revenue" name="Receita" fill="#6366F1" radius={[0,4,4,0]} barSize={20} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
             <div className={styles.chartCard}>
               <h3 className={styles.chartTitle}>Categorias de Gastos</h3>
               <HorizontalBar title="Distribuição" items={summary?.byCategory ?? []} />

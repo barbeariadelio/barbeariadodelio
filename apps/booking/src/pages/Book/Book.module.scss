@@ -496,6 +496,17 @@
   .svcRow:hover & { color: var(--gold); transform: translateX(2px); }
   .svcRowSel & { color: var(--gold); }
 }
+.initializing {
+  padding: 4rem 2rem;
+  text-align: center;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+  color: var(--text-secondary);
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  margin-top: 1rem;
+}
 
 // ── Employee grid ─────────────────────────────────────────────────────────────
 .empGrid {

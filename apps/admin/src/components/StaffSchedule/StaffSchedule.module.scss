@@ -471,130 +471,139 @@
 }
 
 .panel {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-top: 4px solid;
-  border-radius: 12px;
-  width: min(400px, 92vw);
-  box-shadow: var(--shadow-lg);
-  animation: slideUp 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  background: var(--bg-elevated);
+  width: 95%;
+  max-width: 440px;
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+  overflow: hidden;
+  animation: modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.9) translateY(20px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .panelHead {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.panelClient {
-  font-family: 'Playfair Display', serif;
-  font-style: italic;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-primary);
+.panelActions {
+  display: flex;
+  gap: 0.5rem;
 }
 
-.closeBtn {
-  background: var(--bg-elevated);
+.actionIcon {
+  background: none;
   border: none;
   color: var(--text-muted);
-  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  cursor: pointer;
   transition: all 0.2s;
   &:hover { background: var(--bg-overlay); color: var(--text-primary); }
 }
 
+.closeBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0.5rem;
+  &:hover { color: var(--text-primary); }
+}
+
 .panelBody {
-  padding: 1.25rem 1.5rem;
+  padding: 1.5rem;
+}
+
+.mainInfo {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1.5rem;
 }
 
-.panelRow {
+.clientName {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.infoRow {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+  gap: 1.25rem;
+  align-items: flex-start;
 }
 
-.whatsappWrap {
-  margin-top: 1.25rem;
-  padding-top: 1.25rem;
+.infoIcon {
+  color: var(--text-muted);
+  padding-top: 0.25rem;
+}
+
+.infoText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.serviceName {
+  font-weight: 600;
+}
+
+.priceTag {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--gold);
+}
+
+.statusSelectWrap {
+  flex: 1;
+}
+
+.statusSelect {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  font-weight: 500;
+  outline: none;
+  cursor: pointer;
+  &:focus { border-color: var(--gold); }
+}
+
+.panelBottom {
+  padding: 1.5rem;
+  display: flex;
+  justify-content: flex-end;
   border-top: 1px solid var(--border-subtle);
 }
 
-.whatsappBtn {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: #25d366;
-  color: white;
+.faturarBtn {
+  background: none;
   border: none;
-  border-radius: 8px;
-  padding: 0.75rem;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.875rem;
+  color: #1565C0;
+  font-size: 1rem;
   font-weight: 700;
+  letter-spacing: 0.05em;
   cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    background: #20ba5a;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.2);
-  }
-  &:active {
-    transform: scale(0.98);
-  }
-}
-
-.rowLabel {
-  font-family: 'Inter', sans-serif;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  flex-shrink: 0;
-}
-
-.rowValue {
-  font-family: 'Inter', sans-serif;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  text-align: right;
-}
-
-.rowStatus {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-family: 'Inter', sans-serif;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
+  padding: 0.5rem 1rem;
+  transition: opacity 0.2s;
+  &:hover { opacity: 0.7; }
 }
 
 .panelFooter {

@@ -18,14 +18,18 @@ export interface CalendarAppointment {
   date: string;
   startTime: string;
   endTime: string;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'blocked';
+  isPackage?: boolean;
 }
+
+const PACKAGE_COLOR = { bg: 'rgba(255,109,0,0.12)', text: '#FF6D00', border: 'rgba(255,109,0,0.3)', solid: '#FF6D00' };
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; solid: string }> = {
   confirmed: { bg: 'rgba(34,197,94,0.12)',   text: '#22C55E', border: 'rgba(34,197,94,0.3)',   solid: '#22C55E' },
   completed: { bg: 'rgba(21,101,192,0.12)',   text: '#1E88E5', border: 'rgba(21,101,192,0.3)',  solid: '#1565C0' },
   pending:   { bg: 'rgba(245,158,11,0.12)',   text: '#F59E0B', border: 'rgba(245,158,11,0.3)',  solid: '#F59E0B' },
   cancelled: { bg: 'rgba(239,68,68,0.12)',    text: '#EF4444', border: 'rgba(239,68,68,0.3)',   solid: '#C62828' },
+  blocked:   { bg: 'rgba(107,114,128,0.15)',  text: '#6B7280', border: 'rgba(107,114,128,0.3)', solid: '#6B7280' },
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -33,6 +37,7 @@ const STATUS_LABELS: Record<string, string> = {
   completed: 'Concluído',
   pending:   'Pendente',
   cancelled: 'Cancelado',
+  blocked:   'Bloqueado',
 };
 
 const WEEK_DAYS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -89,7 +94,7 @@ interface ModalProps {
 }
 
 function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, isDeleting }: ModalProps) {
-  const c = STATUS_COLORS[appt.status];
+  const c = appt.isPackage && appt.status !== 'cancelled' ? PACKAGE_COLOR : STATUS_COLORS[appt.status];
   const otherStatuses = (['confirmed', 'completed', 'cancelled'] as const).filter(s => s !== appt.status);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -336,16 +341,16 @@ export default function CalendarView({ appointments, employees = [], month: cont
                       </div>
                     ))}
                     {da.slice(0, MAX_PILLS - Math.min(blockedStaff.length, MAX_PILLS)).map(a => {
-                      const c = STATUS_COLORS[a.status];
+                      const c = a.isPackage && a.status !== 'cancelled' ? PACKAGE_COLOR : (STATUS_COLORS[a.status] ?? STATUS_COLORS['confirmed']);
                       return (
                         <div
                           key={a._id}
                           className={styles.pill}
                           style={{ background: c.bg, color: c.text, borderColor: c.border }}
-                          title={`${a.startTime} ${a.clientId?.name ?? ''}`}
+                          title={`${a.startTime} ${a.clientId?.name ?? (a.status === 'blocked' ? 'Bloqueado' : '')}`}
                           onClick={e => { e.stopPropagation(); setSelectedAppt(a); }}
                         >
-                          {a.startTime} {a.clientId?.name ?? ''}
+                          {a.status === 'blocked' ? `Bloqueado ${a.startTime}` : `${a.startTime} ${a.clientId?.name ?? ''}`}
                         </div>
                       );
                     })}
@@ -395,7 +400,7 @@ export default function CalendarView({ appointments, employees = [], month: cont
             <p className={styles.dayEmpty}>Nenhum agendamento neste dia.</p>
           ) : (
             dayAppts.map(a => {
-              const c = STATUS_COLORS[a.status];
+              const c = a.isPackage && a.status !== 'cancelled' ? PACKAGE_COLOR : STATUS_COLORS[a.status];
               return (
                 <div
                   key={a._id}

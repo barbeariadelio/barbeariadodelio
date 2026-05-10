@@ -98,6 +98,141 @@
   letter-spacing: 0.1em;
 }
 
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  cursor: pointer;
+  background: var(--bg-base);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  transition: all 0.2s;
+
+  &:hover {
+    background: var(--bg-overlay);
+    border-color: var(--gold);
+  }
+
+  input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--gold);
+    cursor: pointer;
+  }
+}
+
+.checkboxInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.checkboxTitle {
+  display: block;
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+
+.checkboxDesc {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.packageLogicBox {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--bg-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+}
+
+.offerPackage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.offerTitle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.packageOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.packageOption {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.75rem 1rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    border-color: var(--gold);
+    background: var(--bg-overlay);
+  }
+
+  input[type="radio"] {
+    accent-color: var(--gold);
+    width: 16px;
+    height: 16px;
+  }
+}
+
+.packageOptionActive {
+  border-color: var(--gold);
+  background: var(--gold-dim);
+}
+
+.pkgOptContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex: 1;
+}
+
+.pkgOptName {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.pkgOptPrice {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--gold);
+}
+
+.clearPkgBtn {
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  width: fit-content;
+  padding: 0;
+  margin-top: 4px;
+
+  &:hover { text-decoration: underline; }
+}
+
 .input,
 .select,
 .textarea {

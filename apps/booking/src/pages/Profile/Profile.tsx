@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../api/client';
@@ -9,9 +10,9 @@ interface Appt {
   date: string;
   startTime: string;
   endTime?: string;
-  serviceId: { name: string; price?: number } | null;
-  employeeId: { name: string } | null;
-  unitId: { name: string; address: string } | null;
+  serviceId: { name: string; price?: number; durationMinutes?: number } | null;
+  employeeId: { _id: string; name: string } | null;
+  unitId: { _id: string; name: string; address: string } | null;
   status: string;
   price: number;
 }
@@ -22,7 +23,7 @@ const MONTHS = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov
 const MONTHS_LONG = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
 function fmt(v: number) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v); }
-function initials(name: string) { return name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase(); }
+function initials(name: string) { return name?.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase() || '?'; }
 function isGuest(email: string) { return email?.includes('@delio.guest'); }
 function displayEmail(user: any) {
   if (!user) return '';
@@ -32,11 +33,13 @@ function displayEmail(user: any) {
 function getUserId(user: any) { return user?.id ?? user?._id ?? ''; }
 function todayISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
-function ApptRow({ a }: { a: Appt }) {
+function ApptRow({ a, onCancel, onEdit }: { a: Appt; onCancel?: (id: string) => void; onEdit?: (appt: Appt) => void }) {
   const [, m, d] = a.date.split('-').map(Number);
   const today = todayISO();
   const nowTime = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
   const isPast = a.date < today || (a.date === today && a.startTime < nowTime);
+  const canCancel = !isPast && (a.status === 'pending' || a.status === 'confirmed');
+
   return (
     <div className={styles.apptRow}>
       <div className={`${styles.apptDateCol} ${isPast ? styles.apptDatePast : ''}`}>
@@ -58,9 +61,17 @@ function ApptRow({ a }: { a: Appt }) {
         )}
       </div>
       <div className={styles.apptRight}>
-        <span className={styles.apptBadge} style={{ color: SC[a.status], background: SC[a.status] + '18', borderColor: SC[a.status] + '40' }}>
-          {SL[a.status]}
-        </span>
+        <div className={styles.badgeRow}>
+          <span className={styles.apptBadge} style={{ color: SC[a.status], background: SC[a.status] + '18', borderColor: SC[a.status] + '40' }}>
+            {SL[a.status]}
+          </span>
+          {canCancel && (
+            <div className={styles.rowActions}>
+              <button className={styles.editBtn} onClick={() => onEdit?.(a)}>Editar</button>
+              <button className={styles.cancelBtn} onClick={() => onCancel?.(a._id)}>Cancelar</button>
+            </div>
+          )}
+        </div>
         <span className={styles.apptPrice}>{fmt(a.price)}</span>
       </div>
     </div>
@@ -70,133 +81,200 @@ function ApptRow({ a }: { a: Appt }) {
 export default function Profile() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [apptToCancel, setApptToCancel] = useState<string | null>(null);
+  const [apptToEdit, setApptToEdit] = useState<Appt | null>(null);
+  const [editStep, setEditStep] = useState<'choice' | 'barber' | 'service' | 'datetime' | 'confirm'>('choice');
+  const [selDate, setSelDate] = useState(todayISO());
+  const [pendingUpdate, setPendingUpdate] = useState<any>(null);
+
+  const editUnitId = apptToEdit?.unitId?._id || (typeof apptToEdit?.unitId === 'string' ? apptToEdit.unitId : '');
+
+  const { data: services = [] } = useQuery<any[]>({
+    queryKey: ['services', editUnitId],
+    queryFn: () => api.get(`/services?unitId=${editUnitId}`).then(r => r.data),
+    enabled: !!editUnitId && editStep === 'service',
+  });
+
+  const { data: employees = [] } = useQuery<any[]>({
+    queryKey: ['employees', editUnitId],
+    queryFn: () => api.get(`/employees/public?unitId=${editUnitId}`).then(r => r.data),
+    enabled: !!editUnitId && editStep === 'barber',
+  });
+
+  const { data: slots = [], isFetching: slotsLoading } = useQuery<string[]>({
+    queryKey: ['slots', editUnitId, apptToEdit?.employeeId, selDate],
+    queryFn: () => api.get(`/appointments/slots?unitId=${editUnitId}&employeeId=${apptToEdit?.employeeId?._id || apptToEdit?.employeeId}&date=${selDate}&durationMinutes=${apptToEdit?.serviceId?.durationMinutes || 30}`).then(r => r.data),
+    enabled: !!editUnitId && !!apptToEdit && editStep === 'datetime',
+  });
 
   const { data: appointments = [], isLoading } = useQuery<Appt[]>({
     queryKey: ['my-appointments', getUserId(user)],
     queryFn: async () => {
-      const { data } = await api.get('/appointments/my');
-      return Array.isArray(data) ? data : [];
+      try {
+        const { data } = await api.get('/appointments/my');
+        return Array.isArray(data) ? data : [];
+      } catch (err: any) {
+        if (err.response?.status === 401) return [];
+        throw err;
+      }
     },
     enabled: !!user,
   });
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/appointments/${id}/status`, { status: 'cancelled' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-appointments'] });
+      setApptToCancel(null);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (payload: any) => api.patch(`/appointments/${apptToEdit?._id}`, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['my-appointments'] });
+      setApptToEdit(null);
+      setEditStep('choice');
+      setPendingUpdate(null);
+    },
+  });
+
+  const handleEditSelect = (payload: any) => {
+    setPendingUpdate(payload);
+    setEditStep('confirm');
+  };
 
   if (!user) {
     return (
       <div className={styles.page}>
         <div className={styles.noAuth}>
-          <div className={styles.noAuthIcon}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          </div>
-          <p className={styles.noAuthText}>Faça login para ver seu perfil e seus agendamentos.</p>
-          <button className={styles.loginBtn} onClick={() => navigate('/login')}>Entrar / Criar Conta</button>
-          <button className={styles.backLinkBtn} onClick={() => navigate('/')}>← Voltar ao início</button>
+          <p>Faça login para ver seu perfil.</p>
+          <button onClick={() => navigate('/login')}>Entrar</button>
         </div>
       </div>
     );
   }
 
-  const u = user as any;
-  const today = todayISO();
-  const nowTime = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
-  const upcoming = appointments.filter(a => (a.status === 'pending' || a.status === 'confirmed') && (a.date > today || (a.date === today && a.startTime >= nowTime)));
-  const past = appointments.filter(a => a.status === 'completed' || a.status === 'cancelled' || a.date < today || (a.date === today && a.startTime < nowTime));
-  const nextAppt = upcoming.sort((a, b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))[0];
-  const totalSpent = appointments.filter(a => a.status === 'completed').reduce((s, a) => s + a.price, 0);
+  const upcoming = appointments.filter(a => (a.status === 'pending' || a.status === 'confirmed') && a.date >= todayISO());
+  const nextAppt = [...upcoming].sort((a,b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))[0];
+
+  const cancelApptData = appointments.find(it => it._id === apptToCancel);
 
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <button className={styles.backBtn} onClick={() => navigate('/')}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-          Início
-        </button>
+        <button className={styles.backBtn} onClick={() => navigate('/')}>Início</button>
         <button className={styles.logoutBtn} onClick={() => { logout(); navigate('/'); }}>Sair</button>
       </header>
 
       <div className={styles.inner}>
-
-        {/* ── Profile card ── */}
         <div className={styles.profileCard}>
-          <div className={styles.avatar}>{initials(u.name)}</div>
+          <div className={styles.avatar}>{initials((user as any).name)}</div>
           <div className={styles.profileInfo}>
-            <h1 className={styles.name}>{u.name}</h1>
-            <p className={styles.profileSub}>{displayEmail(u)}</p>
+            <h1 className={styles.name}>{(user as any).name}</h1>
+            <p className={styles.profileSub}>{displayEmail(user)}</p>
           </div>
-          <button className={styles.newApptBtn} onClick={() => navigate('/')}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Novo agendamento
-          </button>
         </div>
 
-        {/* ── Next appointment highlight ── */}
-        {nextAppt && (() => {
-          const [y, m, d] = nextAppt.date.split('-').map(Number);
-          return (
-            <div className={styles.nextCard}>
-              <div className={styles.nextLabel}>Próximo agendamento</div>
-              <div className={styles.nextMain}>
-                <div className={styles.nextDate}>
-                  <span className={styles.nextDay}>{d}</span>
-                  <div>
-                    <span className={styles.nextMonth}>{MONTHS_LONG[m - 1]}</span>
-                    <span className={styles.nextYear}>{y}</span>
-                  </div>
-                </div>
-                <div className={styles.nextInfo}>
-                  <span className={styles.nextService}>{nextAppt.serviceId?.name}</span>
-                  <span className={styles.nextMeta}>{nextAppt.startTime} · {nextAppt.employeeId?.name}</span>
-                  {nextAppt.unitId && (
-                    <span className={styles.nextUnit}>
-                      {typeof nextAppt.unitId === 'object' && nextAppt.unitId.name
-                        ? <>{nextAppt.unitId.name} <br /> <small>{nextAppt.unitId.address}</small></>
-                        : `Unidade: ${typeof nextAppt.unitId === 'string' ? nextAppt.unitId : 'Dados incompletos'}`}
-                    </span>
-                  )}
-                </div>
-                <span className={styles.nextBadge} style={{ color: SC[nextAppt.status], background: SC[nextAppt.status] + '18', borderColor: SC[nextAppt.status] + '40' }}>
-                  {SL[nextAppt.status]}
-                </span>
-              </div>
-            </div>
-          );
-        })()}
-
-        {isLoading && <p className={styles.loading}>Carregando agendamentos...</p>}
-
-        {/* ── Upcoming ── */}
-        {!isLoading && upcoming.length > 0 && (
-          <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>Próximos</h2>
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>Seus Agendamentos</h2>
+          {isLoading ? <p>Carregando...</p> : (
             <div className={styles.apptList}>
-              {upcoming.sort((a,b) => a.date.localeCompare(b.date)).map(a => <ApptRow key={a._id} a={a} />)}
+              {upcoming.map(a => (
+                <ApptRow key={a._id} a={a} onCancel={setApptToCancel} onEdit={setApptToEdit} />
+              ))}
             </div>
-          </section>
-        )}
-
-        {!isLoading && upcoming.length === 0 && appointments.length === 0 && (
-          <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>Próximos</h2>
-            <div className={styles.emptyState}>
-              <div className={styles.emptyIcon}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              </div>
-              <p>Nenhum agendamento ainda.</p>
-              <button className={styles.emptyBtn} onClick={() => navigate('/')}>Agendar agora</button>
-            </div>
-          </section>
-        )}
-
-        {/* ── History ── */}
-        {!isLoading && past.length > 0 && (
-          <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>Histórico</h2>
-            <div className={styles.apptList}>
-              {past.sort((a,b) => b.date.localeCompare(a.date)).map(a => <ApptRow key={a._id} a={a} />)}
-            </div>
-          </section>
-        )}
-
+          )}
+        </section>
       </div>
+
+      {apptToCancel && cancelApptData && (
+        <div className={styles.modalOverlay} onClick={() => setApptToCancel(null)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>Cancelar agendamento?</h3>
+            <p className={styles.modalText}>Deseja cancelar o serviço {cancelApptData.serviceId?.name}?</p>
+            <div className={styles.modalActions}>
+              <button className={styles.modalCancelBtn} onClick={() => setApptToCancel(null)}>Voltar</button>
+              <button className={styles.modalConfirmBtn} onClick={() => cancelMutation.mutate(apptToCancel)}>Confirmar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {apptToEdit && (
+        <div className={styles.modalOverlay} onClick={() => { setApptToEdit(null); setEditStep('choice'); }}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <h3 className={styles.modalTitle}>Editar Agendamento</h3>
+            
+            {editStep === 'choice' && (
+              <div className={styles.editOptions}>
+                <button className={styles.editOptionBtn} onClick={() => setEditStep('datetime')}>Data e Hora</button>
+                <button className={styles.editOptionBtn} onClick={() => setEditStep('barber')}>Profissional</button>
+                <button className={styles.editOptionBtn} onClick={() => setEditStep('service')}>Serviço</button>
+              </div>
+            )}
+
+            {editStep === 'barber' && (
+              <div className={styles.listOptions}>
+                {employees.map(e => (
+                  <button key={e._id} className={styles.listOptionBtn} onClick={() => handleEditSelect({ employeeId: e._id, employeeName: e.name })}>
+                    {e.name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {editStep === 'service' && (
+              <div className={styles.listOptions}>
+                {services.map(s => (
+                  <button key={s._id} className={styles.listOptionBtn} onClick={() => handleEditSelect({ serviceId: s._id, price: s.price, serviceName: s.name })}>
+                    {s.name} — {fmt(s.price)}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {editStep === 'datetime' && (
+              <div className={styles.datePickerWrap}>
+                <input type="date" value={selDate} min={todayISO()} onChange={e => setSelDate(e.target.value)} className={styles.dateInput} />
+                <div className={styles.slotGrid}>
+                  {slotsLoading ? <p>Carregando...</p> : slots.map(t => (
+                    <button key={t} className={styles.slotBtn} onClick={() => handleEditSelect({ date: selDate, startTime: t })}>{t}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {editStep === 'confirm' && (
+              <div className={styles.confirmView}>
+                <p className={styles.modalText}>Deseja alterar as informações para:</p>
+                <div className={styles.confirmBox}>
+                  {pendingUpdate.serviceName && <p><strong>Serviço:</strong> {pendingUpdate.serviceName}</p>}
+                  {pendingUpdate.employeeName && <p><strong>Profissional:</strong> {pendingUpdate.employeeName}</p>}
+                  {pendingUpdate.date && <p><strong>Data:</strong> {pendingUpdate.date.split('-').reverse().join('/')}</p>}
+                  {pendingUpdate.startTime && <p><strong>Horário:</strong> {pendingUpdate.startTime}</p>}
+                </div>
+                <div className={styles.modalActions} style={{ marginTop: '1.5rem', display: 'flex', gap: '0.5rem' }}>
+                  <button className={styles.modalCancelBtn} style={{ flex: 1 }} onClick={() => setEditStep('choice')}>Voltar</button>
+                  <button className={styles.modalConfirmBtn} style={{ flex: 1 }} onClick={() => updateMutation.mutate(pendingUpdate)} disabled={updateMutation.isPending}>
+                    {updateMutation.isPending ? 'Salvando...' : 'Confirmar'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {editStep !== 'confirm' && (
+              <button className={styles.modalCancelBtn} style={{ width: '100%', marginTop: '1rem' }} onClick={() => {
+                if (editStep === 'choice') setApptToEdit(null);
+                else setEditStep('choice');
+              }}>
+                {editStep === 'choice' ? 'Fechar' : 'Voltar'}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -16,6 +16,7 @@ import { financeRoutes } from './modules/finance/finance.routes';
 import { franchiseRoutes } from './modules/franchise/franchise.routes';
 import { productRoutes } from './modules/inventory/product.routes';
 import { userRoutes } from './modules/auth/user.routes';
+import { notificationRoutes } from './modules/notifications/notification.routes';
 
 const app = express();
 
@@ -39,6 +40,7 @@ app.use('/finance', financeRoutes);
 app.use('/franchise', franchiseRoutes);
 app.use('/products', productRoutes);
 app.use('/users', userRoutes);
+app.use('/notifications', notificationRoutes);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

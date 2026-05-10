@@ -19,7 +19,10 @@ export interface CalendarAppointment {
   startTime: string;
   endTime: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'blocked';
+  isPackage?: boolean;
 }
+
+const PACKAGE_COLOR = { bg: 'rgba(255,109,0,0.12)', text: '#FF6D00', border: 'rgba(255,109,0,0.3)', solid: '#FF6D00' };
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; solid: string }> = {
   confirmed: { bg: 'rgba(34,197,94,0.12)',   text: '#22C55E', border: 'rgba(34,197,94,0.3)',   solid: '#22C55E' },
@@ -91,7 +94,7 @@ interface ModalProps {
 }
 
 function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, isDeleting }: ModalProps) {
-  const c = STATUS_COLORS[appt.status];
+  const c = appt.isPackage && appt.status !== 'cancelled' ? PACKAGE_COLOR : STATUS_COLORS[appt.status];
   const otherStatuses = (['confirmed', 'completed', 'cancelled'] as const).filter(s => s !== appt.status);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -338,7 +341,7 @@ export default function CalendarView({ appointments, employees = [], month: cont
                       </div>
                     ))}
                     {da.slice(0, MAX_PILLS - Math.min(blockedStaff.length, MAX_PILLS)).map(a => {
-                      const c = STATUS_COLORS[a.status] ?? STATUS_COLORS['confirmed'];
+                      const c = a.isPackage && a.status !== 'cancelled' ? PACKAGE_COLOR : (STATUS_COLORS[a.status] ?? STATUS_COLORS['confirmed']);
                       return (
                         <div
                           key={a._id}
@@ -397,7 +400,7 @@ export default function CalendarView({ appointments, employees = [], month: cont
             <p className={styles.dayEmpty}>Nenhum agendamento neste dia.</p>
           ) : (
             dayAppts.map(a => {
-              const c = STATUS_COLORS[a.status];
+              const c = a.isPackage && a.status !== 'cancelled' ? PACKAGE_COLOR : STATUS_COLORS[a.status];
               return (
                 <div
                   key={a._id}

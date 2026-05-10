@@ -39,6 +39,7 @@ export default function Dashboard() {
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
+  const [editAppt, setEditAppt] = useState<any>(null);
 
   /* ── Month appointments (calendar view) ── */
   const monthStart = dateISO(startOfMonth(calendarMonth));
@@ -55,7 +56,7 @@ export default function Dashboard() {
   const monthAppointments = useMemo(() => {
     if (!isStaff || !userId) return monthAppointmentsRaw;
     return monthAppointmentsRaw.filter(a => {
-      const empId = a.employeeId?._id || a.employeeId;
+      const empId = (a.employeeId as any)?._id || a.employeeId;
       return empId === userId;
     });
   }, [monthAppointmentsRaw, isStaff, userId]);
@@ -90,7 +91,7 @@ export default function Dashboard() {
   const employees = useMemo(() => {
     if (!isStaff || !userId) return employeesRaw;
     return employeesRaw.filter(e => {
-      const empId = e._id || e.id;
+      const empId = e._id;
       return empId === userId;
     });
   }, [employeesRaw, isStaff, userId]);
@@ -167,7 +168,14 @@ export default function Dashboard() {
           selectedDate={selectedDay}
           onDateChange={day => { setSelectedDay(day); }}
           onUpdate={handleScheduleUpdate}
-          onNewAppt={() => setShowForm(true)}
+          onNewAppt={() => {
+            setEditAppt(null);
+            setShowForm(true);
+          }}
+          onEdit={(appt) => {
+            setEditAppt(appt);
+            setShowForm(true);
+          }}
           onBack={() => setView('calendar')}
           unitId={unitId}
           workingDays={unitConfig?.workingDays}
@@ -177,9 +185,14 @@ export default function Dashboard() {
 
       {showForm && (
         <AppointmentForm
-          onClose={() => setShowForm(false)}
+          appointment={editAppt}
+          onClose={() => {
+            setShowForm(false);
+            setEditAppt(null);
+          }}
           onSuccess={() => {
             setShowForm(false);
+            setEditAppt(null);
             if (view === 'calendar') handleMonthUpdate();
             else handleScheduleUpdate();
           }}

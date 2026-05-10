@@ -12,6 +12,7 @@ export interface IAppointment extends Document {
   status: AppointmentStatus;
   notes?: string;
   price: number;
+  isPackage?: boolean;
 }
 
 const appointmentSchema = new Schema<IAppointment>(
@@ -30,6 +31,7 @@ const appointmentSchema = new Schema<IAppointment>(
     },
     notes: String,
     price: { type: Number, required: true, min: 0, default: 0 },
+    isPackage: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

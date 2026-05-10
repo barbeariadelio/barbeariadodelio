@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useMemo, useEffect } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
@@ -184,6 +184,17 @@ export default function Book() {
   const [guestPhone, setGuestPhone] = useState('');
   const [success, setSuccess] = useState(false);
   const [bookError, setBookError] = useState<string | null>(null);
+  const [isInitializing, setIsInitializing] = useState(false);
+
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('editId');
+  const targetStep = searchParams.get('step') as Step | null;
+
+  useEffect(() => {
+    if (editId) setIsInitializing(true);
+  }, [editId]);
+
+
 
   const stepIdx = STEPS.indexOf(step);
 
@@ -208,8 +219,33 @@ export default function Book() {
     enabled: !!unitId && !!unit && !!selectedEmployee && !!selectedDate && !!selectedService && step === 'datetime',
   });
 
+  // Fetch appointment if editing
+  const { data: editAppt } = useQuery<any>({
+    queryKey: ['appointment', editId],
+    queryFn: () => unitApi.get(`/appointments/${editId}`).then(r => r.data),
+    enabled: !!editId && !!unit,
+  });
+
+  // Pre-fill if editing
+  useEffect(() => {
+    if (editId && editAppt && services.length > 0 && employees.length > 0 && isInitializing) {
+      const svc = services.find(s => s._id === (editAppt.serviceId?._id || editAppt.serviceId));
+      const emp = employees.find(e => e._id === (editAppt.employeeId?._id || editAppt.employeeId));
+      
+      if (svc) setSelectedService(svc);
+      if (emp) setSelectedEmployee(emp);
+      if (editAppt.date) setSelectedDate(editAppt.date);
+      if (editAppt.startTime) setSelectedTime(editAppt.startTime);
+      
+      setStep(targetStep || 'confirm');
+      setIsInitializing(false);
+    }
+  }, [editId, editAppt, services, employees, isInitializing, targetStep]);
+
   const bookMutation = useMutation({
-    mutationFn: (payload: object) => unitApi.post('/appointments', payload),
+    mutationFn: (payload: object) => editId 
+      ? unitApi.patch(`/appointments/${editId}`, payload)
+      : unitApi.post('/appointments', payload),
     onSuccess: () => setSuccess(true),
     onError: (error: any) => {
       if (error.response?.status === 401) {
@@ -312,10 +348,17 @@ export default function Book() {
       <div className={styles.body}>
         <div className={styles.stepMeta}>
           <span className={styles.stepCounter}>{stepIdx + 1} de {STEPS.length}</span>
-          <h1 className={styles.stepHeading}>{STEP_LABELS[stepIdx]}</h1>
+          <h1 className={styles.stepHeading}>
+            {editId ? `Editar ${STEP_LABELS[stepIdx]}` : STEP_LABELS[stepIdx]}
+          </h1>
         </div>
 
-        <div className={styles.layout}>
+        {isInitializing ? (
+          <div className={styles.initializing}>
+            <p>Carregando dados do agendamento...</p>
+          </div>
+        ) : (
+          <div className={styles.layout}>
           <main className={styles.main}>
 
             {/* ── Service ── */}
@@ -326,7 +369,7 @@ export default function Book() {
                   <button
                     key={svc._id}
                     className={`${styles.svcRow} ${selectedService?._id === svc._id ? styles.svcRowSel : ''}`}
-                    onClick={() => { setSelectedService(svc); setStep('barber'); }}
+                    onClick={() => { setSelectedService(svc); setStep(editId ? 'confirm' : 'barber'); }}
                   >
                     <div className={styles.svcIcon}>
                       {svc.image ? (
@@ -359,7 +402,7 @@ export default function Book() {
                   <button
                     key={emp._id}
                     className={`${styles.empCard} ${selectedEmployee?._id === emp._id ? styles.empCardSel : ''}`}
-                    onClick={() => { setSelectedEmployee(emp); setStep('datetime'); }}
+                    onClick={() => { setSelectedEmployee(emp); setStep(editId ? 'confirm' : 'datetime'); }}
                   >
                     <div className={styles.empAvatarWrap}>
                       <div className={styles.empAvatar}>
@@ -492,6 +535,7 @@ export default function Book() {
           </main>
           <Summary service={selectedService} employee={selectedEmployee} date={selectedDate} time={selectedTime} />
         </div>
+        )}
       </div>
     </div>
   );

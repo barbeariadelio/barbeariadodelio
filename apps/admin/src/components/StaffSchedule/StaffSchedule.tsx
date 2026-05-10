@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { format, addDays, subDays, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useMutation } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import ConfirmModal from '../ConfirmModal/ConfirmModal';
 import styles from './StaffSchedule.module.scss';
@@ -71,6 +72,7 @@ export interface ScheduleAppointment {
   date: string;
   startTime: string;
   endTime: string;
+  price: number;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'blocked';
 }
 
@@ -122,92 +124,102 @@ interface ModalProps {
   isDeleting: boolean;
 }
 
-function ApptModal({ appt, palette, onClose, onStatusChange, onDelete, isPending, isDeleting }: ModalProps) {
+function ApptModal({ appt, palette, onClose, onStatusChange, onDelete, isPending, isDeleting, onEdit }: ModalProps & { onEdit?: (a: ScheduleAppointment) => void }) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const others = (['confirmed', 'completed', 'cancelled'] as const).filter(s => s !== appt.status);
+  const navigate = useNavigate();
+  
+  const dateFmt = format(new Date(appt.date + 'T12:00:00'), "EEEE, dd 'de' MMMM", { locale: ptBR });
+
+  const handleWhatsApp = () => {
+    const phone = appt.clientId?.phone?.replace(/\D/g, '');
+    if (!phone) return;
+    const msg = encodeURIComponent(
+      `Olá ${appt.clientId?.name}, estou entrando em contato para confirmar seu agendamento no Delio.\n\n` +
+      `Data: ${appt.date.split('-').reverse().join('/')}\n` +
+      `Horário: ${appt.startTime}\n` +
+      `Serviço: ${appt.serviceId?.name}\n` +
+      `Barbeiro: ${appt.employeeId?.name}\n\n` +
+      `Podemos confirmar?`
+    );
+    window.open(`https://wa.me/55${phone}?text=${msg}`, '_blank');
+  };
+
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className={styles.panel} style={{ borderTopColor: appt.status === 'blocked' ? '#6B7280' : palette.border }}>
+      <div className={styles.panel} style={{ borderTop: `4px solid ${appt.status === 'blocked' ? '#6B7280' : palette.border}` }}>
         <div className={styles.panelHead}>
-          <span className={styles.panelClient}>{appt.clientId?.name ?? (appt.status === 'blocked' ? 'Bloqueio de Horário' : 'Cliente')}</span>
+          <div className={styles.panelActions}>
+             <button className={styles.actionIcon} title="Enviar WhatsApp" onClick={handleWhatsApp}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+             <button className={styles.actionIcon} title="Editar" onClick={() => onEdit?.(appt)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+             <button className={styles.actionIcon} title="Excluir" onClick={() => setConfirmDelete(true)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+             <button className={styles.actionIcon} title="Perfil do Cliente" onClick={() => appt.clientId?._id && navigate(`/clients?id=${appt.clientId._id}`)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+             <button className={styles.actionIcon}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
+          </div>
           <button className={styles.closeBtn} onClick={onClose}><XIcon /></button>
         </div>
         <div className={styles.panelBody}>
-          {[
-            ['Data',     appt.date.split('-').reverse().join('/')],
-            ['Horário',  `${appt.startTime} – ${appt.endTime}`],
-            ...(appt.status !== 'blocked' ? [
-              ['Serviço',  appt.serviceId?.name ?? '—'],
-              ['Barbeiro', appt.employeeId?.name ?? '—'],
-              ['Telefone', appt.clientId?.phone ?? '—']
-            ] : [
-              ['Barbeiro', appt.employeeId?.name ?? '—']
-            ])
-          ].map(([label, val]) => (
-            <div key={label} className={styles.panelRow}>
-              <span className={styles.rowLabel}>{label}</span>
-              <span className={styles.rowValue}>{val}</span>
+          <div className={styles.mainInfo}>
+            <h2 className={styles.clientName}>{appt.clientId?.name ?? (appt.status === 'blocked' ? 'Bloqueio de Horário' : 'Cliente')}</h2>
+            
+            <div className={styles.infoRow}>
+              <div className={styles.infoIcon}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+              <div className={styles.infoText}>
+                <span>{dateFmt} • {appt.startTime} até {appt.endTime}</span>
+                <span className={styles.serviceName}>{appt.serviceId?.name ?? '—'}</span>
+                <span className={styles.priceTag}>R$ {appt.price?.toFixed(2).replace('.', ',')}</span>
+              </div>
             </div>
-          ))}
-          <div className={styles.panelRow}>
-            <span className={styles.rowLabel}>Status</span>
-            <span className={styles.rowStatus} style={{ color: STATUS_DOT[appt.status] }}>
-              <span className={styles.dot} style={{ background: STATUS_DOT[appt.status] }} />
-              {STATUS_LABELS[appt.status]}
-            </span>
+
+            <div className={styles.infoRow}>
+              <div className={styles.infoIcon}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></div>
+              <div className={styles.statusSelectWrap}>
+                <select 
+                  className={styles.statusSelect}
+                  value={appt.status}
+                  onChange={(e) => onStatusChange(appt._id, e.target.value)}
+                  disabled={isPending}
+                >
+                  {Object.entries(STATUS_LABELS).map(([val, label]) => (
+                    <option key={val} value={val}>{label}</option>
+                  ))}
+                  <option value="blocked" disabled>Bloqueado</option>
+                </select>
+              </div>
+            </div>
           </div>
-          {appt.clientId?.phone && appt.status !== 'blocked' && (
-            <div className={styles.whatsappWrap}>
-              <button
-                className={styles.whatsappBtn}
-                onClick={() => {
-                  const phone = appt.clientId?.phone?.replace(/\D/g, '');
-                  const dateFmt = appt.date.split('-').reverse().join('/');
-                  const msg = encodeURIComponent(
-                    `Olá ${appt.clientId?.name}, estou entrando em contato para confirmar seu agendamento no Delio.\n\n` +
-                    `Data: ${dateFmt}\n` +
-                    `Horário: ${appt.startTime}\n` +
-                    `Serviço: ${appt.serviceId?.name}\n` +
-                    `Barbeiro: ${appt.employeeId?.name}\n\n` +
-                    `Podemos confirmar?`
-                  );
-                  window.open(`https://wa.me/55${phone}?text=${msg}`, '_blank');
-                }}
-              >
-                <WhatsAppIcon />
-                Confirmar via WhatsApp
-              </button>
-            </div>
-          )}
         </div>
-        {others.length > 0 && appt.status !== 'blocked' && (
+
+        <div className={styles.panelBottom}>
+          <button 
+            className={styles.faturarBtn}
+            onClick={() => onStatusChange(appt._id, 'completed')}
+          >
+            FATURAR
+          </button>
+        </div>
+
+        {appt.status !== 'blocked' && (
           <div className={styles.panelFooter}>
             <span className={styles.footerLabel}>Alterar status</span>
             <div className={styles.footerBtns}>
-              {others.map(s => (
-                <button
-                  key={s}
-                  className={styles.statusBtn}
-                  style={{ color: STATUS_DOT[s], borderColor: STATUS_DOT[s] + '50' }}
-                  onClick={() => s === 'cancelled' ? setConfirmCancel(true) : onStatusChange(appt._id, s)}
-                  disabled={isPending || isDeleting}
-                >
-                  {STATUS_LABELS[s]}
-                </button>
-              ))}
+              {(['confirmed', 'cancelled'] as const)
+                .filter(s => s !== appt.status)
+                .map(s => (
+                  <button
+                    key={s}
+                    className={styles.statusBtn}
+                    style={{ color: STATUS_DOT[s], borderColor: STATUS_DOT[s] + '50' }}
+                    onClick={() => s === 'cancelled' ? setConfirmCancel(true) : onStatusChange(appt._id, s)}
+                    disabled={isPending || isDeleting}
+                  >
+                    {STATUS_LABELS[s]}
+                  </button>
+                ))
+              }
             </div>
           </div>
         )}
-        <div className={styles.panelDelete}>
-          <button
-            className={styles.deleteBtn}
-            onClick={() => setConfirmDelete(true)}
-            disabled={isPending || isDeleting}
-          >
-            {appt.status === 'blocked' ? 'Remover Bloqueio' : 'Excluir agendamento'}
-          </button>
-        </div>
       </div>
       {confirmDelete && (
         <ConfirmModal
@@ -283,12 +295,13 @@ interface Props {
   onUpdate?: () => void;
   onNewAppt?: () => void;
   onBack?: () => void;
+  onEdit?: (appt: ScheduleAppointment) => void;
   unitId?: string;
   workingDays?: number[];   // 0=Sun … 6=Sat
   workingHours?: { start: string; end: string; lunchStart?: string; lunchEnd?: string };
 }
 
-export default function StaffSchedule({ appointments, employees, selectedDate, onDateChange, onUpdate, onNewAppt, onBack, unitId, workingDays, workingHours }: Props) {
+export default function StaffSchedule({ appointments, employees, selectedDate, onDateChange, onUpdate, onNewAppt, onBack, onEdit, unitId, workingDays, workingHours }: Props) {
   // ── Dynamic grid based on unit working hours ──
   const startHour = workingHours?.start ? parseInt(workingHours.start.split(':')[0], 10) : 8;
   const endHour   = workingHours?.end   ? parseInt(workingHours.end.split(':')[0], 10) + (parseInt(workingHours.end.split(':')[1], 10) > 0 ? 1 : 0) : 21;
@@ -572,6 +585,10 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
           onDelete={(id) => deleteMut.mutate(id)}
           isPending={statusMut.isPending}
           isDeleting={deleteMut.isPending}
+          onEdit={(a) => {
+            setSelectedAppt(null);
+            onEdit?.(a);
+          }}
         />
       )}
 

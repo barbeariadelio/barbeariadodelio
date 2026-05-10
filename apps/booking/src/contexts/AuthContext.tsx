@@ -13,7 +13,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     try {
       const stored = localStorage.getItem('user');
-      return stored ? (JSON.parse(stored) as User) : null;
+      const token = localStorage.getItem('accessToken');
+      if (!stored || !token) return null;
+      return JSON.parse(stored) as User;
     } catch {
       return null;
     }

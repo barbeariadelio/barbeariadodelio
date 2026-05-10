@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { AppointmentModel, IAppointment } from './appointment.model';
@@ -52,7 +53,7 @@ export class AppointmentService {
   }
 
   async findByUserId(userId: string): Promise<IAppointment[]> {
-    const clients = await ClientModel.find({ userId });
+    const clients = await ClientModel.find({ userId: new mongoose.Types.ObjectId(userId) });
     const clientIds = clients.map(c => c._id);
     return AppointmentModel.find({ clientId: { $in: clientIds } })
       .populate('serviceId', 'name price')
@@ -142,6 +143,15 @@ export class AppointmentService {
     });
   }
 
+  async findById(id: string): Promise<IAppointment> {
+    const appt = await AppointmentModel.findById(id)
+      .populate('clientId', 'name phone')
+      .populate('employeeId', 'name')
+      .populate('serviceId', 'name durationMinutes price');
+    if (!appt) throw new NotFoundError('Appointment');
+    return appt;
+  }
+
   async create(data: Partial<IAppointment>): Promise<IAppointment> {
     if (data.status !== 'blocked') {
       if (!data.clientId || !data.serviceId) {
@@ -187,7 +197,12 @@ export class AppointmentService {
     });
     if (conflict) throw new AppError('Time slot already booked', 409);
     
-    const apptData = { ...data, status: data.status || 'confirmed' };
+    const svc = await ServiceModel.findById(data.serviceId);
+    const apptData = { 
+      ...data, 
+      status: data.status || 'confirmed',
+      isPackage: data.isPackage || svc?.type === 'package'
+    };
     return AppointmentModel.create(apptData);
   }
 
@@ -247,6 +262,17 @@ export class AppointmentService {
       await client.save();
     }
 
+    // Check if client has a package for THIS service
+    const activeSub = client.packages?.find(p => 
+      p.active && (p.packageId.toString() === serviceId || p.itemLimits?.some(il => il.serviceId.toString() === serviceId))
+    );
+
+    const isUsingPackage = !!activeSub && svc.type === 'single';
+    const isBuyingPackage = svc.type === 'package';
+
+    const finalIsPackage = isUsingPackage || isBuyingPackage;
+    const finalPrice = isUsingPackage ? 0 : price;
+
     const conflict = await AppointmentModel.findOne({
       employeeId,
       date,
@@ -269,7 +295,36 @@ export class AppointmentService {
       throw new AppError('Profissional indisponível: Em período de férias.', 400);
     }
 
-    const appointment = await AppointmentModel.create({ clientId: client._id, employeeId, serviceId, unitId, date, startTime, endTime, price, status: 'confirmed' });
+    // If booking a PACKAGE service, automatically subscribe the client
+    if (svc.type === 'package') {
+      const alreadyHas = client.packages?.some(p => p.packageId.toString() === serviceId && p.active);
+      if (!alreadyHas) {
+        client.packages = client.packages || [];
+        client.packages.push({
+          packageId: svc._id as any,
+          startDate: new Date(),
+          active: true,
+          itemLimits: svc.packageItems?.map(pi => ({
+            serviceId: pi.serviceId,
+            quantity: pi.quantity
+          })) || []
+        });
+        await client.save();
+      }
+    }
+
+    const appointment = await AppointmentModel.create({ 
+      clientId: client._id, 
+      employeeId, 
+      serviceId, 
+      unitId, 
+      date, 
+      startTime, 
+      endTime, 
+      price: finalPrice, 
+      status: 'confirmed',
+      isPackage: finalIsPackage
+    });
 
     const tokenPayload = { id: userAccount._id.toString(), role: 'client' as const, unitId };
     const accessToken = jwt.sign(tokenPayload, env.jwtSecret, { expiresIn: env.jwtExpiresIn as any });
@@ -284,18 +339,79 @@ export class AppointmentService {
   }
 
   async updateStatus(id: string, status: AppointmentStatus): Promise<IAppointment> {
-    const appt = await AppointmentModel.findByIdAndUpdate(
-      id,
-      { status },
-      { new: true },
-    );
+    const appt = await AppointmentModel.findById(id).populate('serviceId', 'name price');
     if (!appt) throw new NotFoundError('Appointment');
+
+    const oldStatus = appt.status;
+    appt.status = status;
+    await appt.save();
+
+    // Automatically create transaction if completed
+    if (status === 'completed' && oldStatus !== 'completed') {
+      const { TransactionModel } = await import('../finance/transaction.model');
+      
+      const exists = await TransactionModel.findOne({ appointmentId: appt._id });
+      if (!exists) {
+        await TransactionModel.create({
+          unitId: appt.unitId,
+          appointmentId: appt._id,
+          type: 'income',
+          category: 'service',
+          amount: appt.price || (appt.serviceId as any)?.price || 0,
+          description: `Atendimento: ${(appt.serviceId as any)?.name || 'Serviço'}`,
+          date: appt.date,
+          createdBy: appt.employeeId
+        });
+      }
+    } else if (status !== 'completed' && oldStatus === 'completed') {
+      // Remove transaction if no longer completed
+      const { TransactionModel } = await import('../finance/transaction.model');
+      await TransactionModel.deleteOne({ appointmentId: appt._id });
+    }
+
     return appt;
   }
 
   async delete(id: string): Promise<void> {
     const appt = await AppointmentModel.findByIdAndDelete(id);
     if (!appt) throw new NotFoundError('Appointment');
+  }
+
+  async update(id: string, data: Partial<IAppointment>): Promise<IAppointment> {
+    const appt = await AppointmentModel.findById(id);
+    if (!appt) throw new NotFoundError('Appointment');
+
+    if (data.startTime && !data.endTime && (data.serviceId || appt.serviceId)) {
+      const svcId = data.serviceId || appt.serviceId;
+      const svc = await ServiceModel.findById(svcId);
+      if (svc) {
+        data.endTime = calcEndTime(data.startTime, svc.durationMinutes);
+      }
+    }
+
+    // Conflict check
+    if (data.startTime || data.date || data.employeeId) {
+      const checkDate = data.date || appt.date;
+      const checkEmp  = data.employeeId || appt.employeeId;
+      const checkStart = data.startTime || appt.startTime;
+      const checkEnd   = data.endTime || appt.endTime;
+
+      const conflict = await AppointmentModel.findOne({
+        _id: { $ne: id },
+        employeeId: checkEmp,
+        date: checkDate,
+        status: { $nin: ['cancelled'] },
+        $or: [
+          { startTime: { $lt: checkEnd, $gte: checkStart } },
+          { endTime: { $gt: checkStart, $lte: checkEnd } },
+          { startTime: { $lte: checkStart }, endTime: { $gte: checkEnd } },
+        ],
+      });
+      if (conflict) throw new AppError('Time slot already booked', 409);
+    }
+
+    Object.assign(appt, data);
+    return appt.save();
   }
 
   private generateSlots(start: string, end: string, intervalMin: number): string[] {

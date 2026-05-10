@@ -6,8 +6,24 @@ import styles from './AppointmentForm.module.scss';
 
 interface Unit { _id: string; name: string; apiUrl?: string; }
 interface Employee { _id: string; name: string; }
-interface Client { _id: string; name: string; phone?: string; }
-interface Service { _id: string; name: string; durationMinutes: number; price: number; }
+interface Client {
+  _id: string;
+  name: string;
+  phone?: string;
+  packages?: {
+    packageId: string;
+    active: boolean;
+    itemLimits?: { serviceId: string; quantity: number }[];
+  }[];
+}
+interface Service { 
+  _id: string; 
+  name: string; 
+  durationMinutes: number; 
+  price: number; 
+  type: 'single' | 'package';
+  packageItems?: { serviceId: string; quantity: number }[];
+}
 
 interface Props {
   onClose: () => void;
@@ -46,6 +62,8 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate }: Pro
   const [date, setDate] = useState(initialDate ?? todayISO());
   const [startTime, setStartTime] = useState('09:00');
   const [notes, setNotes] = useState('');
+  const [usePackage, setUsePackage] = useState(false);
+  const [selectedPackageId, setSelectedPackageId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const clientBoxRef = useRef<HTMLDivElement>(null);
@@ -110,11 +128,15 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate }: Pro
     setClientId(c._id);
     setClientSearch('');
     setShowClientList(false);
+    setUsePackage(false);
+    setSelectedPackageId('');
   }
 
   function clearClient() {
     setClientId('');
     setClientSearch('');
+    setUsePackage(false);
+    setSelectedPackageId('');
   }
 
   const mutation = useMutation({
@@ -132,7 +154,37 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate }: Pro
       return;
     }
     const service = services.find(s => s._id === serviceId);
-    mutation.mutate({ unitId, clientId, employeeId, serviceId, date, startTime, notes, price: service?.price ?? 0 });
+
+    // Date/Time validation
+    const now = new Date();
+    const selectedDateTime = new Date(`${date}T${startTime}`);
+    if (selectedDateTime < now) {
+      setError('Não é possível agendar em uma data ou hora que já passou.');
+      return;
+    }
+    
+    const finish = (finalIsPackage: boolean) => {
+      mutation.mutate({
+        unitId,
+        clientId,
+        employeeId,
+        serviceId,
+        date,
+        startTime,
+        notes,
+        price: finalIsPackage ? 0 : (service?.price ?? 0),
+        isPackage: finalIsPackage
+      });
+    };
+
+    if (selectedPackageId && !usePackage) {
+      // User chose to SIGN a new package during this booking
+      unitApi.post(`/clients/${clientId}/packages`, { packageId: selectedPackageId })
+        .then(() => finish(true))
+        .catch(err => setError(err.response?.data?.message || 'Erro ao assinar pacote.'));
+    } else {
+      finish(usePackage);
+    }
   }
 
   return (
@@ -235,10 +287,83 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate }: Pro
             </select>
           </div>
 
+          {selectedClient && serviceId && (() => {
+            const sub = selectedClient.packages?.find(p => 
+              p.active && (p.packageId === serviceId || p.itemLimits?.some(il => il.serviceId === serviceId))
+            );
+            
+            if (sub) {
+              return (
+                <div className={styles.packageLogicBox}>
+                  <label className={styles.checkboxLabel}>
+                    <input 
+                      type="checkbox" 
+                      checked={usePackage} 
+                      onChange={e => {
+                        setUsePackage(e.target.checked);
+                        if (e.target.checked) setSelectedPackageId('');
+                      }} 
+                    />
+                    <div className={styles.checkboxInfo}>
+                      <span className={styles.checkboxTitle}>Utilizar pacote ativo</span>
+                      <span className={styles.checkboxDesc}>O cliente já possui uma assinatura válida para este serviço.</span>
+                    </div>
+                  </label>
+                </div>
+              );
+            }
+
+            const availablePackages = services.filter(s => 
+              s.type === 'package' && s.packageItems?.some(item => item.serviceId === serviceId)
+            );
+
+            if (availablePackages.length > 0) {
+              return (
+                <div className={styles.packageLogicBox}>
+                  <div className={styles.offerPackage}>
+                    <p className={styles.offerTitle}>O cliente não tem pacote para este serviço. Deseja assinar agora?</p>
+                    <div className={styles.packageOptions}>
+                      {availablePackages.map(pkg => (
+                        <label key={pkg._id} className={`${styles.packageOption} ${selectedPackageId === pkg._id ? styles.packageOptionActive : ''}`}>
+                          <input 
+                            type="radio" 
+                            name="package_offer" 
+                            value={pkg._id}
+                            checked={selectedPackageId === pkg._id}
+                            onChange={() => {
+                              setSelectedPackageId(pkg._id);
+                              setUsePackage(false);
+                            }}
+                          />
+                          <div className={styles.pkgOptContent}>
+                            <span className={styles.pkgOptName}>{pkg.name}</span>
+                            <span className={styles.pkgOptPrice}>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(pkg.price)}</span>
+                          </div>
+                        </label>
+                      ))}
+                      {selectedPackageId && (
+                        <button type="button" className={styles.clearPkgBtn} onClick={() => setSelectedPackageId('')}>Remover seleção</button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
+            return null;
+          })()}
+
           <div className={styles.row}>
             <div className={styles.field}>
               <label className={styles.label}>Data *</label>
-              <input type="date" className={styles.input} value={date} onChange={e => setDate(e.target.value)} required />
+              <input 
+                type="date" 
+                className={styles.input} 
+                value={date} 
+                min={todayISO()}
+                onChange={e => setDate(e.target.value)} 
+                required 
+              />
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Horário *</label>

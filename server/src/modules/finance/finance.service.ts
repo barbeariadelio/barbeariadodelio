@@ -29,7 +29,7 @@ export class FinanceService {
       status: { $in: ['pending', 'confirmed', 'completed'] },
     })
       .populate('serviceId', 'name price')
-      .populate('employeeId', 'name')
+      .populate('employeeId', 'name commissionRate')
       .populate('unitId', 'name');
 
     console.log(`[FinanceService] Data Detail:`);
@@ -228,6 +228,7 @@ export class FinanceService {
       unitId: string; unitName: string;
       appointments: number;
       grossRevenue: number;
+      commissionRate?: number;
     }>();
 
     for (const appt of appointments) {
@@ -257,7 +258,15 @@ export class FinanceService {
       const unitKey = unitId;
 
       if (!byEmployeeMap.has(empId)) {
-        byEmployeeMap.set(empId, { id: empId, name: empName, unitId: unitKey, unitName, appointments: 0, grossRevenue: 0 });
+        byEmployeeMap.set(empId, { 
+          id: empId, 
+          name: empName, 
+          unitId: unitKey, 
+          unitName, 
+          appointments: 0, 
+          grossRevenue: 0,
+          commissionRate: appt.employeeId?.commissionRate 
+        });
       }
       const empEntry = byEmployeeMap.get(empId)!;
       empEntry.appointments += 1;
