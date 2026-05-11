@@ -103,8 +103,8 @@ function Calendar({ value, onChange }: { value: string; onChange: (d: string) =>
 }
 
 /* ── Summary sidebar ── */
-function Summary({ service, employee, date, time }: { service: Service|null; employee: Employee|null; date: string; time: string }) {
-  const hasAny = !!(service || employee || (date && date !== todayISO()) || time);
+function Summary({ service, employee, date, time, notes }: { service: Service|null; employee: Employee|null; date: string; time: string; notes?: string }) {
+  const hasAny = !!(service || employee || (date && date !== todayISO()) || time || notes);
   return (
     <aside className={styles.sidebar}>
       <p className={styles.sidebarLabel}>Resumo</p>
@@ -136,12 +136,18 @@ function Summary({ service, employee, date, time }: { service: Service|null; emp
                 <span className={styles.sidebarVal}>{time}</span>
               </div>
             )}
+            {notes && (
+              <div className={styles.sidebarBlock}>
+                <span className={styles.sidebarKey}>Observações</span>
+                <span className={styles.sidebarVal} style={{ fontSize: '0.75rem', opacity: 0.8 }}>{notes}</span>
+              </div>
+            )}
           </>
       }
       {service && (
         <div className={styles.sidebarTotal}>
           <span className={styles.sidebarTotalLabel}>Total</span>
-          <span className={styles.sidebarTotalVal}>{fmt(service.price)}</span>
+          <span className={styles.sidebarTotalVal}>A partir de {fmt(service.price)}</span>
         </div>
       )}
     </aside>
@@ -182,6 +188,7 @@ export default function Book() {
   const [selectedTime, setSelectedTime] = useState('');
   const [guestName, setGuestName] = useState('');
   const [guestPhone, setGuestPhone] = useState('');
+  const [notes, setNotes] = useState('');
   const [success, setSuccess] = useState(false);
   const [bookError, setBookError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
@@ -236,6 +243,7 @@ export default function Book() {
       if (emp) setSelectedEmployee(emp);
       if (editAppt.date) setSelectedDate(editAppt.date);
       if (editAppt.startTime) setSelectedTime(editAppt.startTime);
+      if (editAppt.notes) setNotes(editAppt.notes);
       
       setStep(targetStep || 'confirm');
       setIsInitializing(false);
@@ -278,14 +286,24 @@ export default function Book() {
 
   function handleBook() {
     setBookError(null);
+    const payload = { 
+      unitId, 
+      serviceId: selectedService!._id, 
+      employeeId: selectedEmployee!._id, 
+      date: selectedDate, 
+      startTime: selectedTime, 
+      price: selectedService!.price,
+      notes: notes.trim() || undefined
+    };
+
     if (user) {
-      bookMutation.mutate({ unitId, serviceId: selectedService!._id, employeeId: selectedEmployee!._id, date: selectedDate, startTime: selectedTime, price: selectedService!.price });
+      bookMutation.mutate(payload);
     } else {
       if (!guestName.trim() || !guestPhone.trim()) {
         setBookError('Preencha seu nome e telefone para continuar.');
         return;
       }
-      guestMutation.mutate({ unitId, serviceId: selectedService!._id, employeeId: selectedEmployee!._id, date: selectedDate, startTime: selectedTime, price: selectedService!.price, guestName: guestName.trim(), guestPhone: guestPhone.trim() });
+      guestMutation.mutate({ ...payload, guestName: guestName.trim(), guestPhone: guestPhone.trim() });
     }
   }
 
@@ -301,7 +319,7 @@ export default function Book() {
         <div className={styles.successDetails}>
           <span>{selectedService?.name} com {selectedEmployee?.name}</span>
           <span>{fmtDateLong(selectedDate)} às {selectedTime}</span>
-          <span className={styles.successPrice}>{fmt(selectedService?.price ?? 0)}</span>
+          <span className={styles.successPrice}>A partir de {fmt(selectedService?.price ?? 0)}</span>
         </div>
         <div className={styles.successActions}>
           <button className={styles.successPrimary} onClick={() => navigate('/profile')}>Ver meus agendamentos</button>
@@ -385,7 +403,7 @@ export default function Book() {
                       {svc.description && <span className={styles.svcDesc}>{svc.description}</span>}
                     </div>
                     <div className={styles.svcRight}>
-                      <span className={styles.svcPrice}>{fmt(svc.price)}</span>
+                      <span className={styles.svcPrice}>A partir de {fmt(svc.price)}</span>
                       <span className={styles.svcDur}>{svc.durationMinutes}min</span>
                     </div>
                     <svg className={styles.svcArrow} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
@@ -482,7 +500,7 @@ export default function Book() {
                   ))}
                   <div className={styles.confirmTotal}>
                     <span className={styles.confirmTotalLabel}>Total</span>
-                    <span className={styles.confirmTotalVal}>{fmt(selectedService?.price ?? 0)}</span>
+                    <span className={styles.confirmTotalVal}>A partir de {fmt(selectedService?.price ?? 0)}</span>
                   </div>
                 </div>
 
@@ -516,6 +534,23 @@ export default function Book() {
                   </div>
                 )}
 
+                <div className={styles.guestForm} style={{ marginTop: '1.5rem' }}>
+                  <div className={styles.guestFormHead}>
+                    <p className={styles.guestFormTitle}>Observações</p>
+                  </div>
+                  <div className={styles.guestFields}>
+                    <div className={styles.guestField}>
+                      <textarea
+                        className={styles.guestTextarea}
+                        placeholder="Algum detalhe adicional sobre o seu atendimento?"
+                        value={notes}
+                        onChange={e => setNotes(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 {bookError && <div className={styles.error}>{bookError}</div>}
                 <button
                   className={styles.confirmBtn}
@@ -533,7 +568,7 @@ export default function Book() {
             )}
 
           </main>
-          <Summary service={selectedService} employee={selectedEmployee} date={selectedDate} time={selectedTime} />
+          <Summary service={selectedService} employee={selectedEmployee} date={selectedDate} time={selectedTime} notes={notes} />
         </div>
         )}
       </div>

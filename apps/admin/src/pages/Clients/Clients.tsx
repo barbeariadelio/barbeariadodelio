@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import ClientForm from './ClientForm';
@@ -72,11 +73,33 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 export default function Clients() {
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('id'));
   const [showForm, setShowForm] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   const debouncedSearch = useDebounce(search, 400);
   const qc = useQueryClient();
+
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (id) setSelectedId(id);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const copyToClipboard = (text: string, fieldId: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldId);
+    setToast({ message: 'Copiado para a área de transferência!', type: 'success' });
+    setTimeout(() => setCopiedField(null), 1500);
+  };
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ['clients', debouncedSearch],
@@ -113,8 +136,27 @@ export default function Clients() {
     ).length;
   }
 
+  const IconCopy = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
+  const IconCheck = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
+
   return (
     <div className={styles.page}>
+      {toast && (
+        <div className={`${styles.toast} ${styles[toast.type]}`}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            {toast.type === 'success' ? (
+              <polyline points="20 6 9 17 4 12"/>
+            ) : (
+              <>
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </>
+            )}
+          </svg>
+          {toast.message}
+        </div>
+      )}
       <div className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>CLIENTES</h1>
         <button className={styles.newBtn} onClick={() => setShowForm(true)}>
@@ -167,8 +209,22 @@ export default function Clients() {
               </div>
               <div>
                 <h2 className={styles.detailName}>{selectedClient.name}</h2>
-                {selectedClient.phone && <p className={styles.detailMeta}>{selectedClient.phone}</p>}
-                {selectedClient.email && !isGuestEmail(selectedClient.email) && <p className={styles.detailMeta}>{selectedClient.email}</p>}
+                {selectedClient.phone && (
+                  <div className={styles.detailMetaWrapper}>
+                    <p className={styles.detailMeta}>{selectedClient.phone}</p>
+                    <button className={styles.copyBtn} onClick={() => copyToClipboard(selectedClient.phone || '', 'phone')} title="Copiar telefone">
+                      {copiedField === 'phone' ? <IconCheck /> : <IconCopy />}
+                    </button>
+                  </div>
+                )}
+                {selectedClient.email && !isGuestEmail(selectedClient.email) && (
+                  <div className={styles.detailMetaWrapper}>
+                    <p className={styles.detailMeta}>{selectedClient.email}</p>
+                    <button className={styles.copyBtn} onClick={() => copyToClipboard(selectedClient.email || '', 'email')} title="Copiar e-mail">
+                      {copiedField === 'email' ? <IconCheck /> : <IconCopy />}
+                    </button>
+                  </div>
+                )}
                 {selectedClient.notes && <p className={styles.detailNotes}>{selectedClient.notes}</p>}
               </div>
             </div>

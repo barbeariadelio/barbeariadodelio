@@ -40,6 +40,9 @@ export default function Permissions() {
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [pendingRole, setPendingRole] = useState<string>('');
   const [pendingAllowedApps, setPendingAllowedApps] = useState<string[]>([]);
+  const [pendingEmail, setPendingEmail] = useState<string>('');
+  const [pendingPhone, setPendingPhone] = useState<string>('');
+  const [pendingLoginType, setPendingLoginType] = useState<'email' | 'phone'>('email');
   const [showModal, setShowModal] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ show: boolean; userId: string; userName: string; isActive: boolean } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -80,6 +83,9 @@ export default function Permissions() {
           ? u.allowedApps 
           : (role === 'franchisor' || role === 'franchisee' ? ['franchise'] : ['admin']);
         setPendingAllowedApps(initialApps);
+        setPendingEmail(u.email || '');
+        setPendingPhone(u.phone || '');
+        setPendingLoginType(u.email ? 'email' : 'phone');
       }
     }
   }, [expandedRow, users]);
@@ -88,8 +94,13 @@ export default function Permissions() {
     mutationFn: (data: any) => {
       // Clean up empty fields based on loginType
       const payload = { ...data };
-      if (loginType === 'email') delete payload.phone;
-      else delete payload.email;
+      if (loginType === 'email') {
+        delete payload.phone;
+        payload.email = payload.email.toLowerCase();
+      } else {
+        delete payload.email;
+        payload.phone = payload.phone.replace(/\D/g, '');
+      }
       return api.post('/users/register', payload);
     },
     onSuccess: () => {
@@ -242,7 +253,10 @@ export default function Permissions() {
                 const role = normalizeRole(u.role);
                 const isPassVisible = visiblePasswords.has(u._id);
                 const isExpanded = expandedRow === u._id;
-                const hasChanges = pendingRole !== role || JSON.stringify(u.allowedApps || []) !== JSON.stringify(pendingAllowedApps);
+                const hasChanges = pendingRole !== role || 
+                                 JSON.stringify(u.allowedApps || []) !== JSON.stringify(pendingAllowedApps) ||
+                                 (pendingLoginType === 'email' ? pendingEmail !== (u.email || '') : pendingPhone !== (u.phone || '')) ||
+                                 (u.email && pendingLoginType === 'phone') || (u.phone && pendingLoginType === 'email');
 
                 return (
                   <Fragment key={u._id}>
@@ -307,6 +321,44 @@ export default function Permissions() {
                           <div className={styles.accordionContent}>
                             <div className={styles.accordionGrid}>
                               <div className={styles.accordionCol}>
+                                <label className={styles.label}>Configurações de Login</label>
+                                <div className={styles.toggleGroup} style={{ marginBottom: '0.75rem', width: 'fit-content' }}>
+                                  <button 
+                                    type="button" 
+                                    className={`${styles.toggleBtn} ${pendingLoginType === 'email' ? styles.active : ''}`} 
+                                    onClick={(e) => { e.stopPropagation(); setPendingLoginType('email'); }}
+                                  >
+                                    E-mail
+                                  </button>
+                                  <button 
+                                    type="button" 
+                                    className={`${styles.toggleBtn} ${pendingLoginType === 'phone' ? styles.active : ''}`} 
+                                    onClick={(e) => { e.stopPropagation(); setPendingLoginType('phone'); }}
+                                  >
+                                    Telefone
+                                  </button>
+                                </div>
+                                {pendingLoginType === 'email' ? (
+                                  <input 
+                                    className={styles.input} 
+                                    type="email" 
+                                    value={pendingEmail} 
+                                    onChange={e => setPendingEmail(e.target.value)} 
+                                    onClick={e => e.stopPropagation()}
+                                    placeholder="exemplo@email.com" 
+                                  />
+                                ) : (
+                                  <input 
+                                    className={styles.input} 
+                                    type="tel" 
+                                    value={pendingPhone} 
+                                    onChange={e => setPendingPhone(e.target.value)} 
+                                    onClick={e => e.stopPropagation()}
+                                    placeholder="(00) 00000-0000" 
+                                  />
+                                )}
+                              </div>
+                              <div className={styles.accordionCol}>
                                 <label className={styles.label}>Nível de Acesso</label>
                                 <div className={styles.roleActionRow}>
                                   <select 
@@ -325,7 +377,15 @@ export default function Permissions() {
                                         className={styles.btnSave}
                                         onClick={(e) => { 
                                           e.stopPropagation(); 
-                                          updateMutation.mutate({ id: u._id, role: pendingRole as any, allowedApps: pendingAllowedApps }); 
+                                          const payload: any = { id: u._id, role: pendingRole as any, allowedApps: pendingAllowedApps };
+                                          if (pendingLoginType === 'email') {
+                                            payload.email = pendingEmail.toLowerCase();
+                                            payload.phone = null;
+                                          } else {
+                                            payload.phone = pendingPhone.replace(/\D/g, '');
+                                            payload.email = null;
+                                          }
+                                          updateMutation.mutate(payload); 
                                         }}
                                         disabled={updateMutation.isPending}
                                       >

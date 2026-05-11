@@ -24,7 +24,7 @@ export default function Login() {
     e.preventDefault();
     setLoading(true); setError(null);
     try {
-      const { data: auth } = await api.post('/auth/login', { identifier: email, password, appId: 'franchise' });
+      const { data: auth } = await api.post('/auth/login', { identifier: email.trim(), password, appId: 'franchise' });
       localStorage.setItem('accessToken', auth.accessToken);
       localStorage.setItem('refreshToken', auth.refreshToken);
       const { data: me } = await api.get('/auth/me');

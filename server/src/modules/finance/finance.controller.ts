@@ -25,7 +25,9 @@ export async function listTransactions(req: AuthRequest, res: Response, next: Ne
       : (req.user!.unitId as string);
     if (!unitId) { ok(res, { data: [], total: 0 }); return; }
     const { page, limit } = parsePagination(req.query);
-    const result = await service.getTransactions(req.user!.id, req.user!.role, unitId, page, limit);
+    const employeeId = req.query.employeeId as string;
+    const category = req.query.category as string;
+    const result = await service.getTransactions(req.user!.id, req.user!.role, unitId, page, limit, { employeeId, category });
     ok(res, result);
   } catch (e) { next(e); }
 }

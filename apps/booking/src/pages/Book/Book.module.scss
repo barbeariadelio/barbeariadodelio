@@ -388,6 +388,33 @@
   gap: 0.625rem;
 }
 
+.guestInput {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  padding: 0.875rem 1rem;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  outline: none;
+  transition: all 0.2s;
+  &:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); }
+}
+
+.guestTextarea {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  padding: 1rem;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  outline: none;
+  resize: none;
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.2s;
+  &:focus { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-dim); }
+}
+
 .svcRow {
   display: grid;
   grid-template-columns: 42px 1fr auto 16px;

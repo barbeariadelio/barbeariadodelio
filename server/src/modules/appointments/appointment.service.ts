@@ -215,8 +215,9 @@ export class AppointmentService {
     price: number;
     guestName: string;
     guestPhone: string;
+    notes?: string;
   }): Promise<GuestBookResult> {
-    const { unitId, serviceId, employeeId, date, startTime, price, guestName, guestPhone } = payload;
+    const { unitId, serviceId, employeeId, date, startTime, price, guestName, guestPhone, notes } = payload;
 
     const svc = await ServiceModel.findById(serviceId);
     if (!svc) throw new AppError('Service not found', 404);
@@ -323,7 +324,8 @@ export class AppointmentService {
       endTime, 
       price: finalPrice, 
       status: 'confirmed',
-      isPackage: finalIsPackage
+      isPackage: finalIsPackage,
+      notes
     });
 
     const tokenPayload = { id: userAccount._id.toString(), role: 'client' as const, unitId };
@@ -338,12 +340,21 @@ export class AppointmentService {
     };
   }
 
-  async updateStatus(id: string, status: AppointmentStatus): Promise<IAppointment> {
+  async updateStatus(
+    id: string, 
+    status: AppointmentStatus, 
+    options?: { price?: number; paymentMethod?: string }
+  ): Promise<IAppointment> {
     const appt = await AppointmentModel.findById(id).populate('serviceId', 'name price');
     if (!appt) throw new NotFoundError('Appointment');
 
     const oldStatus = appt.status;
     appt.status = status;
+    
+    if (options?.price != null) {
+      appt.price = options.price;
+    }
+
     await appt.save();
 
     // Automatically create transaction if completed
@@ -357,9 +368,10 @@ export class AppointmentService {
           appointmentId: appt._id,
           type: 'income',
           category: 'service',
-          amount: appt.price || (appt.serviceId as any)?.price || 0,
+          amount: options?.price ?? appt.price ?? (appt.serviceId as any)?.price ?? 0,
           description: `Atendimento: ${(appt.serviceId as any)?.name || 'Serviço'}`,
           date: appt.date,
+          paymentMethod: options?.paymentMethod,
           createdBy: appt.employeeId
         });
       }

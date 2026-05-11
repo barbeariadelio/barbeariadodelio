@@ -1,5 +1,5 @@
 import { FormEvent, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import styles from './TransactionForm.module.scss';
 
@@ -15,6 +15,7 @@ interface Props {
     description: string;
     date: string;
     unitId?: { _id: string } | string;
+    employeeId?: string;
   };
   onClose: () => void;
   onSuccess: () => void;
@@ -37,6 +38,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   product: 'Produto',
   salary: 'Salário',
   rent: 'Aluguel',
+  voucher: 'Vale',
   other: 'Outro',
 };
 
@@ -50,7 +52,17 @@ export default function TransactionForm({ units, initialData, onClose, onSuccess
   const [description, setDescription] = useState(initialData?.description || '');
   const [date, setDate] = useState(initialData?.date || todayISO());
   const [unitId, setUnitId] = useState(initialUnitId);
+  const [employeeId, setEmployeeId] = useState(initialData?.employeeId || '');
   const [error, setError] = useState<string | null>(null);
+
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees', unitId],
+    queryFn: async () => {
+      const { data } = await api.get(`/employees?unitId=${unitId}`);
+      return Array.isArray(data) ? data : data.employees ?? [];
+    },
+    enabled: !!unitId,
+  });
 
   const mutation = useMutation({
     mutationFn: (payload: object) => 
@@ -65,11 +77,15 @@ export default function TransactionForm({ units, initialData, onClose, onSuccess
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    mutation.mutate({ type, category, amount: parseBR(amount), description, date, unitId });
+    const payload: any = { type, category, amount: parseBR(amount), description, date, unitId };
+    if (category === 'voucher' || category === 'salary') {
+      payload.employeeId = employeeId || null;
+    }
+    mutation.mutate(payload);
   }
 
   const incomeCategories = ['service', 'product', 'other'];
-  const expenseCategories = ['salary', 'rent', 'product', 'other'];
+  const expenseCategories = ['salary', 'rent', 'product', 'voucher', 'other'];
   const categories = type === 'income' ? incomeCategories : expenseCategories;
 
   return (
@@ -109,10 +125,25 @@ export default function TransactionForm({ units, initialData, onClose, onSuccess
 
           <div className={styles.field}>
             <label className={styles.label}>Categoria *</label>
-            <select className={styles.select} value={category} onChange={e => setCategory(e.target.value)}>
+            <select className={styles.select} value={category} onChange={e => {
+              setCategory(e.target.value);
+              if (e.target.value !== 'voucher' && e.target.value !== 'salary') setEmployeeId('');
+            }}>
               {categories.map(c => <option key={c} value={c}>{CATEGORY_LABELS[c] || c}</option>)}
             </select>
           </div>
+
+          {(category === 'voucher' || category === 'salary') && (
+            <div className={styles.field}>
+              <label className={styles.label}>Funcionário</label>
+              <select className={styles.select} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
+                <option value="">Selecione um funcionário (opcional)</option>
+                {employees.map((emp: any) => (
+                  <option key={emp._id} value={emp._id}>{emp.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className={styles.row}>
             <div className={styles.field}>

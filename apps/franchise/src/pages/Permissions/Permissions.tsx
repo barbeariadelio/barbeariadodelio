@@ -40,11 +40,22 @@ export default function Permissions() {
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [pendingRole, setPendingRole] = useState<string>('');
   const [pendingAllowedApps, setPendingAllowedApps] = useState<string[]>([]);
+  const [pendingEmail, setPendingEmail] = useState<string>('');
+  const [pendingPhone, setPendingPhone] = useState<string>('');
+  const [pendingLoginType, setPendingLoginType] = useState<'email' | 'phone'>('email');
   const [showModal, setShowModal] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ show: boolean; userId: string; userName: string; isActive: boolean } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
   
   const [newUser, setNewUser] = useState({ name: '', email: '', phone: '', password: '', role: 'employee', allowedApps: ['admin'] });
   const [loginType, setLoginType] = useState<'email' | 'phone'>('email');
+
+  const copyToClipboard = (text: string, fieldId: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldId);
+    setToast({ message: 'Copiado para a área de transferência!', type: 'success' });
+    setTimeout(() => setCopiedField(null), 1500);
+  };
 
   const { data: users = [], isLoading } = useQuery<AppUser[]>({
     queryKey: ['users'],
@@ -72,6 +83,9 @@ export default function Permissions() {
           ? u.allowedApps 
           : (role === 'franchisor' || role === 'franchisee' ? ['franchise'] : ['admin']);
         setPendingAllowedApps(initialApps);
+        setPendingEmail(u.email || '');
+        setPendingPhone(u.phone || '');
+        setPendingLoginType(u.email ? 'email' : 'phone');
       }
     }
   }, [expandedRow, users]);
@@ -80,8 +94,13 @@ export default function Permissions() {
     mutationFn: (data: any) => {
       // Clean up empty fields based on loginType
       const payload = { ...data };
-      if (loginType === 'email') delete payload.phone;
-      else delete payload.email;
+      if (loginType === 'email') {
+        delete payload.phone;
+        payload.email = payload.email.toLowerCase();
+      } else {
+        delete payload.email;
+        payload.phone = payload.phone.replace(/\D/g, '');
+      }
       return api.post('/users/register', payload);
     },
     onSuccess: () => {
@@ -150,6 +169,8 @@ export default function Permissions() {
   const IconUsers = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
   const IconChevron = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>;
   const IconAlert = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="12" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
+  const IconCopy = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
+  const IconCheck = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
 
   return (
     <div className={styles.page}>
@@ -232,7 +253,10 @@ export default function Permissions() {
                 const role = normalizeRole(u.role);
                 const isPassVisible = visiblePasswords.has(u._id);
                 const isExpanded = expandedRow === u._id;
-                const hasChanges = pendingRole !== role || JSON.stringify(u.allowedApps || []) !== JSON.stringify(pendingAllowedApps);
+                const hasChanges = pendingRole !== role || 
+                                 JSON.stringify(u.allowedApps || []) !== JSON.stringify(pendingAllowedApps) ||
+                                 (pendingLoginType === 'email' ? pendingEmail !== (u.email || '') : pendingPhone !== (u.phone || '')) ||
+                                 (u.email && pendingLoginType === 'phone') || (u.phone && pendingLoginType === 'email');
 
                 return (
                   <Fragment key={u._id}>
@@ -252,12 +276,22 @@ export default function Permissions() {
                           {ROLE_LABELS[role] || role}
                         </span>
                       </td>
-                      <td className={styles.td}>{u.email || u.phone}</td>
+                      <td className={styles.td}>
+                        <div className={styles.passCell}>
+                          <span>{u.email || u.phone}</span>
+                          <button className={styles.btnAction} title="Copiar identificador" onClick={(e) => { e.stopPropagation(); copyToClipboard((u.email || u.phone) || '', `id-${u._id}`); }}>
+                            {copiedField === `id-${u._id}` ? <IconCheck /> : <IconCopy />}
+                          </button>
+                        </div>
+                      </td>
                       <td className={styles.td}>
                         <div className={styles.passCell}>
                           <span>{isPassVisible ? (u.passwordPlain || '••••••') : '••••••••'}</span>
                           <button className={styles.btnAction} onClick={(e) => { e.stopPropagation(); togglePassword(u._id); }}>
                             {isPassVisible ? <IconEyeOff /> : <IconEye />}
+                          </button>
+                          <button className={styles.btnAction} title="Copiar senha" onClick={(e) => { e.stopPropagation(); copyToClipboard(u.passwordPlain || '', `pw-${u._id}`); }}>
+                            {copiedField === `pw-${u._id}` ? <IconCheck /> : <IconCopy />}
                           </button>
                         </div>
                       </td>
@@ -287,6 +321,44 @@ export default function Permissions() {
                           <div className={styles.accordionContent}>
                             <div className={styles.accordionGrid}>
                               <div className={styles.accordionCol}>
+                                <label className={styles.label}>Configurações de Login</label>
+                                <div className={styles.toggleGroup} style={{ marginBottom: '0.75rem', width: 'fit-content' }}>
+                                  <button 
+                                    type="button" 
+                                    className={`${styles.toggleBtn} ${pendingLoginType === 'email' ? styles.active : ''}`} 
+                                    onClick={(e) => { e.stopPropagation(); setPendingLoginType('email'); }}
+                                  >
+                                    E-mail
+                                  </button>
+                                  <button 
+                                    type="button" 
+                                    className={`${styles.toggleBtn} ${pendingLoginType === 'phone' ? styles.active : ''}`} 
+                                    onClick={(e) => { e.stopPropagation(); setPendingLoginType('phone'); }}
+                                  >
+                                    Telefone
+                                  </button>
+                                </div>
+                                {pendingLoginType === 'email' ? (
+                                  <input 
+                                    className={styles.input} 
+                                    type="email" 
+                                    value={pendingEmail} 
+                                    onChange={e => setPendingEmail(e.target.value)} 
+                                    onClick={e => e.stopPropagation()}
+                                    placeholder="exemplo@email.com" 
+                                  />
+                                ) : (
+                                  <input 
+                                    className={styles.input} 
+                                    type="tel" 
+                                    value={pendingPhone} 
+                                    onChange={e => setPendingPhone(e.target.value)} 
+                                    onClick={e => e.stopPropagation()}
+                                    placeholder="(00) 00000-0000" 
+                                  />
+                                )}
+                              </div>
+                              <div className={styles.accordionCol}>
                                 <label className={styles.label}>Nível de Acesso</label>
                                 <div className={styles.roleActionRow}>
                                   <select 
@@ -305,7 +377,15 @@ export default function Permissions() {
                                         className={styles.btnSave}
                                         onClick={(e) => { 
                                           e.stopPropagation(); 
-                                          updateMutation.mutate({ id: u._id, role: pendingRole as any, allowedApps: pendingAllowedApps }); 
+                                          const payload: any = { id: u._id, role: pendingRole as any, allowedApps: pendingAllowedApps };
+                                          if (pendingLoginType === 'email') {
+                                            payload.email = pendingEmail.toLowerCase();
+                                            payload.phone = null;
+                                          } else {
+                                            payload.phone = pendingPhone.replace(/\D/g, '');
+                                            payload.email = null;
+                                          }
+                                          updateMutation.mutate(payload); 
                                         }}
                                         disabled={updateMutation.isPending}
                                       >

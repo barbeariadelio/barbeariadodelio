@@ -21,7 +21,7 @@ export class FinanceService {
     const transactions = await TransactionModel.find({
       unitId: { $in: unitIds },
       date: { $gte: startDate, $lte: endDate },
-    }).populate('unitId', 'name');
+    }).populate('unitId', 'name').populate('employeeId', 'name');
 
     const appointments = await AppointmentModel.find({
       unitId: { $in: unitIds },
@@ -41,16 +41,20 @@ export class FinanceService {
     return this.buildSummary(transactions, appointments as any);
   }
 
-  async getTransactions(userId: string, role: string, unitId: string, page: number, limit: number): Promise<{ data: ITransaction[]; total: number }> {
+  async getTransactions(userId: string, role: string, unitId: string, page: number, limit: number, filters?: { employeeId?: string; category?: string }): Promise<{ data: ITransaction[]; total: number }> {
     const unitIds = await this.resolveUnitIds(userId, role, unitId);
     
+    const query: any = { unitId: { $in: unitIds } };
+    if (filters?.employeeId) query.employeeId = filters.employeeId;
+    if (filters?.category) query.category = filters.category;
+
     const [data, total] = await Promise.all([
-      TransactionModel.find({ unitId: { $in: unitIds } })
+      TransactionModel.find(query)
         .sort({ date: -1, createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .populate('unitId', 'name'),
-      TransactionModel.countDocuments({ unitId: { $in: unitIds } }),
+      TransactionModel.countDocuments(query),
     ]);
     return { data, total };
   }
@@ -188,6 +192,14 @@ export class FinanceService {
     let totalExpense = 0;
     const byUnitMap = new Map<string, { unitId: string; name: string; income: number; expense: number; profit: number }>();
     const byCategoryMap = new Map<TransactionCategory, number>();
+    const byEmployeeMap = new Map<string, {
+      id: string; name: string;
+      unitId: string; unitName: string;
+      appointments: number;
+      grossRevenue: number;
+      commissionRate?: number;
+      totalVouchers: number;
+    }>();
     const dailyMap = new Map<string, { date: string; income: number; expense: number }>();
 
     // 1. Process Transactions (Cash Flow)
@@ -215,21 +227,29 @@ export class FinanceService {
         unit.expense += t.amount;
         day.expense += t.amount;
       }
-      unit.profit = unit.income - unit.expense;
-
       const prev = byCategoryMap.get(t.category) ?? 0;
       byCategoryMap.set(t.category, prev + t.amount);
+
+      // Track vouchers per employee
+      if (t.category === 'voucher' && t.employeeId) {
+        const empId = (t.employeeId as any)._id?.toString() || t.employeeId.toString();
+        if (!byEmployeeMap.has(empId)) {
+          byEmployeeMap.set(empId, { 
+            id: empId, 
+            name: (t.employeeId as any).name || 'Funcionário', 
+            unitId: t.unitId?._id?.toString() || t.unitId?.toString() || '',
+            unitName: t.unitId?.name || '',
+            appointments: 0, 
+            grossRevenue: 0,
+            totalVouchers: 0 
+          });
+        }
+        byEmployeeMap.get(empId)!.totalVouchers += t.amount;
+      }
     }
 
     // 2. Process Appointments (Work Metrics & Commissions)
     const byServiceMap = new Map<string, { name: string; revenue: number; count: number; unitId: string; unitName: string }>();
-    const byEmployeeMap = new Map<string, {
-      id: string; name: string;
-      unitId: string; unitName: string;
-      appointments: number;
-      grossRevenue: number;
-      commissionRate?: number;
-    }>();
 
     for (const appt of appointments) {
       const price = appt.price || (appt.serviceId?.price ?? 0);
@@ -265,10 +285,14 @@ export class FinanceService {
           unitName, 
           appointments: 0, 
           grossRevenue: 0,
-          commissionRate: appt.employeeId?.commissionRate 
+          commissionRate: appt.employeeId?.commissionRate,
+          totalVouchers: 0 
         });
       }
       const empEntry = byEmployeeMap.get(empId)!;
+      if (!empEntry.name && appt.employeeId?.name) empEntry.name = appt.employeeId.name;
+      if (!empEntry.unitName && appt.unitId?.name) empEntry.unitName = appt.unitId.name;
+      
       empEntry.appointments += 1;
       empEntry.grossRevenue += price;
 

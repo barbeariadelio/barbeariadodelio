@@ -493,6 +493,13 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.panelTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
 .panelActions {
   display: flex;
   gap: 0.5rem;
@@ -562,10 +569,52 @@
   font-weight: 600;
 }
 
-.priceTag {
+.priceInputWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.pricePrefix {
   font-size: 1.1rem;
   font-weight: 800;
-  color: var(--gold);
+  color: #1565C0;
+}
+
+.priceInput {
+  background: none;
+  border: none;
+  border-bottom: 2px dashed var(--gold);
+  color: #1565C0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  width: 100px;
+  outline: none;
+  padding: 0;
+  transition: all 0.2s;
+  &:focus { border-bottom-style: solid; color: var(--gold); }
+}
+
+.notesLabel {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+  display: block;
+}
+
+.notesContent {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin: 0;
+  background: var(--bg-overlay);
+  padding: 0.75rem;
+  border-radius: 8px;
+  border-left: 3px solid var(--gold);
 }
 
 .statusSelectWrap {
@@ -646,6 +695,190 @@
 .panelDelete {
   padding: 1.25rem 1.5rem;
   border-top: 1px solid var(--border-subtle);
+}
+
+.billingSection {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.whatsappModal {
+  background: var(--bg-surface);
+  width: 90%;
+  max-width: 440px;
+  border-radius: 20px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+  overflow: hidden;
+  position: relative;
+  border-top: 4px solid #25D366;
+}
+
+.billingForm {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.billingField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.billingLabel {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.billingInputWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-default);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+
+  &:focus-within {
+    border-color: var(--blue-600);
+    background: var(--bg-surface);
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+  }
+
+  span {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    opacity: 0.8;
+  }
+}
+
+.billingInput {
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 1.75rem;
+  font-weight: 800;
+  width: 100%;
+  outline: none;
+  letter-spacing: -0.02em;
+}
+
+.paymentGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.paymentBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.25rem 1rem;
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-default);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  color: var(--text-muted);
+
+  .pmIcon { 
+    transition: transform 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .pmLabel { 
+    font-size: 0.875rem; 
+    font-weight: 600; 
+    color: var(--text-secondary); 
+  }
+
+  &:hover {
+    border-color: var(--border-strong);
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    .pmIcon { transform: translateY(-2px); }
+  }
+
+  &.active {
+    border-color: var(--blue-600);
+    background: rgba(37, 99, 235, 0.04);
+    color: var(--blue-600);
+    .pmLabel { color: var(--blue-600); }
+    .pmIcon { stroke: var(--blue-600); }
+  }
+}
+
+.billingActions {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+}
+
+.cancelBillingBtn {
+  flex: 1;
+  padding: 0.875rem;
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+  cursor: pointer;
+  &:hover { background: var(--bg-surface); }
+}
+
+.confirmBillingBtn {
+  flex: 2;
+  padding: 0.875rem;
+  background: var(--gold);
+  border: none;
+  border-radius: 12px;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+  transition: all 0.2s;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+  }
+
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.whatsappForm {
+  display: flex;
+  flex-direction: column;
+}
+
+.whatsappTextarea {
+  background: var(--bg-surface);
+  border: 1.5px solid var(--border-default);
+  border-radius: 12px;
+  padding: 1rem;
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  resize: none;
+  width: 100%;
+  outline: none;
+  transition: all 0.2s;
+
+  &:focus {
+    border-color: #25D366;
+    box-shadow: 0 0 0 4px rgba(37, 211, 102, 0.1);
+  }
 }
 
 .deleteBtn {

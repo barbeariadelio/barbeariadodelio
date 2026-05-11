@@ -23,6 +23,12 @@
   }
 }
 
+.headerRight {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
 .pageTitle {
   font-family: 'Playfair Display', serif;
   font-size: 1.75rem;
@@ -41,14 +47,25 @@
 }
 
 .txUnitBadge {
-  background: var(--bg-elevated);
-  color: var(--text-muted);
-  padding: 0.1rem 0.4rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  padding: 1px 6px;
   border-radius: 4px;
-  font-size: 0.65rem;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
-  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.txPaymentBadge {
+  background: var(--gold-dim);
+  border: 1px solid var(--gold);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--gold);
 }
 
 .subtitle {
@@ -436,40 +453,43 @@
 
 .commissionHeader {
   display: grid;
-  grid-template-columns: 2fr 0.5fr 1fr 0.6fr 1fr 1fr;
-  padding: 0.75rem 1.25rem;
+  grid-template-columns: 2.5fr 80px 1.2fr 80px 1.2fr 1fr 1.2fr 1.2fr;
+  padding: 1rem 1.5rem;
   background: var(--bg-elevated);
   border-bottom: 1px solid var(--border-default);
-  font-size: 0.6875rem;
+  font-size: 0.65rem;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   gap: 1rem;
+  align-items: center;
   > span:not(:first-child) { text-align: right; }
 }
 
 .commissionRow {
   display: grid;
-  grid-template-columns: 2fr 0.5fr 1fr 0.6fr 1fr 1fr;
-  padding: 0.875rem 1.25rem;
+  grid-template-columns: 2.5fr 80px 1.2fr 80px 1.2fr 1fr 1.2fr 1.2fr;
+  padding: 1.125rem 1.5rem;
   border-bottom: 1px solid var(--border-subtle);
   align-items: center;
   gap: 1rem;
-  transition: background 0.15s;
-  &:last-of-type { border-bottom: 1px solid var(--border-default); }
+  transition: all 0.2s;
+  &:last-of-type { border-bottom: none; }
   &:hover { background: var(--bg-overlay); }
 }
 
 .commissionFooter {
   display: grid;
-  grid-template-columns: 2fr 0.5fr 1fr 0.6fr 1fr 1fr;
-  padding: 0.875rem 1.25rem;
-  background: var(--gold-dim);
+  grid-template-columns: 2.5fr 80px 1.2fr 80px 1.2fr 1fr 1.2fr 1.2fr;
+  padding: 1.125rem 1.5rem;
+  background: rgba(21, 101, 192, 0.05);
+  border-top: 2px solid var(--gold);
   gap: 1rem;
-  font-size: 0.8125rem;
-  font-weight: 700;
+  font-size: 0.875rem;
+  font-weight: 800;
   color: var(--text-primary);
+  align-items: center;
   > span:not(:first-child) { text-align: right; }
 }
 
@@ -525,24 +545,26 @@
 .empName {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  font-size: 0.875rem;
-  font-weight: 600;
+  gap: 0.75rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
   color: var(--text-primary);
 }
 
 .empAvatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--gold);
-  color: white;
-  font-size: 0.75rem;
-  font-weight: 700;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  color: var(--gold);
+  border: 1px solid var(--border-default);
+  font-size: 0.875rem;
+  font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
 }
 
 // Monthly Tab
@@ -625,6 +647,24 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1.5rem;
+}
+
+.exportActions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.excelBtn {
+  background: #1D6F42;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover { background: #155734; transform: translateY(-1px); }
 }
 
 .reportBtn {

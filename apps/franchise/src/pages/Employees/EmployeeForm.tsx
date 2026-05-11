@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
+import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../api/client';
 import styles from './EmployeeForm.module.scss';
 
@@ -20,6 +21,7 @@ interface Employee {
   vacations?: { start: string; end: string }[];
   blockedDays?: string[];
   isActive: boolean;
+  unitId?: string;
 }
 
 function maskPhone(raw: string) {
@@ -37,6 +39,7 @@ interface Props {
 }
 
 export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
+  const { user } = useAuth();
   const isEdit = !!employee;
   const [name, setName] = useState(employee?.name ?? '');
   const [email, setEmail] = useState(employee?.email ?? '');
@@ -54,7 +57,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
   
   const [blockedDays, setBlockedDays] = useState<string[]>(employee?.blockedDays ?? []);
   const [newBlockedDay, setNewBlockedDay] = useState('');
-  
+  const [initialVale, setInitialVale] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
@@ -114,7 +117,28 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
       blockedDays: finalBlockedDays.sort()
     };
     if (!isEdit || password) payload.password = password;
-    mutation.mutate(payload);
+    
+    mutation.mutate(payload, {
+      onSuccess: async (res: any) => {
+        const empId = res.data?._id || res.data?.employee?._id;
+        if (!isEdit && initialVale && empId) {
+          try {
+            await api.post('/finance/transactions', {
+              type: 'expense',
+              category: 'voucher',
+              amount: parseFloat(initialVale.replace(',', '.')),
+              description: `Vale Inicial (na criação)`,
+              date: new Date().toISOString().split('T')[0],
+              employeeId: empId,
+              unitId: res.data?.unitId || res.data?.employee?.unitId || (user as any)?.unitId
+            });
+          } catch (e) {
+            console.error('Falha ao registrar vale inicial:', e);
+          }
+        }
+        onSuccess();
+      }
+    });
   }
 
   return (
@@ -228,6 +252,24 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
               </div>
             )}
           </div>
+
+          {!isEdit && (
+            <div className={styles.field} style={{ marginTop: '1rem' }}>
+              <label className={styles.label}>Vale Inicial (Opcional)</label>
+              <div className={styles.currencyWrap} style={{ display: 'flex', alignItems: 'center', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: '4px', paddingLeft: '0.75rem' }}>
+                <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: 600 }}>R$</span>
+                <input 
+                  type="text" 
+                  className={styles.input} 
+                  style={{ border: 'none', background: 'transparent' }}
+                  placeholder="0,00" 
+                  value={initialVale} 
+                  onChange={e => setInitialVale(e.target.value.replace(/[^\d,]/g, ''))} 
+                />
+              </div>
+              <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>Este valor será descontado automaticamente do primeiro salário.</p>
+            </div>
+          )}
 
           <hr style={{ borderColor: 'var(--border-subtle)', margin: '0.5rem 0' }} />
 

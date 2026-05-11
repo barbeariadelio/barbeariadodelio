@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend, Cell, PieChart, Pie } from 'recharts';
+import * as XLSX from 'xlsx';
 import TransactionForm from './TransactionForm';
 import { useAuth } from '../../contexts/AuthContext';
 import styles from './Finance.module.scss';
@@ -11,6 +12,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   product: 'Produto',
   salary: 'Salário',
   rent: 'Aluguel',
+  voucher: 'Vale',
   other: 'Outro',
 };
 
@@ -78,7 +80,7 @@ interface FinanceSummary {
   byUnit?: Array<{ unitId: string; name: string; income: number; expense: number; profit: number }>;
   byCategory?: Array<{ category: string; amount: number }>;
   byService?: Array<{ name: string; revenue: number; count: number }>;
-  byEmployee?: Array<{ id: string; name: string; unitId: string; unitName: string; appointments: number; grossRevenue: number }>;
+  byEmployee?: Array<{ id: string; name: string; unitId: string; unitName: string; appointments: number; grossRevenue: number; totalVouchers: number }>;
   chart?: Array<{ date: string; income: number; expense: number }>;
 }
 
@@ -91,6 +93,8 @@ interface Transaction {
   description: string;
   date: string;
   createdBy?: string | { _id: string; name: string };
+  employeeId?: string | { _id: string; name: string };
+  paymentMethod?: 'money' | 'card' | 'pix' | 'other';
 }
 
 function formatCurrency(v: number) {
@@ -107,6 +111,13 @@ const TYPE_LABELS: Record<string, string> = {
   income: 'Receita',
   expense: 'Despesa',
   royalty: 'Royalty',
+};
+
+const PAYMENT_LABELS: Record<string, string> = {
+  money: 'Dinheiro',
+  card: 'Cartão',
+  pix: 'Pix',
+  other: 'Outro',
 };
 
 type TabType = 'geral' | 'mensal' | 'despesas' | 'lancamentos';
@@ -161,6 +172,27 @@ export default function Finance() {
     },
   });
 
+  const handleExportExcel = () => {
+    if (transactions.length === 0) return;
+    
+    const data = transactions.map(tx => ({
+      Data: tx.date,
+      Tipo: TYPE_LABELS[tx.type] || tx.type,
+      Categoria: CATEGORY_LABELS[tx.category] || tx.category,
+      Descrição: tx.description,
+      Valor: tx.amount,
+      Unidade: typeof tx.unitId === 'object' ? tx.unitId.name : '',
+      'Meio de Pagamento': tx.paymentMethod ? PAYMENT_LABELS[tx.paymentMethod] : '',
+      Responsável: typeof tx.createdBy === 'object' ? tx.createdBy.name : '',
+      Profissional: typeof tx.employeeId === 'object' ? tx.employeeId.name : ''
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Transações');
+    XLSX.writeFile(wb, `financeiro_${unitId}_${period}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
   if (summaryLoading) {
     return (
       <div className={styles.page}>
@@ -180,9 +212,14 @@ export default function Finance() {
           <p className={styles.subtitle}>Gestão de fluxo de caixa e indicadores de desempenho</p>
         </div>
         {!isStaff && (
-          <button className={styles.newBtn} onClick={() => setShowForm(true)}>
-            + Novo Lançamento
-          </button>
+          <div className={styles.headerRight}>
+            <button className={styles.excelBtn} onClick={handleExportExcel}>
+              Exportar Excel
+            </button>
+            <button className={styles.newBtn} onClick={() => setShowForm(true)}>
+              + Novo Lançamento
+            </button>
+          </div>
         )}
       </div>
 
@@ -424,7 +461,7 @@ export default function Finance() {
               </p>
             )}
             {(summary?.byEmployee ?? []).length > 0 && (() => {
-              type Emp = { id: string; name: string; unitId: string; unitName: string; appointments: number; grossRevenue: number };
+              type Emp = { id: string; name: string; unitId: string; unitName: string; appointments: number; grossRevenue: number; totalVouchers: number };
               let empList: Emp[] = (summary!.byEmployee as Emp[]) || [];
 
               if (isStaff && userId) {
@@ -453,8 +490,10 @@ export default function Finance() {
                         <span>Atend.</span>
                         <span>Receita Gerada</span>
                         <span style={{ textAlign: 'center' }}>%</span>
-                        <span>Parte do Barbeiro</span>
-                        <span>Parte Barbearia</span>
+                        <span>Comissão</span>
+                        <span>Vales</span>
+                        <span>A Pagar</span>
+                        <span>Parte Loja</span>
                       </div>
                       {employees.map(emp => {
                         const rate = individualRates[emp.id] ?? commissionRate;
@@ -479,26 +518,24 @@ export default function Finance() {
                               />
                               <span className={styles.miniRateSuffix}>%</span>
                             </div>
-                            <span className={`${styles.commissionCell} ${styles.blue}`}>{formatCurrency(gross)}</span>
-                            <span className={`${styles.commissionCell} ${styles.green}`}>{formatCurrency(salonShare)}</span>
+                            <span className={`${styles.commissionCell} ${styles.blue}`}>{formatCurrency(emp.grossRevenue * (rate / 100))}</span>
+                            <span className={`${styles.commissionCell} ${styles.red}`}>{formatCurrency(emp.totalVouchers || 0)}</span>
+                            <span className={`${styles.commissionCell} ${styles.green}`} style={{ fontWeight: 800 }}>{formatCurrency((emp.grossRevenue * (rate / 100)) - (emp.totalVouchers || 0))}</span>
+                            <span className={styles.commissionCell}>{formatCurrency(emp.grossRevenue - (emp.grossRevenue * (rate / 100)))}</span>
                           </div>
                         );
                       })}
                       {!isStaff && (
-                        <div className={styles.commissionFooter}>
-                          <span>SUBTOTAL</span>
-                          <span>{employees.reduce((s, e) => s + e.appointments, 0)}</span>
-                          <span>{formatCurrency(employees.reduce((s, e) => s + e.grossRevenue, 0))}</span>
-                          <span /> 
-                          <span>{formatCurrency(employees.reduce((s, e) => {
-                            const rate = individualRates[e.id] ?? commissionRate;
-                            return s + (e.grossRevenue * (rate / 100));
-                          }, 0))}</span>
-                          <span>{formatCurrency(employees.reduce((s, e) => {
-                            const rate = individualRates[e.id] ?? commissionRate;
-                            return s + (e.grossRevenue - (e.grossRevenue * (rate / 100)));
-                          }, 0))}</span>
-                        </div>
+                          <div className={styles.commissionFooter}>
+                            <span>SUBTOTAL</span>
+                            <span>{employees.reduce((s, e) => s + e.appointments, 0)}</span>
+                            <span>{formatCurrency(employees.reduce((s, e) => s + e.grossRevenue, 0))}</span>
+                            <span /> 
+                            <span>{formatCurrency(employees.reduce((s, e) => s + (e.grossRevenue * ((individualRates[e.id] ?? commissionRate) / 100)), 0))}</span>
+                            <span>{formatCurrency(employees.reduce((s, e) => s + (e.totalVouchers || 0), 0))}</span>
+                            <span style={{ fontWeight: 800 }}>{formatCurrency(employees.reduce((s, e) => s + ((e.grossRevenue * ((individualRates[e.id] ?? commissionRate) / 100)) - (e.totalVouchers || 0)), 0))}</span>
+                            <span>{formatCurrency(employees.reduce((s, e) => s + (e.grossRevenue - (e.grossRevenue * ((individualRates[e.id] ?? commissionRate) / 100))), 0))}</span>
+                          </div>
                       )}
 
                       {Object.keys(individualRates).length > 0 && (
@@ -686,7 +723,9 @@ export default function Finance() {
                   <span className={styles.txDesc}>{tx.description}</span>
                   <span className={styles.txMeta}>
                     {typeof tx.unitId === 'object' && tx.unitId?.name && <span className={styles.txUnitBadge}>{tx.unitId.name}</span>}
-                    {CATEGORY_LABELS[tx.category] || tx.category} · {tx.date}
+                    {tx.paymentMethod && <span className={styles.txPaymentBadge}>{PAYMENT_LABELS[tx.paymentMethod]}</span>}
+                    {CATEGORY_LABELS[tx.category] || tx.category} 
+                    {tx.employeeId && ' · Funcionario'} · {tx.date}
                   </span>
                 </div>
                 <div className={styles.txRight}>

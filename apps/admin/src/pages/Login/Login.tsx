@@ -17,7 +17,7 @@ export default function Login() {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    login({ identifier: email, password, appId: 'admin' });
+    login({ identifier: email.trim(), password, appId: 'admin' });
   }
 
   return (

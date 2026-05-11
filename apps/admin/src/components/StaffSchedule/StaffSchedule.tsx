@@ -114,47 +114,108 @@ function WhatsAppIcon() {
   );
 }
 
+function WhatsAppModal({ appt, onClose }: { appt: any, onClose: () => void }) {
+  const defaultMsg = `Olá, ${appt.clientId?.name}! Você tem um horário marcado para ${appt.date.split('-').reverse().join('/')} às ${appt.startTime}.\n\n` +
+    `${appt.serviceId?.name ?? 'Serviço'}\n\n` +
+    `Podemos confirmar o seu horário?\n\n` +
+    `Obrigado,\n` +
+    `Barbearia do Delio`;
+
+  const [message, setMessage] = useState(defaultMsg);
+
+  const handleSend = () => {
+    const phone = appt.clientId?.phone?.replace(/\D/g, '');
+    if (!phone) return;
+    const msg = encodeURIComponent(message);
+    window.open(`https://wa.me/55${phone}?text=${msg}`, '_blank');
+    onClose();
+  };
+
+  return (
+    <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()} style={{ zIndex: 1001 }}>
+      <div className={styles.whatsappModal}>
+        <div className={styles.panelHead}>
+          <h2 className={styles.panelTitle}>Personalizar Mensagem</h2>
+          <button className={styles.closeBtn} onClick={onClose}><XIcon /></button>
+        </div>
+        
+        <div className={styles.panelBody}>
+          <div className={styles.whatsappForm}>
+            <div className={styles.billingField}>
+              <label className={styles.billingLabel}>Mensagem do WhatsApp</label>
+              <textarea 
+                className={styles.whatsappTextarea}
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                rows={8}
+                autoFocus
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.panelFooter}>
+           <div className={styles.billingActions}>
+              <button className={styles.cancelBillingBtn} onClick={onClose}>Cancelar</button>
+              <button 
+                className={styles.confirmBillingBtn} 
+                onClick={handleSend}
+                style={{ background: '#25D366', boxShadow: '0 4px 12px rgba(37, 211, 102, 0.3)' }}
+              >
+                Abrir WhatsApp
+              </button>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface ModalProps {
   appt: ScheduleAppointment;
   palette: typeof PALETTES[number];
   onClose: () => void;
-  onStatusChange: (id: string, status: string) => void;
+  onStatusChange: (id: string, status: string, options?: any) => void;
   onDelete: (id: string) => void;
   isPending: boolean;
   isDeleting: boolean;
+  onUpdateAppt?: (id: string, data: any) => void;
 }
 
-function ApptModal({ appt, palette, onClose, onStatusChange, onDelete, isPending, isDeleting, onEdit }: ModalProps & { onEdit?: (a: ScheduleAppointment) => void }) {
+function ApptModal({ appt, palette, onClose, onStatusChange, onDelete, isPending, isDeleting, onEdit, onUpdateAppt }: ModalProps & { onEdit?: (a: ScheduleAppointment) => void }) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isBilling, setIsBilling] = useState(false);
+  const [showWhatsApp, setShowWhatsApp] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'money' | 'card' | 'pix' | 'other'>('pix');
   const navigate = useNavigate();
-  
+
   const dateFmt = format(new Date(appt.date + 'T12:00:00'), "EEEE, dd 'de' MMMM", { locale: ptBR });
 
-  const handleWhatsApp = () => {
-    const phone = appt.clientId?.phone?.replace(/\D/g, '');
-    if (!phone) return;
-    const msg = encodeURIComponent(
-      `Olá ${appt.clientId?.name}, estou entrando em contato para confirmar seu agendamento no Delio.\n\n` +
-      `Data: ${appt.date.split('-').reverse().join('/')}\n` +
-      `Horário: ${appt.startTime}\n` +
-      `Serviço: ${appt.serviceId?.name}\n` +
-      `Barbeiro: ${appt.employeeId?.name}\n\n` +
-      `Podemos confirmar?`
-    );
-    window.open(`https://wa.me/55${phone}?text=${msg}`, '_blank');
+  const [localPrice, setLocalPrice] = useState(appt.price?.toString().replace('.', ',') || '0,00');
+
+  useEffect(() => {
+    setLocalPrice(appt.price?.toString().replace('.', ',') || '0,00');
+  }, [appt.price]);
+
+  const handlePriceBlur = () => {
+    const numeric = parseFloat(localPrice.replace(',', '.'));
+    if (!isNaN(numeric) && numeric !== appt.price) {
+      onUpdateAppt?.(appt._id, { price: numeric });
+    }
   };
 
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className={styles.panel} style={{ borderTop: `4px solid ${appt.status === 'blocked' ? '#6B7280' : palette.border}` }}>
+        {!isBilling ? (
+          <>
         <div className={styles.panelHead}>
           <div className={styles.panelActions}>
-             <button className={styles.actionIcon} title="Enviar WhatsApp" onClick={handleWhatsApp}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+             <button className={styles.actionIcon} title="Enviar WhatsApp" onClick={() => setShowWhatsApp(true)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
              <button className={styles.actionIcon} title="Editar" onClick={() => onEdit?.(appt)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
              <button className={styles.actionIcon} title="Excluir" onClick={() => setConfirmDelete(true)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
              <button className={styles.actionIcon} title="Perfil do Cliente" onClick={() => appt.clientId?._id && navigate(`/clients?id=${appt.clientId._id}`)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
-             <button className={styles.actionIcon}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>
           </div>
           <button className={styles.closeBtn} onClick={onClose}><XIcon /></button>
         </div>
@@ -187,13 +248,23 @@ function ApptModal({ appt, palette, onClose, onStatusChange, onDelete, isPending
                 </select>
               </div>
             </div>
+
+            {(appt as any).notes && (
+              <div className={styles.infoRow}>
+                <div className={styles.infoIcon}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+                <div className={styles.infoText}>
+                  <span className={styles.notesLabel}>Observações</span>
+                  <p className={styles.notesContent}>{(appt as any).notes}</p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         <div className={styles.panelBottom}>
           <button 
             className={styles.faturarBtn}
-            onClick={() => onStatusChange(appt._id, 'completed')}
+            onClick={() => setIsBilling(true)}
           >
             FATURAR
           </button>
@@ -220,7 +291,95 @@ function ApptModal({ appt, palette, onClose, onStatusChange, onDelete, isPending
             </div>
           </div>
         )}
+        </>
+        ) : (
+          <div className={styles.billingSection}>
+            <div className={styles.panelHead}>
+              <h2 className={styles.panelTitle}>Finalizar Atendimento</h2>
+              <button className={styles.closeBtn} onClick={() => setIsBilling(false)}><XIcon /></button>
+            </div>
+            
+            <div className={styles.panelBody}>
+              <div className={styles.billingForm}>
+                <div className={styles.billingField}>
+                  <label className={styles.billingLabel}>Valor Final</label>
+                  <div className={styles.billingInputWrap}>
+                    <span>R$</span>
+                    <input 
+                      type="text" 
+                      className={styles.billingInput}
+                      value={localPrice}
+                      onChange={e => setLocalPrice(e.target.value.replace(/[^0-9,]/g, ''))}
+                      autoFocus
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.billingField}>
+                  <label className={styles.billingLabel}>Forma de Pagamento</label>
+                  <div className={styles.paymentGrid}>
+                    {[
+                      { 
+                        id: 'money', 
+                        label: 'Dinheiro', 
+                        icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+                      },
+                      { 
+                        id: 'card', 
+                        label: 'Cartão', 
+                        icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                      },
+                      { 
+                        id: 'pix', 
+                        label: 'Pix', 
+                        icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                      },
+                      { 
+                        id: 'other', 
+                        label: 'Outro', 
+                        icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                      },
+                    ].map(pm => (
+                      <button
+                        key={pm.id}
+                        className={`${styles.paymentBtn} ${paymentMethod === pm.id ? styles.active : ''}`}
+                        onClick={() => setPaymentMethod(pm.id as any)}
+                      >
+                        <span className={styles.pmIcon}>{pm.icon}</span>
+                        <span className={styles.pmLabel}>{pm.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className={styles.panelFooter}>
+               <div className={styles.billingActions}>
+                  <button className={styles.cancelBillingBtn} onClick={() => setIsBilling(false)}>Voltar</button>
+                  <button 
+                    className={styles.confirmBillingBtn} 
+                    disabled={isPending}
+                    onClick={() => onStatusChange(appt._id, 'completed', { 
+                      price: parseFloat(localPrice.replace(',', '.')), 
+                      paymentMethod 
+                    })}
+                  >
+                    {isPending ? 'Processando...' : 'Confirmar e Concluir'}
+                  </button>
+               </div>
+            </div>
+          </div>
+        )}
       </div>
+
+      {showWhatsApp && (
+        <WhatsAppModal 
+          appt={appt} 
+          onClose={() => setShowWhatsApp(false)} 
+        />
+      )}
+
       {confirmDelete && (
         <ConfirmModal
           title={appt.status === 'blocked' ? 'Remover Bloqueio?' : 'Excluir agendamento?'}
@@ -296,6 +455,7 @@ interface Props {
   onNewAppt?: () => void;
   onBack?: () => void;
   onEdit?: (appt: ScheduleAppointment) => void;
+  onUpdateAppt?: (id: string, data: any) => void;
   unitId?: string;
   workingDays?: number[];   // 0=Sun … 6=Sat
   workingHours?: { start: string; end: string; lunchStart?: string; lunchEnd?: string };
@@ -317,8 +477,8 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
     : PALETTES[0];
 
   const statusMut = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      api.patch(`/appointments/${id}/status`, { status }),
+    mutationFn: ({ id, status, options }: { id: string; status: string; options?: any }) =>
+      api.patch(`/appointments/${id}/status`, { status, ...options }),
     onSuccess: () => { setSelectedAppt(null); onUpdate?.(); },
   });
 
@@ -330,6 +490,11 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
   const blockMut = useMutation({
     mutationFn: (payload: any) => api.post('/appointments', payload),
     onSuccess: () => { setBlockPrompt(null); setBlockDuration(30); onUpdate?.(); },
+  });
+
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.patch(`/appointments/${id}`, data),
+    onSuccess: () => onUpdate?.(),
   });
 
   function confirmBlock() {
@@ -581,10 +746,11 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
           appt={selectedAppt}
           palette={palette}
           onClose={() => setSelectedAppt(null)}
-          onStatusChange={(id, status) => statusMut.mutate({ id, status })}
+          onStatusChange={(id, status, options) => statusMut.mutate({ id, status, options })}
           onDelete={(id) => deleteMut.mutate(id)}
           isPending={statusMut.isPending}
           isDeleting={deleteMut.isPending}
+          onUpdateAppt={(id, data) => updateMut.mutate({ id, data })}
           onEdit={(a) => {
             setSelectedAppt(null);
             onEdit?.(a);

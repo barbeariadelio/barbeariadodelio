@@ -1,10 +1,11 @@
 export type TransactionType = 'income' | 'expense' | 'royalty';
-export type TransactionCategory = 'service' | 'product' | 'salary' | 'rent' | 'other';
+export type TransactionCategory = 'service' | 'product' | 'salary' | 'rent' | 'voucher' | 'other';
 
 export interface Transaction {
   _id: string;
   unitId: string;
   appointmentId?: string;
+  employeeId?: string;
   type: TransactionType;
   category: TransactionCategory;
   amount: number;
@@ -53,6 +54,7 @@ export interface EmployeeFinance {
   unitName: string;
   appointments: number;
   grossRevenue: number;
+  totalVouchers?: number;
 }
 
 export interface ChartPoint {

@@ -93,20 +93,30 @@ export async function createAppointment(req: AuthRequest, res: Response, next: N
 
 export async function guestBookAppointment(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { guestName, guestPhone, unitId, serviceId, employeeId, date, startTime, price } = req.body;
+    const { guestName, guestPhone, unitId, serviceId, employeeId, date, startTime, price, notes } = req.body;
     if (!guestName || !guestPhone || !unitId || !serviceId || !employeeId || !date || !startTime) {
       res.status(400).json({ message: 'Missing required fields' });
       return;
     }
-    const result = await service.guestBook({ guestName, guestPhone, unitId, serviceId, employeeId, date, startTime, price: Number(price) });
+    const result = await service.guestBook({ 
+      guestName, 
+      guestPhone, 
+      unitId, 
+      serviceId, 
+      employeeId, 
+      date, 
+      startTime, 
+      price: Number(price),
+      notes
+    });
     
     // Create notification for new booking
     await notificationService.create({
-      unitId: (result as any).unitId,
+      unitId: result.appointment.unitId as any,
       type: 'new',
       title: 'Novo Agendamento',
       message: `${guestName} agendou um novo serviço.`,
-      appointmentId: (result as any)._id
+      appointmentId: result.appointment._id as any
     });
 
     created(res, result);
@@ -116,7 +126,7 @@ export async function guestBookAppointment(req: Request, res: Response, next: Ne
 export async function updateAppointmentStatus(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, price, paymentMethod } = req.body;
 
     // If role is client, verify ownership
     if (req.user!.role === 'client') {
@@ -130,7 +140,7 @@ export async function updateAppointmentStatus(req: AuthRequest, res: Response, n
       }
     }
 
-    const appt = await service.updateStatus(id, status);
+    const appt = await service.updateStatus(id, status, { price, paymentMethod });
 
     if (status === 'cancelled') {
       const fullAppt = await service.findById(id);

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import EmployeeForm from './EmployeeForm';
+import EmployeeVales from './EmployeeVales';
 import ConfirmModal from '../../components/ConfirmModal/ConfirmModal';
 import styles from './Employees.module.scss';
 
@@ -21,6 +22,7 @@ interface Employee {
   vacations?: { start: string; end: string }[];
   blockedDays?: string[];
   isActive: boolean;
+  unitId?: string | { _id: string; name: string };
 }
 
 function getInitials(name: string) {
@@ -116,6 +118,11 @@ function EmployeeDetail({ emp, onClose, onEdit, onToggle, isToggling }: DetailPr
               </div>
             )}
           </div>
+
+          <EmployeeVales 
+            employeeId={emp._id} 
+            unitId={typeof emp.unitId === 'object' ? emp.unitId._id : emp.unitId} 
+          />
         </div>
 
         <div className={styles.panelFooter}>
