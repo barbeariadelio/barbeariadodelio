@@ -243,7 +243,7 @@
         <div class="grid">
             <!-- ADMIN -->
             <!-- Admin / Morada do Sol -->
-            <div class="card">
+            <a href="#" id="admin-card" class="card">
                 <div class="card-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -253,11 +253,11 @@
                 <h2 class="card-title">Jd Morada do Sol</h2>
                 <p class="card-description">Gestão administrativa centralizada, dashboards financeiros e controle global
                     da unidade Morada do Sol.</p>
-                <a href="#" id="admin-link" class="card-button">ACESSAR ADMIN</a>
-            </div>
+                <div class="card-button">ACESSAR ADMIN</div>
+            </a>
 
             <!-- Franchise / Nova Veneza -->
-            <div class="card">
+            <a href="#" id="franchise-card" class="card">
                 <div class="card-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -268,11 +268,11 @@
                 <h2 class="card-title">Nova Veneza</h2>
                 <p class="card-description">Controle completo da franquia Nova Veneza: gestão de profissionais,
                     serviços, estoque e financeiro local.</p>
-                <a href="#" id="franchise-link" class="card-button">ACESSAR UNIDADE</a>
-            </div>
+                <div class="card-button">ACESSAR UNIDADE</div>
+            </a>
 
             <!-- Booking -->
-            <div class="card">
+            <a href="#" id="booking-card" class="card">
                 <div class="card-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -285,8 +285,8 @@
                 <h2 class="card-title">Agendamento Online</h2>
                 <p class="card-description">Portal premium para clientes realizarem agendamentos de forma rápida,
                     intuitiva e sem burocracia.</p>
-                <a href="#" id="booking-link" class="card-button">ACESSAR AGENDAMENTO</a>
-            </div>
+                <div class="card-button">ACESSAR AGENDAMENTO</div>
+            </a>
         </div>
 
         <footer class="footer">
@@ -313,9 +313,9 @@
             booking: '/booking/' // We'll set a base for booking to be safe
         };
 
-        document.getElementById('admin-link').href = routes.admin;
-        document.getElementById('franchise-link').href = routes.franchise;
-        document.getElementById('booking-link').href = routes.booking;
+        document.getElementById('admin-card').href = routes.admin;
+        document.getElementById('franchise-card').href = routes.franchise;
+        document.getElementById('booking-card').href = routes.booking;
     </script>
 </body>
 

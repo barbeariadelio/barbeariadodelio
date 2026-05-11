@@ -33,7 +33,9 @@ apiClient.interceptors.response.use(
     return res;
   },
   async error => {
-    if (error.response?.status === 401) {
+    const isAuthRoute = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/refresh');
+
+    if (error.response?.status === 401 && !isAuthRoute) {
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {
         try {

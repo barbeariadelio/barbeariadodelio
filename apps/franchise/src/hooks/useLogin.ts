@@ -5,8 +5,9 @@ import { api } from '../api/client';
 import type { User } from '@barber/types';
 
 interface LoginForm {
-  email: string;
+  identifier: string;
   password: string;
+  appId?: string;
 }
 
 interface AuthResponse {
@@ -41,11 +42,11 @@ export function useLogin() {
       setUser(me as unknown as User);
 
       navigate('/dashboard');
-    } catch (err: unknown) {
+    } catch (err: any) {
       const message =
-        err instanceof Error
-          ? err.message
-          : 'E-mail ou senha inválidos.';
+        err?.response?.data?.message ||
+        (err instanceof Error ? err.message : null) ||
+        'E-mail ou senha inválidos.';
       setError(message);
     } finally {
       setLoading(false);

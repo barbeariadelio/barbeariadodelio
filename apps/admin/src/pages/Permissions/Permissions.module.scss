@@ -304,6 +304,40 @@
   .input { flex: 1; }
 }
 
+.toggleGroup {
+  display: flex;
+  background: var(--bg-elevated);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+}
+
+.toggleBtn {
+  flex: 1;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+
+  &.active {
+    background: var(--bg-surface);
+    color: var(--gold);
+    box-shadow: var(--shadow-sm);
+  }
+
+  &:hover:not(.active) {
+    color: var(--text-primary);
+    background: rgba(0,0,0,0.02);
+  }
+}
+
 .roleActionRow {
   display: flex;
   flex-direction: column;

@@ -2,8 +2,8 @@ import { z } from 'zod';
 
 export const loginSchema = z.object({
   body: z.object({
-    email: z.string().email(),
-    password: z.string().min(6),
+    identifier: z.string().min(1, 'Informe seu e-mail ou telefone'),
+    password: z.string().min(1, 'Informe sua senha'),
   }),
 });
 

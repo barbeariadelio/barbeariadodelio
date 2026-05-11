@@ -6,9 +6,14 @@ import { AppError } from '../../shared/errors/AppError';
 import type { AuthTokens, UserRole } from '@barber/types';
 
 export class AuthService {
-  async login(email: string, password: string, appId?: string): Promise<AuthTokens> {
-    const user = await UserModel.findOne({ email: email.toLowerCase(), isActive: true });
-    if (!user) throw new AppError('Invalid credentials', 401);
+  async login(identifier: string, password: string, appId?: string): Promise<AuthTokens> {
+    const isEmail = identifier.includes('@');
+    const query = isEmail 
+      ? { email: identifier.toLowerCase() }
+      : { phone: identifier.replace(/\D/g, '') };
+
+    const user = await UserModel.findOne({ ...query, isActive: true });
+    if (!user) throw new AppError('As credenciais informadas são inválidas.', 401);
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) throw new AppError('Invalid credentials', 401);

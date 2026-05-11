@@ -24,7 +24,7 @@ export default function Login() {
     e.preventDefault();
     setLoading(true); setError(null);
     try {
-      const { data: auth } = await api.post('/auth/login', { email, password, appId: 'franchise' });
+      const { data: auth } = await api.post('/auth/login', { identifier: email, password, appId: 'franchise' });
       localStorage.setItem('accessToken', auth.accessToken);
       localStorage.setItem('refreshToken', auth.refreshToken);
       const { data: me } = await api.get('/auth/me');
@@ -53,7 +53,17 @@ export default function Login() {
         </div>
         <p className={styles.sub}>Unidade Nova Veneza</p>
         <form onSubmit={handleSubmit} className={styles.form}>
-          <div className={styles.field}><label className={styles.label}>E-mail</label><input type="email" className={styles.input} value={email} onChange={e => setEmail(e.target.value)} required /></div>
+          <div className={styles.field}>
+            <label className={styles.label}>E-mail ou Telefone</label>
+            <input 
+              type="text" 
+              className={styles.input} 
+              value={email} 
+              onChange={e => setEmail(e.target.value)} 
+              placeholder="seu@email.com ou (00) 00000-0000"
+              required 
+            />
+          </div>
           <div className={styles.field}>
             <label className={styles.label}>Senha</label>
             <div className={styles.pwWrap}>

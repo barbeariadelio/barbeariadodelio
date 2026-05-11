@@ -17,7 +17,7 @@ export default function Login() {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    login({ email, password, appId: 'admin' });
+    login({ identifier: email, password, appId: 'admin' });
   }
 
   return (
@@ -30,16 +30,16 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.field}>
-            <label htmlFor="email" className={styles.label}>E-mail</label>
+            <label htmlFor="email" className={styles.label}>E-mail ou Telefone</label>
             <input
               id="email"
-              type="email"
+              type="text"
               className={styles.input}
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder="seu@email.com"
+              placeholder="seu@email.com ou (00) 00000-0000"
               required
-              autoComplete="email"
+              autoComplete="username"
             />
           </div>
 

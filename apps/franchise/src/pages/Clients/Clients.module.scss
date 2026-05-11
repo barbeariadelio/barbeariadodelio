@@ -56,6 +56,8 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  height: calc(100vh - 180px);
+  overflow: hidden;
 }
 
 .searchInput {
@@ -75,6 +77,22 @@
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 0.25rem;
+
+  &::-webkit-scrollbar {
+    width: 5px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border-radius: 999px;
+    &:hover { background: var(--text-muted); }
+  }
 }
 
 .clientRow {

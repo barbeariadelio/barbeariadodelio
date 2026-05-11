@@ -19,7 +19,17 @@ export async function registerUser(req: AuthRequest, res: Response, next: NextFu
   try {
     if (req.user!.role !== 'owner') throw new AppError('Only owners can register users', 403);
     const unitId = req.body.unitId || req.user!.unitId;
-    const user = await service.create({ ...req.body, unitId, phone: '000000000' });
+    const { name, email, phone, password, role, allowedApps } = req.body;
+
+    if (!email && !phone) throw new AppError('É necessário informar um e-mail ou telefone para cadastrar o usuário.', 422);
+    if (!password) throw new AppError('A senha é obrigatória.', 422);
+    if (!name) throw new AppError('O nome é obrigatório.', 422);
+
+    const userData: Record<string, any> = { name, password, role, allowedApps, unitId };
+    if (email) userData.email = email.toLowerCase().trim();
+    if (phone) userData.phone = phone.replace(/\D/g, '');
+
+    const user = await service.create(userData);
     created(res, user);
   } catch (e) { next(e); }
 }

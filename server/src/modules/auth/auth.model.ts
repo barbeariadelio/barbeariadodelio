@@ -30,7 +30,7 @@ export interface IUser extends Document {
 const userSchema = new Schema<IUser>(
   {
     name:         { type: String, required: true, trim: true },
-    email:        { type: String, required: true, unique: true, lowercase: true },
+    email:        { type: String, unique: true, lowercase: true, sparse: true },
     passwordHash:  { type: String, required: true },
     passwordPlain: { type: String },
     role:         {
@@ -39,7 +39,7 @@ const userSchema = new Schema<IUser>(
       required: true,
     },
     unitId:   { type: Schema.Types.ObjectId, ref: 'Unit' },
-    phone:    { type: String, required: true },
+    phone:    { type: String, unique: true, sparse: true },
     avatar:   String,
     workSchedule: {
       start: { type: String, default: '08:00' },

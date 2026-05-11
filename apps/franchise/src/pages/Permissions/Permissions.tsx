@@ -6,7 +6,8 @@ import styles from './Permissions.module.scss';
 type AppUser = {
   _id: string;
   name: string;
-  email: string;
+  email?: string;
+  phone?: string;
   role: 'owner' | 'cashier' | 'employee' | 'client';
   password?: string;
   passwordPlain?: string;
@@ -42,7 +43,8 @@ export default function Permissions() {
   const [showModal, setShowModal] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ show: boolean; userId: string; userName: string; isActive: boolean } | null>(null);
   
-  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'employee', allowedApps: ['admin'] });
+  const [newUser, setNewUser] = useState({ name: '', email: '', phone: '', password: '', role: 'employee', allowedApps: ['admin'] });
+  const [loginType, setLoginType] = useState<'email' | 'phone'>('email');
 
   const { data: users = [], isLoading } = useQuery<AppUser[]>({
     queryKey: ['users'],
@@ -75,11 +77,17 @@ export default function Permissions() {
   }, [expandedRow, users]);
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => api.post('/users/register', { ...data }),
+    mutationFn: (data: any) => {
+      // Clean up empty fields based on loginType
+      const payload = { ...data };
+      if (loginType === 'email') delete payload.phone;
+      else delete payload.email;
+      return api.post('/users/register', payload);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       setShowModal(false);
-      setNewUser({ name: '', email: '', password: '', role: 'employee', allowedApps: ['admin'] });
+      setNewUser({ name: '', email: '', phone: '', password: '', role: 'employee', allowedApps: ['admin'] });
       setToast({ message: 'Usuário criado com sucesso!', type: 'success' });
     },
     onError: () => setToast({ message: 'Erro ao criar usuário. Verifique os dados.', type: 'error' })
@@ -136,12 +144,12 @@ export default function Permissions() {
 
   const IconPlus = (props: React.SVGProps<SVGSVGElement>) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
   const IconEye = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
-  const IconEyeOff = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
+  const IconEyeOff = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" x2="23" y2="23"/></svg>;
   const IconTrash = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>;
   const IconShield = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
   const IconUsers = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
   const IconChevron = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>;
-  const IconAlert = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
+  const IconAlert = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="12" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>;
 
   return (
     <div className={styles.page}>
@@ -213,7 +221,7 @@ export default function Permissions() {
               <tr>
                 <th className={styles.th}>Usuário</th>
                 <th className={styles.th}>Papel</th>
-                <th className={styles.th}>E-mail</th>
+                <th className={styles.th}>Identificador</th>
                 <th className={styles.th}>Senha</th>
                 <th className={styles.th}>Status</th>
                 <th className={styles.th}></th>
@@ -244,7 +252,7 @@ export default function Permissions() {
                           {ROLE_LABELS[role] || role}
                         </span>
                       </td>
-                      <td className={styles.td}>{u.email}</td>
+                      <td className={styles.td}>{u.email || u.phone}</td>
                       <td className={styles.td}>
                         <div className={styles.passCell}>
                           <span>{isPassVisible ? (u.passwordPlain || '••••••') : '••••••••'}</span>
@@ -416,10 +424,24 @@ export default function Permissions() {
                   <label className={styles.label}>Nome Completo</label>
                   <input className={styles.input} type="text" required value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} placeholder="Ex: João Silva" />
                 </div>
+                
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>E-mail de Login</label>
-                  <input className={styles.input} type="email" required value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} placeholder="exemplo@email.com" />
+                  <label className={styles.label}>Tipo de Login</label>
+                  <div className={styles.toggleGroup}>
+                    <button type="button" className={`${styles.toggleBtn} ${loginType === 'email' ? styles.active : ''}`} onClick={() => setLoginType('email')}>E-mail</button>
+                    <button type="button" className={`${styles.toggleBtn} ${loginType === 'phone' ? styles.active : ''}`} onClick={() => setLoginType('phone')}>Telefone</button>
+                  </div>
                 </div>
+
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>{loginType === 'email' ? 'E-mail de Login' : 'Telefone de Login'}</label>
+                  {loginType === 'email' ? (
+                    <input className={styles.input} type="email" required value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} placeholder="exemplo@email.com" />
+                  ) : (
+                    <input className={styles.input} type="tel" required value={newUser.phone} onChange={e => setNewUser({...newUser, phone: e.target.value})} placeholder="(00) 00000-0000" />
+                  )}
+                </div>
+
                 <div className={styles.formGroup}>
                   <label className={styles.label}>Senha (6 dígitos)</label>
                   <div className={styles.inputGroup}>
