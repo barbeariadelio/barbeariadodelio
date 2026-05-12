@@ -7,18 +7,28 @@ const populateOptions = {
 };
 
 export class ClientService {
-  async findByUnit(unitId: string): Promise<IClient[]> {
-    return ClientModel.find({ unitId }).populate(populateOptions).sort({ name: 1 });
+  async findByUnit(unitId: string, pagination?: { skip: number, limit: number }): Promise<IClient[]> {
+    let query = ClientModel.find({ unitId }).populate(populateOptions).sort({ name: 1 });
+    if (pagination) {
+      query = query.skip(pagination.skip).limit(pagination.limit);
+    }
+    return query;
   }
 
-  async search(unitId: string, query: string): Promise<IClient[]> {
-    return ClientModel.find({
+  async search(unitId: string, query: string, pagination?: { skip: number, limit: number }): Promise<IClient[]> {
+    let q = ClientModel.find({
       unitId,
       $or: [
         { name: { $regex: query, $options: 'i' } },
         { phone: { $regex: query, $options: 'i' } },
       ],
     }).populate(populateOptions).sort({ name: 1 });
+
+    if (pagination) {
+      q = q.skip(pagination.skip).limit(pagination.limit);
+    }
+
+    return q;
   }
 
   async findById(id: string): Promise<IClient> {

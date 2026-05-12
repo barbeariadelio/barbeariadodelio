@@ -23,19 +23,38 @@ function calcEndTime(startTime: string, durationMinutes: number): string {
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
 
+function sanitize(str?: string): string {
+  if (!str) return '';
+  return str.replace(/<[^>]*>?/gm, '').trim();
+}
+
+import { IService } from '../services/service.model';
+import { IClient } from '../clients/client.model';
+
+interface PopulatedService extends IService { _id: mongoose.Types.ObjectId }
+interface PopulatedClient extends IClient { _id: mongoose.Types.ObjectId }
+interface PopulatedUser { _id: mongoose.Types.ObjectId, name: string }
+
 export class AppointmentService {
-  async findByUnitAndDate(unitId: string, date?: string, start?: string, end?: string): Promise<IAppointment[]> {
+  async findByUnitAndDate(unitId: string, date?: string, start?: string, end?: string, pagination?: { skip: number, limit: number }): Promise<IAppointment[]> {
     const filter: Record<string, unknown> = { unitId };
     if (date) {
       filter.date = date;
     } else if (start && end) {
       filter.date = { $gte: start, $lte: end };
     }
-    return AppointmentModel.find(filter)
+    
+    let query = AppointmentModel.find(filter)
       .populate('clientId', 'name phone')
       .populate('employeeId', 'name')
       .populate('serviceId', 'name durationMinutes')
       .sort({ startTime: 1 });
+
+    if (pagination) {
+      query = query.skip(pagination.skip).limit(pagination.limit);
+    }
+
+    return query;
   }
 
   async findByEmployee(employeeId: string, date?: string): Promise<IAppointment[]> {
@@ -171,7 +190,7 @@ export class AppointmentService {
       const nowTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
       
       if (data.date! < todayISO || (data.date === todayISO && data.startTime! < nowTime)) {
-        throw new AppError('Cannot book in the past', 400);
+        throw new AppError('Não é possível agendar em uma data ou hora retroativa.', 400);
       }
     }
     
@@ -195,7 +214,7 @@ export class AppointmentService {
         { startTime: { $lte: data.startTime }, endTime: { $gte: data.endTime } },
       ],
     });
-    if (conflict) throw new AppError('Time slot already booked', 409);
+    if (conflict) throw new AppError('Horário já ocupado por outro agendamento.', 409);
     
     const svc = await ServiceModel.findById(data.serviceId);
     const apptData = { 
@@ -227,7 +246,7 @@ export class AppointmentService {
     const nowTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
     
     if (date < todayISO || (date === todayISO && startTime < nowTime)) {
-      throw new AppError('Cannot book in the past', 400);
+      throw new AppError('Não é possível agendar em uma data ou hora retroativa.', 400);
     }
 
     const endTime = calcEndTime(startTime, svc.durationMinutes);
@@ -325,7 +344,7 @@ export class AppointmentService {
       price: finalPrice, 
       status: 'confirmed',
       isPackage: finalIsPackage,
-      notes
+      notes: sanitize(notes)
     });
 
     const tokenPayload = { id: userAccount._id.toString(), role: 'client' as const, unitId };
@@ -368,8 +387,8 @@ export class AppointmentService {
           appointmentId: appt._id,
           type: 'income',
           category: 'service',
-          amount: options?.price ?? appt.price ?? (appt.serviceId as any)?.price ?? 0,
-          description: `Atendimento: ${(appt.serviceId as any)?.name || 'Serviço'}`,
+          amount: options?.price ?? appt.price ?? (appt.serviceId as unknown as PopulatedService)?.price ?? 0,
+          description: `Atendimento: ${(appt.serviceId as unknown as PopulatedService)?.name || 'Serviço'}`,
           date: appt.date,
           paymentMethod: options?.paymentMethod,
           createdBy: appt.employeeId
@@ -419,7 +438,7 @@ export class AppointmentService {
           { startTime: { $lte: checkStart }, endTime: { $gte: checkEnd } },
         ],
       });
-      if (conflict) throw new AppError('Time slot already booked', 409);
+      if (conflict) throw new AppError('Horário já ocupado por outro agendamento.', 409);
     }
 
     Object.assign(appt, data);

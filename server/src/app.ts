@@ -99,7 +99,10 @@ async function start() {
 }
 
 if (process.env.NODE_ENV !== 'test') {
-  start().catch(console.error);
+  start().catch(err => {
+    console.error('ERRO FATAL NO BOOT:', err);
+    process.exit(1);
+  });
 }
 
 export default app;

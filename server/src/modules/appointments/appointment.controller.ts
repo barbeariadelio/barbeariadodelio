@@ -15,8 +15,11 @@ export async function listAppointments(req: AuthRequest, res: Response, next: Ne
       ? ((req.query.unitId as string) || req.user!.unitId)
       : req.user!.unitId;
     if (!unitId) { ok(res, []); return; }
+    
     const { date, start, end } = req.query as Record<string, string | undefined>;
-    const appointments = await service.findByUnitAndDate(unitId, date, start, end);
+    const { page, limit, skip } = (await import('../../shared/utils/pagination')).parsePagination(req.query as any);
+    
+    const appointments = await service.findByUnitAndDate(unitId, date, start, end, { skip, limit });
     ok(res, appointments);
   } catch (e) { next(e); }
 }

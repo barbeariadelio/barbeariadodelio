@@ -11,10 +11,13 @@ export async function listClients(req: AuthRequest, res: Response, next: NextFun
       ? ((req.query.unitId as string) || req.user!.unitId)
       : req.user!.unitId;
     if (!unitId) { ok(res, []); return; }
+    
     const q = req.query.q as string | undefined;
+    const { page, limit, skip } = (await import('../../shared/utils/pagination')).parsePagination(req.query as any);
+    
     const clients = q
-      ? await service.search(unitId, q)
-      : await service.findByUnit(unitId);
+      ? await service.search(unitId, q, { skip, limit })
+      : await service.findByUnit(unitId, { skip, limit });
     ok(res, clients);
   } catch (e) { next(e); }
 }

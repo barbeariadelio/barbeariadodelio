@@ -16,7 +16,7 @@ export class AuthService {
     if (!user) throw new AppError('As credenciais informadas são inválidas.', 401);
 
     const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) throw new AppError('Invalid credentials', 401);
+    if (!valid) throw new AppError('As credenciais informadas são inválidas.', 401);
 
     // Restriction Logic
     if (user.role !== 'owner' && appId) {
@@ -48,13 +48,13 @@ export class AuthService {
       const accessToken = this.signAccess(payload.id, payload.role, payload.unitId);
       return { accessToken };
     } catch {
-      throw new AppError('Invalid refresh token', 401);
+      throw new AppError('Token de atualização inválido ou expirado.', 401);
     }
   }
 
   async me(userId: string) {
     const user = await UserModel.findById(userId).select('-passwordHash');
-    if (!user) throw new AppError('User not found', 404);
+    if (!user) throw new AppError('Usuário não encontrado', 404);
     return user;
   }
 
@@ -64,7 +64,7 @@ export class AuthService {
       { $set: data },
       { new: true },
     ).select('-passwordHash');
-    if (!user) throw new AppError('User not found', 404);
+    if (!user) throw new AppError('Usuário não encontrado', 404);
     return user;
   }
 
@@ -74,7 +74,7 @@ export class AuthService {
       { $set: { theme } },
       { new: true },
     ).select('-passwordHash');
-    if (!user) throw new AppError('User not found', 404);
+    if (!user) throw new AppError('Usuário não encontrado', 404);
     return user;
   }
 

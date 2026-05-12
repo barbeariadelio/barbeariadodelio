@@ -47,4 +47,6 @@ const serviceSchema = new Schema<IService>(
   { timestamps: true },
 );
 
+serviceSchema.index({ unitId: 1, name: 1 }, { unique: true });
+
 export const ServiceModel = mongoose.model<IService>('Service', serviceSchema);

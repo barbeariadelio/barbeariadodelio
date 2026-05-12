@@ -9,7 +9,10 @@ export async function listProducts(req: AuthRequest, res: Response, next: NextFu
   try {
     const unitId = req.query.unitId as string || req.user!.unitId;
     if (!unitId) { ok(res, []); return; }
-    const products = await service.findByUnit(unitId);
+    
+    const { page, limit, skip } = (await import('../../shared/utils/pagination')).parsePagination(req.query as any);
+    
+    const products = await service.findByUnit(unitId, { skip, limit });
     ok(res, products);
   } catch (e) { next(e); }
 }
