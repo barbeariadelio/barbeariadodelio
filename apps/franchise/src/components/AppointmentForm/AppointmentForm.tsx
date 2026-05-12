@@ -29,6 +29,7 @@ interface Props {
   onClose: () => void;
   onSuccess: () => void;
   initialDate?: string;
+  appointment?: any;
 }
 
 function todayISO() {
@@ -52,7 +53,7 @@ function IconX() {
   );
 }
 
-export default function AppointmentForm({ onClose, onSuccess, initialDate }: Props) {
+export default function AppointmentForm({ onClose, onSuccess, initialDate, appointment }: Props) {
   const [unitId, setUnitId] = useState(import.meta.env.VITE_UNIT_ID || '');
   const [clientId, setClientId] = useState('');
   const [clientSearch, setClientSearch] = useState('');
@@ -67,6 +68,20 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate }: Pro
   const [error, setError] = useState<string | null>(null);
 
   const clientBoxRef = useRef<HTMLDivElement>(null);
+
+  // Pre-fill if editing
+  useEffect(() => {
+    if (appointment) {
+      setUnitId(appointment.unitId || import.meta.env.VITE_UNIT_ID || '');
+      setClientId(appointment.clientId?._id || appointment.clientId || '');
+      setEmployeeId(appointment.employeeId?._id || appointment.employeeId || '');
+      setServiceId(appointment.serviceId?._id || appointment.serviceId || '');
+      setDate(appointment.date);
+      setStartTime(appointment.startTime);
+      setNotes(appointment.notes || '');
+      setUsePackage(!!appointment.isPackage);
+    }
+  }, [appointment]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -140,10 +155,15 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate }: Pro
   }
 
   const mutation = useMutation({
-    mutationFn: (payload: object) => unitApi.post('/appointments', payload),
+    mutationFn: (payload: object) => {
+      if (appointment?._id) {
+        return unitApi.patch(`/appointments/${appointment._id}`, payload);
+      }
+      return unitApi.post('/appointments', payload);
+    },
     onSuccess,
     onError: (err: unknown) => {
-      setError(err instanceof Error ? err.message : 'Erro ao criar agendamento.');
+      setError(err instanceof Error ? err.message : `Erro ao ${appointment?._id ? 'atualizar' : 'criar'} agendamento.`);
     },
   });
 

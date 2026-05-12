@@ -51,6 +51,7 @@ export default function Dashboard() {
       api.get(`/appointments?start=${monthStart}&end=${monthEnd}`)
          .then(r => Array.isArray(r.data) ? r.data : r.data?.appointments ?? []),
     enabled: !!user,
+    refetchInterval: 15000, // Auto refresh every 15s
   });
 
   const monthAppointments = useMemo(() => {
@@ -70,6 +71,7 @@ export default function Dashboard() {
       api.get(`/appointments?date=${dayISO}`)
          .then(r => Array.isArray(r.data) ? r.data : r.data?.appointments ?? []),
     enabled: view === 'schedule' && !!user,
+    refetchInterval: 15000, // Auto refresh every 15s
   });
 
   const dayAppointments = useMemo(() => {
