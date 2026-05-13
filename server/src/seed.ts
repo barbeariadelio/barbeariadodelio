@@ -11,7 +11,7 @@ const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/barber-d
 
 const UserSchema = new mongoose.Schema({
   name: String, email: String, passwordHash: String, passwordPlain: String,
-  role: { type: String, enum: ['owner', 'employee', 'franchisor', 'franchisee', 'client'] },
+  role: { type: String, enum: ['owner', 'employee', 'franchisor', 'franchisee', 'client', 'admin', 'cashier'] },
   unitId: { type: mongoose.Schema.Types.ObjectId, ref: 'Unit' },
   phone: String, avatar: String,
   workSchedule: {

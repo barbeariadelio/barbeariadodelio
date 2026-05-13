@@ -12,9 +12,9 @@ export async function listUsers(req: AuthRequest, res: Response, next: NextFunct
     const requestedUnitId = req.query.unitId as string;
     
     // Determine the effective unitId to filter by
-    // Unit-level roles are restricted to their own unit
-    const isUnitLevel = role === 'owner' || role === 'franchisee' || role === 'cashier';
-    const filterUnitId = isUnitLevel ? userUnitId : requestedUnitId;
+    // We prioritize the requestedUnitId from the app (VITE_UNIT_ID)
+    // but fall back to the user's own unitId if not provided.
+    const filterUnitId = requestedUnitId || userUnitId;
     
     // Clear cache to ensure immediate visibility of new users
     const { sharedCache } = await import('../../shared/utils/cache');

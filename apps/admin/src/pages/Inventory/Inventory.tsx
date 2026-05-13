@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
+import { useAuth } from '../../contexts/AuthContext';
+import { ConfirmModal } from '@barber/ui';
 import ProductForm from './ProductForm';
 import styles from './Inventory.module.scss';
 
@@ -28,26 +30,32 @@ function IconPackage() {
 }
 
 export default function Inventory() {
+  const { user } = useAuth();
+  const unitId = (user as any)?.unitId;
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [detailedProduct, setDetailedProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const qc = useQueryClient();
 
   const { data: products = [], isLoading } = useQuery<Product[]>({
-    queryKey: ['products'],
+    queryKey: ['products', unitId],
     queryFn: async () => {
       const { data } = await api.get('/products');
       return Array.isArray(data) ? data : data.products ?? [];
     },
+    enabled: !!user,
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/products/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['products'] });
-      setSelectedProduct(null);
+      setIsDeleteModalOpen(false);
+      setProductToDelete(null);
     }
   });
 
@@ -56,10 +64,9 @@ export default function Inventory() {
     p.category?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  function handleDelete(id: string) {
-    if (window.confirm('Tem certeza que deseja excluir este produto?')) {
-      deleteMutation.mutate(id);
-    }
+  function handleDelete(p: Product) {
+    setProductToDelete(p);
+    setIsDeleteModalOpen(true);
   }
 
   function handleRowClick(p: Product, e: React.MouseEvent) {
@@ -153,7 +160,7 @@ export default function Inventory() {
                   <td align="right">
                     <div className={styles.actions}>
                       <button className={styles.btnAction} onClick={(e) => { e.stopPropagation(); setSelectedProduct(p); setShowForm(true); }}>Editar</button>
-                      <button className={`${styles.btnAction} ${styles.btnDanger}`} onClick={(e) => { e.stopPropagation(); handleDelete(p._id); }}>Excluir</button>
+                      <button className={`${styles.btnAction} ${styles.btnDanger}`} onClick={(e) => { e.stopPropagation(); handleDelete(p); }}>Excluir</button>
                     </div>
                   </td>
                 </tr>
@@ -244,6 +251,20 @@ export default function Inventory() {
             </footer>
           </div>
         </div>
+      )}
+      {isDeleteModalOpen && productToDelete && (
+        <ConfirmModal
+          title="Excluir Produto"
+          message={`Tem certeza que deseja excluir o produto "${productToDelete.name}"? Esta ação não pode ser desfeita.`}
+          confirmLabel="Excluir"
+          danger
+          isPending={deleteMutation.isPending}
+          onConfirm={() => deleteMutation.mutate(productToDelete._id)}
+          onCancel={() => {
+            setIsDeleteModalOpen(false);
+            setProductToDelete(null);
+          }}
+        />
       )}
     </div>
   );

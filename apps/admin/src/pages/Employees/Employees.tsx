@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
+import { useAuth } from '../../contexts/AuthContext';
 import EmployeeForm from './EmployeeForm';
 import EmployeeVales from './EmployeeVales';
 import { ConfirmModal } from '@barber/ui';
@@ -144,17 +145,20 @@ function EmployeeDetail({ emp, onClose, onEdit, onToggle, isToggling }: DetailPr
 }
 
 export default function Employees() {
+  const { user } = useAuth();
+  const unitId = (user as any)?.unitId;
   const [formTarget, setFormTarget]         = useState<Employee | null | 'new'>(null);
   const [detailTarget, setDetailTarget]     = useState<Employee | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<Employee | null>(null);
   const qc = useQueryClient();
 
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
-    queryKey: ['employees'],
+    queryKey: ['employees', unitId],
     queryFn: async () => {
       const { data } = await api.get('/employees');
       return Array.isArray(data) ? data : data.employees ?? [];
     },
+    enabled: !!user,
   });
 
   const toggleActive = useMutation({

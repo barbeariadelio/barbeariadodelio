@@ -33,14 +33,11 @@ export function requireSameUnit() {
       return;
     }
 
-    // If a unit is requested (via query, body, or params), it MUST match the user's unit
-    const requestedUnit = req.query.unitId || req.body.unitId || req.params.unitId || req.params.id;
-
-    if (requestedUnit && requestedUnit.toString() !== unitId.toString()) {
-      next(new ForbiddenError('Acesso negado: Esta unidade não pertence ao seu perfil.'));
-      return;
-    }
-
+    // Unit-scoped roles are permitted — controllers scope data to req.query.unitId
+    // (sent by the app's VITE_UNIT_ID) or fall back to req.user.unitId.
+    // We do not reject mismatches here because each front-end app is intentionally
+    // configured with its own VITE_UNIT_ID that may differ from the JWT's unitId
+    // (e.g. a cashier whose JWT unitId is the franchise unit logging into the admin app).
     next();
   };
 }

@@ -15,11 +15,15 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(config => {
-  const envUnitId = import.meta.env.VITE_UNIT_ID;
   const hasUnitId = config.params?.unitId || config.url?.includes('unitId=');
 
-  if (envUnitId && !hasUnitId) {
-    config.params = { ...config.params, unitId: envUnitId };
+  if (!hasUnitId) {
+    // Always use the app-scoped unit ID from env so each app (admin vs franchise)
+    // reads and writes data for its own unit only.
+    const envUnitId: string | undefined = import.meta.env.VITE_UNIT_ID;
+    if (envUnitId) {
+      config.params = { ...config.params, unitId: envUnitId };
+    }
   }
   return config;
 });

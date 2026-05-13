@@ -14,6 +14,14 @@ export const apiClient = axios.create({
   withCredentials: true,
 });
 
+apiClient.interceptors.request.use(config => {
+  const envUnitId = import.meta.env.VITE_UNIT_ID;
+  if (envUnitId && !config.params?.unitId) {
+    config.params = { ...config.params, unitId: envUnitId };
+  }
+  return config;
+});
+
 export function setupInterceptors(instance: any) {
   instance.interceptors.response.use(
     (res: any) => {

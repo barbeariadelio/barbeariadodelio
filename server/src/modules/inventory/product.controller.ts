@@ -19,7 +19,7 @@ export async function listProducts(req: AuthRequest, res: Response, next: NextFu
 
 export async function createProduct(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const unitId = req.body.unitId || req.user!.unitId;
+    const unitId = (req.query.unitId as string) || req.body.unitId || req.user!.unitId;
     const product = await service.create({ ...req.body, unitId });
     created(res, product);
   } catch (e) { next(e); }

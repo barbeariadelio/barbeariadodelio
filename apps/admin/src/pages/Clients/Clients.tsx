@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
+import { useAuth } from '../../contexts/AuthContext';
 import ClientForm from './ClientForm';
 import styles from './Clients.module.scss';
 
@@ -73,6 +74,8 @@ function useDebounce<T>(value: T, delay: number): T {
 }
 
 export default function Clients() {
+  const { user } = useAuth();
+  const unitId = (user as any)?.unitId;
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('id'));
@@ -102,12 +105,13 @@ export default function Clients() {
   };
 
   const { data: clients = [], isLoading } = useQuery<Client[]>({
-    queryKey: ['clients', debouncedSearch],
+    queryKey: ['clients', debouncedSearch, unitId],
     queryFn: async () => {
       const params = debouncedSearch ? `?q=${encodeURIComponent(debouncedSearch)}` : '';
       const { data } = await api.get(`/clients${params}`);
       return Array.isArray(data) ? data : data.clients ?? [];
     },
+    enabled: !!user,
   });
 
   const { data: appointments = [] } = useQuery<AppointmentItem[]>({

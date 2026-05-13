@@ -51,7 +51,7 @@ export default function Dashboard() {
   const monthEnd   = dateISO(endOfMonth(calendarMonth));
 
   const { data: monthAppointmentsRaw = [] } = useQuery<CalendarAppointment[]>({
-    queryKey: ['appointments-month', monthStart, monthEnd],
+    queryKey: ['appointments-month', monthStart, monthEnd, unitId],
     queryFn: () =>
       api.get(`/appointments?start=${monthStart}&end=${monthEnd}`)
          .then(r => Array.isArray(r.data) ? r.data : r.data?.appointments ?? []),
@@ -72,7 +72,7 @@ export default function Dashboard() {
   const dayISO = dateISO(selectedDay);
 
   const { data: dayAppointmentsRaw = [] } = useQuery<ScheduleAppointment[]>({
-    queryKey: ['appointments-day', dayISO],
+    queryKey: ['appointments-day', dayISO, unitId],
     queryFn: () =>
       api.get(`/appointments?date=${dayISO}`)
          .then(r => Array.isArray(r.data) ? r.data : r.data?.appointments ?? []),
