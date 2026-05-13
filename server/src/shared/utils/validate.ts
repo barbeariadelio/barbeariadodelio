@@ -13,6 +13,7 @@ export function validate(schema: AnyZodObject) {
       next();
     } catch (err) {
       if (err instanceof ZodError) {
+        console.error('Zod Validation Error:', JSON.stringify(err.errors, null, 2));
         const message = err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
         next(new AppError(message, 422));
         return;

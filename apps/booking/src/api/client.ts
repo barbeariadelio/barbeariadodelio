@@ -11,38 +11,34 @@ export function resolveApiBaseUrl(unitApiUrl?: string): string {
 
 export const apiClient = axios.create({
   baseURL: apiBaseUrl,
+  withCredentials: true,
 });
 
-apiClient.interceptors.request.use(config => {
-  const token = localStorage.getItem('accessToken');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-apiClient.interceptors.response.use(
-  res => {
-    if (res.data && typeof res.data === 'object' && 'data' in res.data) {
-      res.data = res.data.data;
-    }
-    return res;
-  },
-  async error => {
-    if (error.response?.status === 401) {
-      const refreshToken = localStorage.getItem('refreshToken');
-      if (refreshToken) {
+export function setupInterceptors(instance: any) {
+  instance.interceptors.response.use(
+    (res: any) => {
+      if (res.data && typeof res.data === 'object' && 'data' in res.data) {
+        res.data = res.data.data;
+      }
+      return res;
+    },
+    async (error: any) => {
+      if (error.response?.status === 401 && !error.config?.url?.includes('/auth/refresh')) {
         try {
-          const { data } = await axios.post(`${apiBaseUrl}/auth/refresh`, { refreshToken });
-          localStorage.setItem('accessToken', data.data.accessToken);
-          error.config.headers.Authorization = `Bearer ${data.data.accessToken}`;
-          return axios(error.config);
+          await axios.post(`${apiBaseUrl}/auth/refresh`, {}, { withCredentials: true });
+          return instance(error.config);
         } catch {
-          localStorage.clear();
-          window.location.href = '/login';
+          localStorage.removeItem('user');
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
         }
       }
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
-  },
-);
+  );
+}
+
+setupInterceptors(apiClient);
 
 export const api = apiClient;

@@ -19,8 +19,8 @@ const transactionSchema = new Schema<ITransaction>(
     unitId:        { type: Schema.Types.ObjectId, ref: 'Unit', required: true },
     appointmentId: { type: Schema.Types.ObjectId, ref: 'Appointment' },
     employeeId:    { type: Schema.Types.ObjectId, ref: 'User' },
-    type:     { type: String, enum: ['income', 'expense', 'royalty'], required: true },
-    category: { type: String, enum: ['service', 'product', 'salary', 'rent', 'voucher', 'other'], required: true },
+    type:     { type: String, enum: ['income', 'expense', 'royalty', 'commission'], required: true },
+    category: { type: String, enum: ['service', 'product', 'salary', 'rent', 'voucher', 'commission', 'other'], required: true },
     amount:      { type: Number, required: true, min: 0 },
     description: { type: String, required: true },
     date:        { type: String, required: true },
@@ -29,5 +29,7 @@ const transactionSchema = new Schema<ITransaction>(
   },
   { timestamps: true },
 );
+
+transactionSchema.index({ unitId: 1, date: 1 });
 
 export const TransactionModel = mongoose.model<ITransaction>('Transaction', transactionSchema);

@@ -5,10 +5,10 @@ import { requireRoles, requireSameUnit } from '../../shared/middlewares/rbac.mid
 
 export const clientRoutes = Router();
 
-clientRoutes.get('/', authenticate, requireRoles('owner', 'employee', 'franchisee', 'franchisor'), requireSameUnit(), listClients);
-clientRoutes.get('/:id', authenticate, requireRoles('owner', 'employee', 'franchisee', 'franchisor'), getClient);
-clientRoutes.post('/', authenticate, requireRoles('owner', 'employee'), createClient);
-clientRoutes.patch('/:id', authenticate, requireRoles('owner', 'employee'), updateClient);
-clientRoutes.post('/:id/packages', authenticate, requireRoles('owner', 'employee'), assignPackage);
-clientRoutes.delete('/:id/packages/:packageId', authenticate, requireRoles('owner', 'employee'), removePackage);
-clientRoutes.patch('/:id/packages/:packageId/items/:serviceId', authenticate, requireRoles('owner', 'employee'), updatePackageItemLimit);
+clientRoutes.get('/', authenticate, requireRoles('owner', 'employee', 'franchisee', 'franchisor', 'cashier'), requireSameUnit(), listClients);
+clientRoutes.get('/:id', authenticate, requireRoles('owner', 'employee', 'franchisee', 'franchisor', 'cashier'), requireSameUnit(), getClient);
+clientRoutes.post('/', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), createClient);
+clientRoutes.patch('/:id', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), updateClient);
+clientRoutes.post('/:id/packages', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), assignPackage);
+clientRoutes.delete('/:id/packages/:packageId', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), removePackage);
+clientRoutes.patch('/:id/packages/:packageId/items/:serviceId', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), updatePackageItemLimit);

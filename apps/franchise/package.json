@@ -12,15 +12,19 @@
   "dependencies": {
     "@barber/styles": "*",
     "@barber/types": "*",
+    "@barber/ui": "*",
     "@barber/utils": "*",
     "@tanstack/react-query": "^5.40.0",
     "axios": "^1.7.0",
+    "exceljs": "^4.4.0",
+    "file-saver": "^2.0.5",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-router-dom": "^6.23.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@types/file-saver": "^2.0.7",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",

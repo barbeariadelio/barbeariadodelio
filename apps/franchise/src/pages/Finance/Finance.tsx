@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend, Cell, PieChart, Pie } from 'recharts';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+import { saveAs } from 'file-saver';
 import TransactionForm from './TransactionForm';
 import { useAuth } from '../../contexts/AuthContext';
 import styles from './Finance.module.scss';
@@ -172,25 +173,43 @@ export default function Finance() {
     },
   });
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (transactions.length === 0) return;
     
-    const data = transactions.map(tx => ({
-      Data: tx.date,
-      Tipo: TYPE_LABELS[tx.type] || tx.type,
-      Categoria: CATEGORY_LABELS[tx.category] || tx.category,
-      Descrição: tx.description,
-      Valor: tx.amount,
-      Unidade: typeof tx.unitId === 'object' ? tx.unitId.name : '',
-      'Meio de Pagamento': tx.paymentMethod ? PAYMENT_LABELS[tx.paymentMethod] : '',
-      Responsável: typeof tx.createdBy === 'object' ? tx.createdBy.name : '',
-      Profissional: typeof tx.employeeId === 'object' ? tx.employeeId.name : ''
-    }));
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Transações');
 
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Transações');
-    XLSX.writeFile(wb, `financeiro_${unitId}_${period}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    worksheet.columns = [
+      { header: 'Data', key: 'date', width: 15 },
+      { header: 'Tipo', key: 'type', width: 12 },
+      { header: 'Categoria', key: 'category', width: 15 },
+      { header: 'Descrição', key: 'description', width: 30 },
+      { header: 'Valor', key: 'amount', width: 12 },
+      { header: 'Unidade', key: 'unit', width: 20 },
+      { header: 'Meio de Pagamento', key: 'payment', width: 18 },
+      { header: 'Responsável', key: 'creator', width: 20 },
+      { header: 'Profissional', key: 'employee', width: 20 },
+    ];
+
+    transactions.forEach(tx => {
+      worksheet.addRow({
+        date: tx.date,
+        type: TYPE_LABELS[tx.type] || tx.type,
+        category: CATEGORY_LABELS[tx.category] || tx.category,
+        description: tx.description,
+        amount: tx.amount,
+        unit: typeof tx.unitId === 'object' ? tx.unitId.name : '',
+        payment: tx.paymentMethod ? PAYMENT_LABELS[tx.paymentMethod] : '',
+        creator: typeof tx.createdBy === 'object' ? tx.createdBy.name : '',
+        employee: typeof tx.employeeId === 'object' ? tx.employeeId.name : ''
+      });
+    });
+
+    worksheet.getRow(1).font = { bold: true };
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `financeiro_${unitId}_${period}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   if (summaryLoading) {
@@ -515,6 +534,7 @@ export default function Finance() {
                                 min={0} max={100} step={1}
                                 onChange={e => setIndividualRates(prev => ({ ...prev, [emp.id]: Number(e.target.value) }))}
                                 onWheel={e => (e.target as HTMLInputElement).blur()}
+                                disabled={isStaff}
                               />
                               <span className={styles.miniRateSuffix}>%</span>
                             </div>

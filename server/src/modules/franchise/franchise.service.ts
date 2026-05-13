@@ -17,7 +17,7 @@ export class FranchiseService {
     const franchise = await FranchiseModel.findByIdAndUpdate(
       franchiseId,
       { $addToSet: { units: unitId } },
-      { new: true },
+      { new: true, runValidators: true },
     );
     if (!franchise) throw new NotFoundError('Franchise');
     return franchise;
@@ -28,7 +28,7 @@ export class FranchiseService {
   }
 
   async update(id: string, data: Partial<IFranchise>): Promise<IFranchise> {
-    const franchise = await FranchiseModel.findByIdAndUpdate(id, data, { new: true });
+    const franchise = await FranchiseModel.findByIdAndUpdate(id, data, { new: true, runValidators: true });
     if (!franchise) throw new NotFoundError('Franchise');
     return franchise;
   }

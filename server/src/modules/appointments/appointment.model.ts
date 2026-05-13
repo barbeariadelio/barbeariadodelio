@@ -36,4 +36,7 @@ const appointmentSchema = new Schema<IAppointment>(
   { timestamps: true },
 );
 
+appointmentSchema.index({ unitId: 1, date: 1, employeeId: 1 });
+appointmentSchema.index({ clientId: 1 });
+
 export const AppointmentModel = mongoose.model<IAppointment>('Appointment', appointmentSchema);

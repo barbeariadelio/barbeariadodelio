@@ -47,4 +47,6 @@ const clientSchema = new Schema<IClient>(
   { timestamps: true },
 );
 
+clientSchema.index({ unitId: 1, phone: 1 });
+
 export const ClientModel = mongoose.model<IClient>('Client', clientSchema);

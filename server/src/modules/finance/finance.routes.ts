@@ -2,11 +2,13 @@ import { Router } from 'express';
 import { getSummary, listTransactions, createTransaction, updateTransaction, deleteTransaction } from './finance.controller';
 import { authenticate } from '../../shared/middlewares/auth.middleware';
 import { requireRoles, requireSameUnit } from '../../shared/middlewares/rbac.middleware';
+import { validate } from '../../shared/utils/validate';
+import { createTransactionSchema, updateTransactionSchema } from './finance.schema';
 
 export const financeRoutes = Router();
 
-financeRoutes.get('/summary', authenticate, requireRoles('owner', 'franchisor', 'franchisee', 'employee'), getSummary);
-financeRoutes.get('/transactions', authenticate, requireRoles('owner', 'franchisee', 'franchisor', 'employee'), requireSameUnit(), listTransactions);
-financeRoutes.post('/transactions', authenticate, requireRoles('owner', 'employee'), createTransaction);
-financeRoutes.patch('/transactions/:id', authenticate, requireRoles('owner', 'employee'), updateTransaction);
-financeRoutes.delete('/transactions/:id', authenticate, requireRoles('owner', 'employee'), deleteTransaction);
+financeRoutes.get('/summary', authenticate, requireRoles('owner', 'franchisor', 'franchisee', 'employee', 'cashier'), getSummary);
+financeRoutes.get('/transactions', authenticate, requireRoles('owner', 'franchisee', 'franchisor', 'employee', 'cashier'), requireSameUnit(), listTransactions);
+financeRoutes.post('/transactions', authenticate, requireRoles('owner', 'employee', 'cashier'), validate(createTransactionSchema), createTransaction);
+financeRoutes.patch('/transactions/:id', authenticate, requireRoles('owner', 'employee', 'cashier'), validate(updateTransactionSchema), updateTransaction);
+financeRoutes.delete('/transactions/:id', authenticate, requireRoles('owner', 'employee', 'cashier'), deleteTransaction);

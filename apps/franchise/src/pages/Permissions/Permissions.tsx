@@ -8,7 +8,7 @@ type AppUser = {
   name: string;
   email?: string;
   phone?: string;
-  role: 'owner' | 'cashier' | 'employee' | 'client';
+  role: 'owner' | 'cashier' | 'employee' | 'client' | 'franchisor' | 'franchisee';
   password?: string;
   passwordPlain?: string;
   isActive: boolean;
@@ -29,8 +29,11 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
 };
 
 function normalizeRole(role: string): string {
-  if (role === 'staff' || role === 'employee' || role === 'funcionario' || role === 'funcionário') return 'employee';
-  return role;
+  const r = role?.toLowerCase();
+  if (r === 'staff' || r === 'employee' || r === 'funcionario' || r === 'funcionário') return 'employee';
+  if (r === 'cashier' || r === 'caixa') return 'cashier';
+  if (r === 'owner' || r === 'admin') return 'owner';
+  return r;
 }
 
 export default function Permissions() {
@@ -47,7 +50,7 @@ export default function Permissions() {
   const [confirmModal, setConfirmModal] = useState<{ show: boolean; userId: string; userName: string; isActive: boolean } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   
-  const [newUser, setNewUser] = useState({ name: '', email: '', phone: '', password: '', role: 'employee', allowedApps: ['admin'] });
+  const [newUser, setNewUser] = useState({ name: '', email: '', phone: '19', password: '', role: 'employee', allowedApps: ['admin'] });
   const [loginType, setLoginType] = useState<'email' | 'phone'>('email');
 
   const copyToClipboard = (text: string, fieldId: string) => {
@@ -106,10 +109,13 @@ export default function Permissions() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       setShowModal(false);
-      setNewUser({ name: '', email: '', phone: '', password: '', role: 'employee', allowedApps: ['admin'] });
+      setNewUser({ name: '', email: '', phone: '19', password: '', role: 'employee', allowedApps: ['admin'] });
       setToast({ message: 'Usuário criado com sucesso!', type: 'success' });
     },
-    onError: () => setToast({ message: 'Erro ao criar usuário. Verifique os dados.', type: 'error' })
+    onError: (err: any) => {
+      const message = err.response?.data?.message || 'Erro ao criar usuário. Verifique os dados.';
+      setToast({ message, type: 'error' });
+    }
   });
 
   const updateMutation = useMutation({
@@ -145,12 +151,17 @@ export default function Permissions() {
   };
 
   const toggleNewUserApp = (app: string) => {
-    setNewUser(prev => ({
-      ...prev,
-      allowedApps: prev.allowedApps.includes(app)
+    setNewUser(prev => {
+      const apps = prev.allowedApps.includes(app)
         ? prev.allowedApps.filter(a => a !== app)
-        : [...prev.allowedApps, app]
-    }));
+        : [...prev.allowedApps, app];
+      return {
+        ...prev,
+        allowedApps: apps,
+        // Also update unitId to the first selected app if it looks like an ID
+        unitId: apps[0]
+      };
+    });
   };
 
   const generatePassword = () => {
@@ -333,7 +344,11 @@ export default function Permissions() {
                                   <button 
                                     type="button" 
                                     className={`${styles.toggleBtn} ${pendingLoginType === 'phone' ? styles.active : ''}`} 
-                                    onClick={(e) => { e.stopPropagation(); setPendingLoginType('phone'); }}
+                                    onClick={(e) => { 
+                                      e.stopPropagation(); 
+                                      setPendingLoginType('phone'); 
+                                      if (!pendingPhone) setPendingPhone('19');
+                                    }}
                                   >
                                     Telefone
                                   </button>
@@ -377,15 +392,15 @@ export default function Permissions() {
                                         className={styles.btnSave}
                                         onClick={(e) => { 
                                           e.stopPropagation(); 
-                                          const payload: any = { id: u._id, role: pendingRole as any, allowedApps: pendingAllowedApps };
+                                          const payload: any = { role: pendingRole as any, allowedApps: pendingAllowedApps };
                                           if (pendingLoginType === 'email') {
                                             payload.email = pendingEmail.toLowerCase();
-                                            payload.phone = null;
+                                            payload.phone = undefined;
                                           } else {
                                             payload.phone = pendingPhone.replace(/\D/g, '');
-                                            payload.email = null;
+                                            payload.email = undefined;
                                           }
-                                          updateMutation.mutate(payload); 
+                                          updateMutation.mutate({ id: u._id, ...payload }); 
                                         }}
                                         disabled={updateMutation.isPending}
                                       >
@@ -411,12 +426,24 @@ export default function Permissions() {
                               </div>
                               <div className={styles.accordionCol}>
                                 <label className={styles.label}>Acesso ao Sistema</label>
-                                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem' }}>
-                                    <input type="checkbox" checked={pendingAllowedApps.includes('admin')} onChange={() => toggleApp('admin')} /> Jd Morada do Sol
+                                <div className={styles.systemsGrid}>
+                                  <label className={styles.checkboxLabel}>
+                                    <input 
+                                      type="checkbox" 
+                                      className={styles.checkbox} 
+                                      checked={pendingAllowedApps.includes('69fa463aa078044937f7024e')} 
+                                      onChange={() => toggleApp('69fa463aa078044937f7024e')} 
+                                    /> 
+                                    <span>Morada do Sol</span>
                                   </label>
-                                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem' }}>
-                                    <input type="checkbox" checked={pendingAllowedApps.includes('franchise')} onChange={() => toggleApp('franchise')} /> Jd Nova Veneza
+                                  <label className={styles.checkboxLabel}>
+                                    <input 
+                                      type="checkbox" 
+                                      className={styles.checkbox} 
+                                      checked={pendingAllowedApps.includes('69fa463aa078044937f70250')} 
+                                      onChange={() => toggleApp('69fa463aa078044937f70250')} 
+                                    /> 
+                                    <span>Nova Veneza</span>
                                   </label>
                                 </div>
                               </div>
@@ -509,7 +536,7 @@ export default function Permissions() {
                   <label className={styles.label}>Tipo de Login</label>
                   <div className={styles.toggleGroup}>
                     <button type="button" className={`${styles.toggleBtn} ${loginType === 'email' ? styles.active : ''}`} onClick={() => setLoginType('email')}>E-mail</button>
-                    <button type="button" className={`${styles.toggleBtn} ${loginType === 'phone' ? styles.active : ''}`} onClick={() => setLoginType('phone')}>Telefone</button>
+                    <button type="button" className={`${styles.toggleBtn} ${loginType === 'phone' ? styles.active : ''}`} onClick={() => { setLoginType('phone'); if(!newUser.phone) setNewUser({...newUser, phone: '19'}); }}>Telefone</button>
                   </div>
                 </div>
 
@@ -547,12 +574,24 @@ export default function Permissions() {
                 </div>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>Sistemas Autorizados</label>
-                  <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={newUser.allowedApps.includes('admin')} onChange={() => toggleNewUserApp('admin')} /> Jd Morada do Sol
+                  <div className={styles.systemsGrid}>
+                    <label className={styles.checkboxLabel}>
+                      <input 
+                        type="checkbox" 
+                        className={styles.checkbox} 
+                        checked={newUser.allowedApps.includes('69fa463aa078044937f7024e')} 
+                        onChange={() => toggleNewUserApp('69fa463aa078044937f7024e')} 
+                      /> 
+                      <span>Morada do Sol</span>
                     </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                      <input type="checkbox" checked={newUser.allowedApps.includes('franchise')} onChange={() => toggleNewUserApp('franchise')} /> Jd Nova Veneza
+                    <label className={styles.checkboxLabel}>
+                      <input 
+                        type="checkbox" 
+                        className={styles.checkbox} 
+                        checked={newUser.allowedApps.includes('69fa463aa078044937f70250')} 
+                        onChange={() => toggleNewUserApp('69fa463aa078044937f70250')} 
+                      /> 
+                      <span>Nova Veneza</span>
                     </label>
                   </div>
                 </div>

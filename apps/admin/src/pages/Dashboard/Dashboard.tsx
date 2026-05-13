@@ -1,11 +1,16 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../api/client';
-import CalendarView, { type CalendarAppointment } from '../../components/CalendarView/CalendarView';
-import StaffSchedule, { type ScheduleAppointment, type ScheduleEmployee } from '../../components/StaffSchedule/StaffSchedule';
+import { 
+  CalendarView, 
+  StaffSchedule, 
+  type CalendarAppointment, 
+  type ScheduleAppointment, 
+  type ScheduleEmployee 
+} from '@barber/ui';
 import AppointmentForm from '../../components/AppointmentForm/AppointmentForm';
 import styles from './Dashboard.module.scss';
 
@@ -120,6 +125,28 @@ export default function Dashboard() {
     qc.invalidateQueries({ queryKey: ['appointments-month'] });
   }
 
+  /* ── Mutations for Shared Components ── */
+  const statusMut = useMutation({
+    mutationFn: ({ id, status, options }: { id: string; status: string; options?: any }) =>
+      api.patch(`/appointments/${id}/status`, { status, ...options }),
+    onSuccess: () => { handleScheduleUpdate(); handleMonthUpdate(); },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => api.delete(`/appointments/${id}`),
+    onSuccess: () => { handleScheduleUpdate(); handleMonthUpdate(); },
+  });
+
+  const blockMut = useMutation({
+    mutationFn: (payload: any) => api.post('/appointments', payload),
+    onSuccess: () => { handleScheduleUpdate(); handleMonthUpdate(); },
+  });
+
+  const updateApptMut = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.patch(`/appointments/${id}`, data),
+    onSuccess: () => { handleScheduleUpdate(); handleMonthUpdate(); },
+  });
+
   const currentMonthLabel = format(calendarMonth, 'MMMM', { locale: ptBR });
 
   return (
@@ -159,6 +186,9 @@ export default function Dashboard() {
             onMonthChange={setCalendarMonth}
             onUpdate={handleMonthUpdate}
             onDayClick={handleDayClick}
+            onStatusChange={(id, s) => statusMut.mutateAsync({ id, status: s })}
+            onDelete={(id) => deleteMut.mutateAsync(id)}
+            isProcessing={statusMut.isPending || deleteMut.isPending}
           />
         </div>
       )}
@@ -182,6 +212,13 @@ export default function Dashboard() {
           unitId={unitId}
           workingDays={unitConfig?.workingDays}
           workingHours={unitConfig?.workingHours}
+          onStatusChange={(id, s, opts) => statusMut.mutateAsync({ id, status: s, options: opts })}
+          onDelete={(id) => deleteMut.mutateAsync(id)}
+          onBlock={(payload) => blockMut.mutateAsync(payload)}
+          onUpdateAppt={(id, data) => updateApptMut.mutateAsync({ id, data })}
+          isProcessing={statusMut.isPending || blockMut.isPending || updateApptMut.isPending}
+          isDeleting={deleteMut.isPending}
+          businessName="Barber Admin"
         />
       )}
 

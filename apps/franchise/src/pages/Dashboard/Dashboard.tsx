@@ -1,11 +1,16 @@
 import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../api/client';
-import CalendarView, { type CalendarAppointment } from '../../components/CalendarView/CalendarView';
-import StaffSchedule, { type ScheduleAppointment, type ScheduleEmployee } from '../../components/StaffSchedule/StaffSchedule';
+import { 
+  CalendarView, 
+  StaffSchedule, 
+  type CalendarAppointment, 
+  type ScheduleAppointment, 
+  type ScheduleEmployee 
+} from '@barber/ui';
 import AppointmentForm from '../../components/AppointmentForm/AppointmentForm';
 import styles from './Dashboard.module.scss';
 
@@ -56,9 +61,10 @@ export default function Dashboard() {
 
   const monthAppointments = useMemo(() => {
     if (!isStaff || !userId) return monthAppointmentsRaw;
+    const currentUserIdStr = userId.toString();
     return monthAppointmentsRaw.filter(a => {
       const empId = (a.employeeId as any)?._id || a.employeeId;
-      return empId === userId;
+      return empId?.toString() === currentUserIdStr;
     });
   }, [monthAppointmentsRaw, isStaff, userId]);
 
@@ -76,9 +82,10 @@ export default function Dashboard() {
 
   const dayAppointments = useMemo(() => {
     if (!isStaff || !userId) return dayAppointmentsRaw;
+    const currentUserIdStr = userId.toString();
     return dayAppointmentsRaw.filter(a => {
-      const empId = a.employeeId?._id || a.employeeId;
-      return empId === userId;
+      const empId = (a.employeeId as any)?._id || a.employeeId;
+      return empId?.toString() === currentUserIdStr;
     });
   }, [dayAppointmentsRaw, isStaff, userId]);
 
@@ -120,6 +127,28 @@ export default function Dashboard() {
     qc.invalidateQueries({ queryKey: ['appointments-month'] });
   }
 
+  /* ── Mutations for Shared Components ── */
+  const statusMut = useMutation({
+    mutationFn: ({ id, status, options }: { id: string; status: string; options?: any }) =>
+      api.patch(`/appointments/${id}/status`, { status, ...options }),
+    onSuccess: () => { handleScheduleUpdate(); handleMonthUpdate(); },
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => api.delete(`/appointments/${id}`),
+    onSuccess: () => { handleScheduleUpdate(); handleMonthUpdate(); },
+  });
+
+  const blockMut = useMutation({
+    mutationFn: (payload: any) => api.post('/appointments', payload),
+    onSuccess: () => { handleScheduleUpdate(); handleMonthUpdate(); },
+  });
+
+  const updateApptMut = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => api.patch(`/appointments/${id}`, data),
+    onSuccess: () => { handleScheduleUpdate(); handleMonthUpdate(); },
+  });
+
   const currentMonthLabel = format(calendarMonth, 'MMMM', { locale: ptBR });
 
   return (
@@ -159,6 +188,9 @@ export default function Dashboard() {
             onMonthChange={setCalendarMonth}
             onUpdate={handleMonthUpdate}
             onDayClick={handleDayClick}
+            onStatusChange={async (id, s) => { await statusMut.mutateAsync({ id, status: s }); }}
+            onDelete={async (id) => { await deleteMut.mutateAsync(id); }}
+            isProcessing={statusMut.isPending || deleteMut.isPending}
           />
         </div>
       )}
@@ -182,6 +214,13 @@ export default function Dashboard() {
           unitId={unitId}
           workingDays={unitConfig?.workingDays}
           workingHours={unitConfig?.workingHours}
+          onStatusChange={async (id, s, opts) => { await statusMut.mutateAsync({ id, status: s, options: opts }); }}
+          onDelete={async (id) => { await deleteMut.mutateAsync(id); }}
+          onBlock={async (payload) => { await blockMut.mutateAsync(payload); }}
+          onUpdateAppt={async (id, data) => { await updateApptMut.mutateAsync({ id, data }); }}
+          isProcessing={statusMut.isPending || blockMut.isPending || updateApptMut.isPending}
+          isDeleting={deleteMut.isPending}
+          businessName="Barber Franchise"
         />
       )}
 

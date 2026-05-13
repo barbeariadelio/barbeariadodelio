@@ -11,9 +11,20 @@ export default function Login() {
   const { login, loading, error } = useLogin();
   const { updateTheme } = useTheme();
 
-  useEffect(() => {
-    updateTheme('light');
-  }, [updateTheme]);
+  // Removed: forcing light theme on mount
+
+  function handleIdentifierChange(val: string) {
+    // Basic phone mask: if it starts with numbers, mask it
+    const numeric = val.replace(/\D/g, '');
+    if (numeric.length > 0 && /^\d/.test(val.trim())) {
+      let masked = numeric;
+      if (numeric.length > 2) masked = `(${numeric.slice(0, 2)}) ${numeric.slice(2)}`;
+      if (numeric.length > 7) masked = `(${numeric.slice(0, 2)}) ${numeric.slice(2, 7)}-${numeric.slice(7, 11)}`;
+      setEmail(masked);
+    } else {
+      setEmail(val);
+    }
+  }
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -36,8 +47,8 @@ export default function Login() {
               type="text"
               className={styles.input}
               value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="seu@email.com ou (00) 00000-0000"
+              onChange={e => handleIdentifierChange(e.target.value)}
+              placeholder="E-mail ou (00) 00000-0000"
               required
               autoComplete="username"
             />

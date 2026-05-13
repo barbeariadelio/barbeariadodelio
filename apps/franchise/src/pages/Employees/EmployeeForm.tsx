@@ -21,7 +21,7 @@ interface Employee {
   vacations?: { start: string; end: string }[];
   blockedDays?: string[];
   isActive: boolean;
-  unitId?: string;
+  unitId?: string | { _id: string; name: string };
 }
 
 function maskPhone(raw: string) {

@@ -16,9 +16,19 @@ export default function Login() {
   const { updateTheme } = useTheme();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    updateTheme('light');
-  }, [updateTheme]);
+  // Removed: forcing light theme on mount
+
+  function handleIdentifierChange(val: string) {
+    const numeric = val.replace(/\D/g, '');
+    if (numeric.length > 0 && /^\d/.test(val.trim())) {
+      let masked = numeric;
+      if (numeric.length > 2) masked = `(${numeric.slice(0, 2)}) ${numeric.slice(2)}`;
+      if (numeric.length > 7) masked = `(${numeric.slice(0, 2)}) ${numeric.slice(2, 7)}-${numeric.slice(7, 11)}`;
+      setEmail(masked);
+    } else {
+      setEmail(val);
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -56,18 +66,28 @@ export default function Login() {
           <div className={styles.field}>
             <label className={styles.label}>E-mail ou Telefone</label>
             <input 
+              id="identifier"
               type="text" 
               className={styles.input} 
               value={email} 
-              onChange={e => setEmail(e.target.value)} 
-              placeholder="seu@email.com ou (00) 00000-0000"
+              onChange={e => handleIdentifierChange(e.target.value)} 
+              placeholder="E-mail ou (00) 00000-0000"
               required 
+              autoComplete="username"
             />
           </div>
           <div className={styles.field}>
             <label className={styles.label}>Senha</label>
             <div className={styles.pwWrap}>
-              <input type={showPw ? 'text' : 'password'} className={styles.input} value={password} onChange={e => setPassword(e.target.value)} required />
+              <input 
+                id="password"
+                type={showPw ? 'text' : 'password'} 
+                className={styles.input} 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+                required 
+                autoComplete="current-password"
+              />
               <button type="button" className={styles.pwToggle} onClick={() => setShowPw(v => !v)} tabIndex={-1} aria-label={showPw ? 'Ocultar senha' : 'Mostrar senha'}>
                 {showPw
                   ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>

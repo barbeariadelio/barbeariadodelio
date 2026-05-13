@@ -11,54 +11,45 @@ export function resolveApiBaseUrl(unitApiUrl?: string): string {
 
 export const apiClient = axios.create({
   baseURL: apiBaseUrl,
+  withCredentials: true,
 });
 
 apiClient.interceptors.request.use(config => {
-  const token = localStorage.getItem('accessToken');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-
   const envUnitId = import.meta.env.VITE_UNIT_ID;
-  if (envUnitId && !config.params?.unitId) {
+  const hasUnitId = config.params?.unitId || config.url?.includes('unitId=');
+
+  if (envUnitId && !hasUnitId) {
     config.params = { ...config.params, unitId: envUnitId };
   }
-
   return config;
 });
 
-apiClient.interceptors.response.use(
-  res => {
-    if (res.data && typeof res.data === 'object' && 'data' in res.data) {
-      res.data = res.data.data;
-    }
-    return res;
-  },
-  async error => {
-    const isAuthRoute = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/refresh');
-
-    if (error.response?.status === 401 && !isAuthRoute) {
-      const refreshToken = localStorage.getItem('refreshToken');
-      if (refreshToken) {
+export function setupInterceptors(instance: any) {
+  instance.interceptors.response.use(
+    (res: any) => {
+      if (res.data && typeof res.data === 'object' && 'data' in res.data) {
+        res.data = res.data.data;
+      }
+      return res;
+    },
+    async (error: any) => {
+      const isAuthRoute = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/refresh');
+  
+      if (error.response?.status === 401 && !isAuthRoute) {
         try {
-          const { data } = await axios.post(`${apiBaseUrl}/auth/refresh`, { refreshToken });
-          const newAccessToken = data.data.accessToken;
-          localStorage.setItem('accessToken', newAccessToken);
-          
-          // Retry original request with new token
-          error.config.headers.Authorization = `Bearer ${newAccessToken}`;
-          return apiClient(error.config);
+          await axios.post(`${apiBaseUrl}/auth/refresh`, {}, { withCredentials: true });
+          return instance(error.config);
         } catch {
-          localStorage.clear();
+          localStorage.removeItem('user');
           const loginUrl = `${import.meta.env.BASE_URL}login`.replace('//', '/');
           window.location.href = loginUrl;
         }
-      } else {
-        localStorage.clear();
-        const loginUrl = `${import.meta.env.BASE_URL}login`.replace('//', '/');
-        window.location.href = loginUrl;
       }
-    }
-    return Promise.reject(error);
-  },
-);
+      return Promise.reject(error);
+    },
+  );
+}
+
+setupInterceptors(apiClient);
 
 export const api = apiClient;

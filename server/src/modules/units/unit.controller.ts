@@ -23,10 +23,14 @@ export async function getPublicUnit(req: Request, res: Response, next: NextFunct
 export async function listUnits(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     let units: IUnit[];
-    if (req.user!.role === 'owner') {
-      units = await service.findByOwner(req.user!.id);
-    } else if (req.user!.unitId) {
-      units = [await service.findById(req.user!.unitId)];
+    const { role, id, unitId } = req.user!;
+
+    if (role === 'owner') {
+      units = await service.findByOwner(id);
+    } else if (role === 'franchisor' || role === 'admin') {
+      units = await service.findAll();
+    } else if (unitId) {
+      units = [await service.findById(unitId)];
     } else {
       units = [];
     }
@@ -36,7 +40,8 @@ export async function listUnits(req: AuthRequest, res: Response, next: NextFunct
 
 export async function getUnit(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const unit = await service.findById(req.params.id);
+    const id = req.params.unitId || req.params.id;
+    const unit = await service.findById(id);
     ok(res, unit);
   } catch (e) { next(e); }
 }
@@ -50,7 +55,8 @@ export async function createUnit(req: AuthRequest, res: Response, next: NextFunc
 
 export async function updateUnit(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const unit = await service.update(req.params.id, req.body);
+    const id = req.params.unitId || req.params.id;
+    const unit = await service.update(id, req.body);
     ok(res, unit);
   } catch (e) { next(e); }
 }

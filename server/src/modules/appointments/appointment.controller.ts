@@ -29,13 +29,22 @@ export async function getAppointment(req: AuthRequest, res: Response, next: Next
     const { id } = req.params;
     const appt = await service.findById(id);
 
-    // Security check: if client, must be the owner
-    if (req.user!.role === 'client') {
-      const clients = await ClientModel.find({ userId: req.user!.id });
-      const clientIds = clients.map(c => c._id.toString());
-      
-      if (!clientIds.includes(appt.clientId?.toString() || '')) {
-        throw new AppError('Access denied', 403);
+    // Security check
+    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    
+    if (!isOwnerOrFranchisor) {
+      // If client, must be the owner of the appointment
+      if (req.user!.role === 'client') {
+        const clients = await ClientModel.find({ userId: req.user!.id });
+        const clientIds = clients.map(c => c._id.toString());
+        if (!clientIds.includes(appt.clientId?.toString() || '')) {
+          throw new AppError('Access denied', 403);
+        }
+      } else {
+        // If employee/franchisee, must belong to the same unit
+        if (appt.unitId?.toString() !== req.user!.unitId?.toString()) {
+          throw new AppError('Access denied to this unit', 403);
+        }
       }
     }
 
@@ -65,6 +74,12 @@ export async function createAppointment(req: AuthRequest, res: Response, next: N
       data.unitId = req.user.unitId;
     }
 
+    // Security check: must belong to the unit
+    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    if (!isOwnerOrFranchisor && data.unitId !== req.user!.unitId?.toString()) {
+      throw new AppError('Cannot create appointment for another unit', 403);
+    }
+
     // For blocked slots, no client lookup needed
     if (data.status !== 'blocked' && !data.clientId && req.user) {
       let client = await ClientModel.findOne({ userId: req.user.id, unitId: data.unitId });
@@ -82,12 +97,13 @@ export async function createAppointment(req: AuthRequest, res: Response, next: N
     // Create notification
     const fullAppt = await service.findById(appt._id.toString());
     const client = await ClientModel.findById(fullAppt.clientId);
-    await notificationService.create({
-      unitId: fullAppt.unitId,
+    await notificationService.notify({
+      unitId: fullAppt.unitId.toString(),
       type: 'new',
       title: 'Novo Agendamento',
       message: `${client?.name || 'Um cliente'} realizou um novo agendamento.`,
-      appointmentId: fullAppt._id as any
+      appointmentId: fullAppt._id.toString(),
+      external: true
     });
 
     created(res, appt);
@@ -114,12 +130,13 @@ export async function guestBookAppointment(req: Request, res: Response, next: Ne
     });
     
     // Create notification for new booking
-    await notificationService.create({
-      unitId: result.appointment.unitId as any,
+    await notificationService.notify({
+      unitId: result.appointment.unitId.toString(),
       type: 'new',
       title: 'Novo Agendamento',
       message: `${guestName} agendou um novo serviço.`,
-      appointmentId: result.appointment._id as any
+      appointmentId: result.appointment._id.toString(),
+      external: true
     });
 
     created(res, result);
@@ -131,39 +148,56 @@ export async function updateAppointmentStatus(req: AuthRequest, res: Response, n
     const { id } = req.params;
     const { status, price, paymentMethod } = req.body;
 
-    // If role is client, verify ownership
-    if (req.user!.role === 'client') {
-      const appt = await AppointmentModel.findById(id);
-      if (!appt) throw new AppError('Appointment not found', 404);
-      
-      const clients = await ClientModel.find({ userId: req.user!.id });
-      const clientIds = clients.map(c => c._id.toString());
-      if (!clientIds.includes(appt.clientId?.toString() || '')) {
-        throw new AppError('You can only update your own appointments', 403);
+    const appt = await AppointmentModel.findById(id);
+    if (!appt) throw new AppError('Appointment not found', 404);
+
+    // Security check
+    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    if (!isOwnerOrFranchisor) {
+      if (req.user!.role === 'client') {
+        const clients = await ClientModel.find({ userId: req.user!.id });
+        const clientIds = clients.map(c => c._id.toString());
+        if (!clientIds.includes(appt.clientId?.toString() || '')) {
+          throw new AppError('You can only update your own appointments', 403);
+        }
+      } else {
+        if (appt.unitId?.toString() !== req.user!.unitId?.toString()) {
+          throw new AppError('Access denied to this unit', 403);
+        }
       }
     }
 
-    const appt = await service.updateStatus(id, status, { price, paymentMethod });
+    const updated = await service.updateStatus(id, status, { price, paymentMethod });
 
     if (status === 'cancelled') {
       const fullAppt = await service.findById(id);
       const client = await ClientModel.findById(fullAppt.clientId);
-      await notificationService.create({
-        unitId: fullAppt.unitId,
+      await notificationService.notify({
+        unitId: fullAppt.unitId.toString(),
         type: 'cancellation',
         title: 'Agendamento Cancelado',
         message: `${client?.name || 'Um cliente'} cancelou o serviço ${(fullAppt.serviceId as any)?.name || 'agendado'}.`,
-        appointmentId: fullAppt._id as any
+        appointmentId: fullAppt._id.toString(),
+        external: true
       });
     }
 
-    ok(res, appt);
+    ok(res, updated);
   } catch (e) { next(e); }
 }
 
 export async function deleteAppointment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    await service.delete(req.params.id);
+    const { id } = req.params;
+    const appt = await AppointmentModel.findById(id);
+    if (!appt) throw new AppError('Appointment not found', 404);
+
+    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    if (!isOwnerOrFranchisor && appt.unitId?.toString() !== req.user!.unitId?.toString()) {
+      throw new AppError('Access denied to this unit', 403);
+    }
+
+    await service.delete(id);
     ok(res, { deleted: true });
   } catch (e) { next(e); }
 }
@@ -171,6 +205,22 @@ export async function deleteAppointment(req: AuthRequest, res: Response, next: N
 export async function getClientAppointments(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const clientId = req.params.clientId;
+    
+    // Security check for client role
+    if (req.user!.role === 'client') {
+      const clients = await ClientModel.find({ userId: req.user!.id });
+      const clientIds = clients.map(c => c._id.toString());
+      if (!clientIds.includes(clientId)) {
+        throw new AppError('Access denied', 403);
+      }
+    } else if (req.user!.role !== 'owner' && req.user!.role !== 'franchisor') {
+      // For employee/franchisee, check unit
+      const client = await ClientModel.findById(clientId);
+      if (client?.unitId?.toString() !== req.user!.unitId?.toString()) {
+        throw new AppError('Access denied to this unit', 403);
+      }
+    }
+
     const appointments = await service.findByClient(clientId);
     ok(res, appointments);
   } catch (e) { next(e); }
@@ -180,32 +230,40 @@ export async function updateAppointment(req: AuthRequest, res: Response, next: N
   try {
     const { id } = req.params;
     
-    if (req.user!.role === 'client') {
-      const appt = await AppointmentModel.findById(id);
-      if (!appt) throw new AppError('Appointment not found', 404);
-      
-      const clients = await ClientModel.find({ userId: req.user!.id });
-      const clientIds = clients.map(c => c._id.toString());
-      
-      if (!clientIds.includes(appt.clientId?.toString() || '')) {
-        throw new AppError('You can only update your own appointments', 403);
+    const appt = await AppointmentModel.findById(id);
+    if (!appt) throw new AppError('Appointment not found', 404);
+
+    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    if (!isOwnerOrFranchisor) {
+      if (req.user!.role === 'client') {
+        const clients = await ClientModel.find({ userId: req.user!.id });
+        const clientIds = clients.map(c => c._id.toString());
+        if (!clientIds.includes(appt.clientId?.toString() || '')) {
+          throw new AppError('You can only update your own appointments', 403);
+        }
+      } else {
+        // Employee/Franchisee: must belong to the same unit
+        if (appt.unitId?.toString() !== req.user!.unitId?.toString()) {
+          throw new AppError('Access denied to this unit', 403);
+        }
       }
     }
 
-    const appt = await service.update(id, req.body);
+    const updated = await service.update(id, req.body);
 
     // Create notification for edit
     const fullAppt = await service.findById(id);
     const client = await ClientModel.findById(fullAppt.clientId);
-    await notificationService.create({
-      unitId: fullAppt.unitId,
+    await notificationService.notify({
+      unitId: fullAppt.unitId.toString(),
       type: 'edit',
       title: 'Agendamento Editado',
       message: `${client?.name || 'Um cliente'} alterou detalhes do agendamento de ${(fullAppt.serviceId as any)?.name || 'serviço'}.`,
-      appointmentId: fullAppt._id as any
+      appointmentId: fullAppt._id.toString(),
+      external: true
     });
 
-    ok(res, appt);
+    ok(res, updated);
   } catch (e) { next(e); }
 }
 

@@ -1,4 +1,4 @@
-export type UserRole = 'owner' | 'employee' | 'franchisor' | 'franchisee' | 'client';
+export type UserRole = 'owner' | 'employee' | 'franchisor' | 'franchisee' | 'client' | 'admin' | 'cashier';
 
 export interface User {
   _id: string;
@@ -17,6 +17,10 @@ export interface User {
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
+}
+
+export interface LoginResponse extends AuthTokens {
+  user: User;
 }
 
 export interface LoginPayload {

@@ -51,7 +51,7 @@ export class EmployeeService {
     const emp = await UserModel.findByIdAndUpdate(
       id,
       { $set: updateData },
-      { new: true },
+      { new: true, runValidators: true },
     ).select('-passwordHash');
     if (!emp) throw new NotFoundError('Employee');
     return emp;
@@ -61,7 +61,7 @@ export class EmployeeService {
     const emp = await UserModel.findByIdAndUpdate(
       id,
       { isActive: false },
-      { new: true },
+      { new: true, runValidators: true },
     ).select('-passwordHash');
     if (!emp) throw new NotFoundError('Employee');
     return emp;

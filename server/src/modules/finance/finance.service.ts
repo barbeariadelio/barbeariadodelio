@@ -3,6 +3,9 @@ import { UnitModel } from '../units/unit.model';
 import { AppointmentModel } from '../appointments/appointment.model';
 import { UserModel } from '../auth/auth.model';
 import type { FinanceSummary, TransactionCategory } from '@barber/types';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { toDate } from 'date-fns-tz';
+import { escapeRegex } from '../../shared/utils/regex';
 
 export class FinanceService {
   async getSummary(
@@ -13,10 +16,6 @@ export class FinanceService {
   ): Promise<FinanceSummary> {
     const unitIds = await this.resolveUnitIds(userId, role, unitId);
     const { startDate, endDate } = this.resolvePeriod(period);
-
-    console.log(`[FinanceService] getSummary: userId=${userId}, role=${role}, unitIdParam=${unitId}`);
-    console.log(`[FinanceService] Resolved unitIds:`, unitIds);
-    console.log(`[FinanceService] Period: ${startDate} to ${endDate}`);
 
     const transactions = await TransactionModel.find({
       unitId: { $in: unitIds },
@@ -31,12 +30,6 @@ export class FinanceService {
       .populate('serviceId', 'name price')
       .populate('employeeId', 'name commissionRate')
       .populate('unitId', 'name');
-
-    console.log(`[FinanceService] Data Detail:`);
-    transactions.forEach(t => console.log(`  - TX: ${t.type}, ${t.amount}, ${t.description}`));
-    appointments.forEach(a => console.log(`  - Appt: ${(a as any).status}, ${(a as any).serviceId?.name}, ${a.date}`));
-
-    console.log(`[FinanceService] Found ${transactions.length} transactions and ${appointments.length} appointments`);
 
     return this.buildSummary(transactions, appointments as any);
   }
@@ -61,12 +54,13 @@ export class FinanceService {
 
   async create(data: Partial<ITransaction>): Promise<ITransaction> {
     const transaction = await TransactionModel.create(data);
-    await this.maybeCreateRoyalty(transaction);
+    // Royalty creation is now handled by the nightly batch job:
+    // server/src/jobs/batchRoyalty.ts
     return transaction;
   }
 
   async update(id: string, data: Partial<ITransaction>): Promise<ITransaction | null> {
-    const transaction = await TransactionModel.findByIdAndUpdate(id, { $set: data }, { new: true });
+    const transaction = await TransactionModel.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: true });
     // Note: updating royalty logic could be complex if amount changes, for now we just update the tx.
     return transaction;
   }
@@ -77,9 +71,10 @@ export class FinanceService {
     
     // If it's income, we should probably delete the linked royalty tx too
     if (tx.type === 'income') {
+      const safeDesc = escapeRegex(tx.description);
       await TransactionModel.deleteMany({ 
         unitId: tx.unitId, 
-        description: { $regex: new RegExp(`Royalty .* — ${tx.description}`) },
+        description: { $regex: new RegExp(`Royalty .* — ${safeDesc}`) },
         date: tx.date 
       });
     }
@@ -87,40 +82,21 @@ export class FinanceService {
     await TransactionModel.findByIdAndDelete(id);
   }
 
-  private async maybeCreateRoyalty(transaction: ITransaction): Promise<void> {
-    if (transaction.type !== 'income') return;
-
-    const { FranchiseModel } = await import('../franchise/franchise.model');
-    const franchise = await FranchiseModel.findOne({ units: transaction.unitId });
-    if (!franchise || franchise.royaltyPercent <= 0) return;
-
-    const royaltyAmount = Math.round((transaction.amount * franchise.royaltyPercent) / 100 * 100) / 100;
-    await TransactionModel.create({
-      unitId: transaction.unitId,
-      type: 'royalty',
-      category: 'other',
-      amount: royaltyAmount,
-      description: `Royalty ${franchise.royaltyPercent}% — ${transaction.description}`,
-      date: transaction.date,
-      createdBy: transaction.createdBy,
-    });
-  }
+  /**
+   * Royalty creation has been moved to the batch job: server/src/jobs/batchRoyalty.ts
+   * Run nightly via cron: npx tsx server/src/jobs/batchRoyalty.ts
+   * This consolidates all income for a given date into a single royalty transaction
+   * per unit, reducing write load during high-traffic hours.
+   */
 
   private async resolveUnitIds(userId: string, role: string, unitId?: string): Promise<string[]> {
     const allowedIds = await this.getAllowedUnitIds(userId, role);
-    console.log(`[FinanceService] getAllowedUnitIds for ${userId} (${role}):`, allowedIds);
     
     if (unitId && unitId !== 'all') {
-      // If owner, trust the unitIdParam
-      if (role === 'owner') {
-        console.log(`[FinanceService] Owner requesting specific unit: ${unitId}. Granting access.`);
-        return [unitId];
-      }
-
-      if (allowedIds.includes(unitId)) return [unitId];
+      const isPrivileged = ['owner', 'franchisor', 'admin'].includes(role);
+      if (isPrivileged) return [unitId];
       
       const user = await UserModel.findById(userId).select('unitId');
-      console.log(`[FinanceService] User fallback check for unitId ${unitId}: user.unitId=${user?.unitId}`);
       if (user?.unitId?.toString() === unitId) return [unitId];
 
       return [];
@@ -147,7 +123,12 @@ export class FinanceService {
       return franchise ? franchise.units.map(u => u.toString()) : [];
     }
 
-    if (role === 'franchisee' || role === 'employee' || role === 'admin') {
+    if (role === 'admin') {
+      const units = await UnitModel.find({ isActive: true }).select('_id');
+      return units.map(u => u._id.toString());
+    }
+
+    if (role === 'franchisee' || role === 'employee' || role === 'cashier') {
       const user = await UserModel.findById(userId).select('unitId');
       return user?.unitId ? [user.unitId.toString()] : [];
     }
@@ -156,11 +137,10 @@ export class FinanceService {
   }
 
   private resolvePeriod(period: string): { startDate: string; endDate: string } {
-    // Force Brazil/Sao_Paulo timezone for date calculations
-    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const timeZone = 'America/Sao_Paulo';
+    const now = toDate(new Date(), { timeZone });
     
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    const fmt = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const fmt = (d: Date) => format(d, 'yyyy-MM-dd');
 
     if (period === 'day') {
       const today = fmt(now);
@@ -168,28 +148,28 @@ export class FinanceService {
     }
 
     if (period === 'week') {
-      const start = new Date(now);
-      const day = now.getDay();
-      start.setDate(now.getDate() - day);
-      const end = new Date(start);
-      end.setDate(start.getDate() + 6);
+      const start = startOfWeek(now, { weekStartsOn: 0 }); // Sunday
+      const end = endOfWeek(now, { weekStartsOn: 0 });
       return { startDate: fmt(start), endDate: fmt(end) };
     }
 
     if (period === 'year') {
-      return { startDate: `${now.getFullYear()}-01-01`, endDate: `${now.getFullYear()}-12-31` };
+      const start = startOfYear(now);
+      const end = endOfYear(now);
+      return { startDate: fmt(start), endDate: fmt(end) };
     }
 
     // month (default)
-    const y = now.getFullYear();
-    const m = now.getMonth() + 1;
-    const lastDay = new Date(y, m, 0).getDate();
-    return { startDate: `${y}-${pad(m)}-01`, endDate: `${y}-${pad(m)}-${lastDay}` };
+    const start = startOfMonth(now);
+    const end = endOfMonth(now);
+    return { startDate: fmt(start), endDate: fmt(end) };
   }
 
   private buildSummary(transactions: any[], appointments: any[]): FinanceSummary {
     let totalIncome = 0;
     let totalExpense = 0;
+    let realizedIncome = 0;   // completed only
+    let projectedIncome = 0;  // confirmed (not yet completed)
     const byUnitMap = new Map<string, { unitId: string; name: string; income: number; expense: number; profit: number }>();
     const byCategoryMap = new Map<TransactionCategory, number>();
     const byEmployeeMap = new Map<string, {
@@ -198,11 +178,12 @@ export class FinanceService {
       appointments: number;
       grossRevenue: number;
       commissionRate?: number;
+      commissionAmount?: number;
       totalVouchers: number;
     }>();
     const dailyMap = new Map<string, { date: string; income: number; expense: number }>();
 
-    // 1. Process Transactions (Cash Flow)
+    // 1. Process Transactions (Cash Flow — realized)
     for (const t of transactions) {
       const unitKey = t.unitId?._id?.toString() || t.unitId?.toString();
       if (!unitKey) continue;
@@ -220,9 +201,10 @@ export class FinanceService {
 
       if (t.type === 'income') {
         totalIncome += t.amount;
+        realizedIncome += t.amount;
         unit.income += t.amount;
         day.income += t.amount;
-      } else if (t.type === 'expense') {
+      } else if (t.type === 'expense' || t.type === 'commission') {
         totalExpense += t.amount;
         unit.expense += t.amount;
         day.expense += t.amount;
@@ -248,7 +230,7 @@ export class FinanceService {
       }
     }
 
-    // 2. Process Appointments (Work Metrics & Commissions)
+    // 2. Process Appointments (Work Metrics)
     const byServiceMap = new Map<string, { name: string; revenue: number; count: number; unitId: string; unitName: string }>();
 
     for (const appt of appointments) {
@@ -258,9 +240,11 @@ export class FinanceService {
       const unitName = appt.unitId?.name || '';
       const status = (appt as any).status;
 
-      // Add to total income if confirmed or completed to show real business movement
-      if (status === 'confirmed' || status === 'completed') {
-        totalIncome += price;
+      // Separate realized (completed) from projected (confirmed)
+      if (status === 'completed') {
+        // Already counted via transactions — don't double-count
+      } else if (status === 'confirmed') {
+        projectedIncome += price;
       }
 
       // Stats by service (unit-aware)
@@ -301,10 +285,19 @@ export class FinanceService {
           byUnitMap.set(unitKey, { unitId: unitKey, name: unitName || 'Unidade', income: 0, expense: 0, profit: 0 });
         }
         const unit = byUnitMap.get(unitKey)!;
-        if (status === 'confirmed' || status === 'completed') {
-          unit.income += price;
-          unit.profit = unit.income - unit.expense;
+        if (status === 'confirmed') {
+          // projected — don't add to realized unit.income
+        } else if (status === 'completed') {
+          // Already in transactions
         }
+        unit.profit = unit.income - unit.expense;
+      }
+    }
+
+    // 3. Compute commission amounts per employee
+    for (const emp of byEmployeeMap.values()) {
+      if (emp.commissionRate && emp.commissionRate > 0) {
+        emp.commissionAmount = Math.round(emp.grossRevenue * emp.commissionRate / 100 * 100) / 100;
       }
     }
 
@@ -314,6 +307,8 @@ export class FinanceService {
       totalIncome,
       totalExpense,
       netProfit: totalIncome - totalExpense,
+      realizedIncome,
+      projectedIncome,
       byUnit: Array.from(byUnitMap.values()),
       byCategory: Array.from(byCategoryMap.entries()).map(([category, amount]) => ({ category, amount })),
       byService: Array.from(byServiceMap.values()),

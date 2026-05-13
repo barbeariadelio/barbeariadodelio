@@ -21,13 +21,13 @@ export class ProductService {
   }
 
   async update(id: string, data: Partial<IProduct>): Promise<IProduct> {
-    const product = await ProductModel.findByIdAndUpdate(id, data, { new: true });
+    const product = await ProductModel.findByIdAndUpdate(id, data, { new: true, runValidators: true });
     if (!product) throw new NotFoundError('Product');
     return product;
   }
 
   async delete(id: string): Promise<void> {
-    const product = await ProductModel.findByIdAndUpdate(id, { isActive: false });
+    const product = await ProductModel.findByIdAndUpdate(id, { isActive: false }, { new: true, runValidators: true });
     if (!product) throw new NotFoundError('Product');
   }
 }

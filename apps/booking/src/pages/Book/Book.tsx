@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
-import { api, resolveApiBaseUrl } from '../../api/client';
+import { api, resolveApiBaseUrl, setupInterceptors } from '../../api/client';
 import styles from './Book.module.scss';
 
 interface Unit { _id: string; name: string; apiUrl?: string; }
@@ -168,16 +168,8 @@ export default function Book() {
 
   const unitApi = useMemo(() => {
     const base = resolveApiBaseUrl(unit?.apiUrl);
-    const instance = axios.create({ baseURL: base });
-    instance.interceptors.request.use(cfg => {
-      const token = localStorage.getItem('accessToken');
-      if (token) cfg.headers.Authorization = `Bearer ${token}`;
-      return cfg;
-    });
-    instance.interceptors.response.use(res => {
-      if (res.data && typeof res.data === 'object' && 'data' in res.data) res.data = res.data.data;
-      return res;
-    });
+    const instance = axios.create({ baseURL: base, withCredentials: true });
+    setupInterceptors(instance);
     return instance;
   }, [unit?.apiUrl]);
 

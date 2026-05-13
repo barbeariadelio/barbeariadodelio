@@ -7,6 +7,11 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 const MONGO_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/barber-delio';
 
 async function cleanup() {
+  if (!process.argv.includes('--force-clear-all')) {
+    console.error('Error: This script is destructive. You must pass --force-clear-all to proceed.');
+    process.exit(1);
+  }
+
   await mongoose.connect(MONGO_URI);
   console.log('Connected to DB');
 
@@ -28,4 +33,7 @@ async function cleanup() {
   console.log('Cleanup finished');
 }
 
-cleanup();
+cleanup().catch(err => {
+  console.error('Cleanup failed:', err);
+  process.exit(1);
+});

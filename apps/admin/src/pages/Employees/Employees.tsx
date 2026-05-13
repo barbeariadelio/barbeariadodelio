@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import EmployeeForm from './EmployeeForm';
 import EmployeeVales from './EmployeeVales';
-import ConfirmModal from '../../components/ConfirmModal/ConfirmModal';
+import { ConfirmModal } from '@barber/ui';
 import styles from './Employees.module.scss';
 
 interface Employee {

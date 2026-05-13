@@ -1,12 +1,34 @@
 import dotenv from 'dotenv';
+import { z } from 'zod';
+
 dotenv.config();
 
+const envSchema = z.object({
+  PORT: z.coerce.number().default(3001),
+  MONGODB_URI: z.string().url().or(z.string().regex(/^mongodb/)),
+  JWT_SECRET: z.string().min(10),
+  JWT_REFRESH_SECRET: z.string().min(10),
+  JWT_EXPIRES_IN: z.string().default('15m'),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+});
+
+const parsed = envSchema.safeParse({
+  ...process.env,
+  MONGODB_URI: process.env.MONGODB_URI ?? process.env.MONGO_URI, // Compatibility
+});
+
+if (!parsed.success) {
+  console.error('❌ Invalid environment variables:', JSON.stringify(parsed.error.format(), null, 2));
+  process.exit(1);
+}
+
 export const env = {
-  port: Number(process.env.PORT) || 3001,
-  mongoUri: process.env.MONGODB_URI ?? process.env.MONGO_URI ?? 'mongodb://localhost:27017/barber-delio',
-  jwtSecret: process.env.JWT_SECRET ?? 'dev-jwt-secret',
-  jwtRefreshSecret: process.env.JWT_REFRESH_SECRET ?? 'dev-refresh-secret',
-  jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? '15m',
-  jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN ?? '7d',
-  nodeEnv: process.env.NODE_ENV ?? 'development',
+  port: parsed.data.PORT,
+  mongoUri: parsed.data.MONGODB_URI,
+  jwtSecret: parsed.data.JWT_SECRET,
+  jwtRefreshSecret: parsed.data.JWT_REFRESH_SECRET,
+  jwtExpiresIn: parsed.data.JWT_EXPIRES_IN,
+  jwtRefreshExpiresIn: parsed.data.JWT_REFRESH_EXPIRES_IN,
+  nodeEnv: parsed.data.NODE_ENV,
 };

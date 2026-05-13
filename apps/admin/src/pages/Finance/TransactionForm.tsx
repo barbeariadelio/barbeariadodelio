@@ -15,7 +15,7 @@ interface Props {
     description: string;
     date: string;
     unitId?: { _id: string } | string;
-    employeeId?: string;
+    employeeId?: { _id: string } | string;
   };
   onClose: () => void;
   onSuccess: () => void;
@@ -39,6 +39,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   salary: 'Salário',
   rent: 'Aluguel',
   voucher: 'Vale',
+  commission: 'Comissão',
   other: 'Outro',
 };
 
@@ -52,7 +53,7 @@ export default function TransactionForm({ units, initialData, onClose, onSuccess
   const [description, setDescription] = useState(initialData?.description || '');
   const [date, setDate] = useState(initialData?.date || todayISO());
   const [unitId, setUnitId] = useState(initialUnitId);
-  const [employeeId, setEmployeeId] = useState(initialData?.employeeId || '');
+  const [employeeId, setEmployeeId] = useState(typeof initialData?.employeeId === 'object' ? initialData.employeeId._id : (initialData?.employeeId || ''));
   const [error, setError] = useState<string | null>(null);
 
   const { data: employees = [] } = useQuery({
@@ -85,7 +86,7 @@ export default function TransactionForm({ units, initialData, onClose, onSuccess
   }
 
   const incomeCategories = ['service', 'product', 'other'];
-  const expenseCategories = ['salary', 'rent', 'product', 'voucher', 'other'];
+  const expenseCategories = ['salary', 'rent', 'product', 'voucher', 'commission', 'other'];
   const categories = type === 'income' ? incomeCategories : expenseCategories;
 
   return (

@@ -1,9 +1,16 @@
 import { ServiceModel, IService } from './service.model';
 import { NotFoundError } from '../../shared/errors/AppError';
+import { sharedCache } from '../../shared/utils/cache';
 
 export class ServiceService {
   async findByUnit(unitId: string): Promise<IService[]> {
-    return ServiceModel.find({ unitId, isActive: true }).sort({ name: 1 });
+    const cacheKey = `services:${unitId}`;
+    const cached = sharedCache.get<IService[]>(cacheKey);
+    if (cached) return cached;
+
+    const services = await ServiceModel.find({ unitId, isActive: true }).sort({ name: 1 });
+    sharedCache.set(cacheKey, services, 60); // 1 minute cache
+    return services;
   }
 
   async findById(id: string): Promise<IService> {
@@ -13,12 +20,15 @@ export class ServiceService {
   }
 
   async create(data: Partial<IService>): Promise<IService> {
-    return ServiceModel.create(data);
+    const svc = await ServiceModel.create(data);
+    sharedCache.delete(`services:${data.unitId}`);
+    return svc;
   }
 
   async update(id: string, data: Partial<IService>): Promise<IService> {
-    const svc = await ServiceModel.findByIdAndUpdate(id, data, { new: true });
+    const svc = await ServiceModel.findByIdAndUpdate(id, data, { new: true, runValidators: true });
     if (!svc) throw new NotFoundError('Service');
+    sharedCache.delete(`services:${svc.unitId}`);
     return svc;
   }
 
@@ -26,6 +36,8 @@ export class ServiceService {
     const svc = await ServiceModel.findById(id);
     if (!svc) throw new NotFoundError('Service');
     svc.isActive = !svc.isActive;
-    return svc.save();
+    await svc.save();
+    sharedCache.delete(`services:${svc.unitId}`);
+    return svc;
   }
 }

@@ -1,5 +1,6 @@
 import { ClientModel, IClient } from './client.model';
 import { NotFoundError } from '../../shared/errors/AppError';
+import { escapeRegex } from '../../shared/utils/regex';
 
 const populateOptions = {
   path: 'packages.packageId',
@@ -16,11 +17,12 @@ export class ClientService {
   }
 
   async search(unitId: string, query: string, pagination?: { skip: number, limit: number }): Promise<IClient[]> {
+    const safeQuery = escapeRegex(query);
     let q = ClientModel.find({
       unitId,
       $or: [
-        { name: { $regex: query, $options: 'i' } },
-        { phone: { $regex: query, $options: 'i' } },
+        { name: { $regex: safeQuery, $options: 'i' } },
+        { phone: { $regex: safeQuery, $options: 'i' } },
       ],
     }).populate(populateOptions).sort({ name: 1 });
 
@@ -42,7 +44,7 @@ export class ClientService {
   }
 
   async update(id: string, data: Partial<IClient>): Promise<IClient> {
-    const client = await ClientModel.findByIdAndUpdate(id, data, { new: true });
+    const client = await ClientModel.findByIdAndUpdate(id, data, { new: true, runValidators: true });
     if (!client) throw new NotFoundError('Client');
     return client;
   }

@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
-import { UnauthorizedError } from '../errors/AppError';
+import { UnauthorizedError, ForbiddenError } from '../errors/AppError';
 import type { UserRole } from '@barber/types';
 
 export interface AuthRequest extends Request {
@@ -13,10 +13,10 @@ export function optionalAuthenticate(
   _res: Response,
   next: NextFunction,
 ): void {
-  const header = req.headers.authorization;
-  if (header?.startsWith('Bearer ')) {
+  const token = (req.headers.authorization?.startsWith('Bearer ') && req.headers.authorization.split(' ')[1]) || req.cookies?.accessToken;
+  
+  if (token) {
     try {
-      const token = header.split(' ')[1];
       const payload = jwt.verify(token, env.jwtSecret) as {
         id: string;
         role: UserRole;
@@ -35,14 +35,14 @@ export function authenticate(
   _res: Response,
   next: NextFunction,
 ): void {
-  const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
-    next(new UnauthorizedError());
+  const token = (req.headers.authorization?.startsWith('Bearer ') && req.headers.authorization.split(' ')[1]) || req.cookies?.accessToken;
+
+  if (!token) {
+    next(new UnauthorizedError('Token de autenticação ausente ou inválido'));
     return;
   }
 
   try {
-    const token = header.split(' ')[1];
     const payload = jwt.verify(token, env.jwtSecret) as {
       id: string;
       role: UserRole;
@@ -51,6 +51,16 @@ export function authenticate(
     req.user = payload;
     next();
   } catch {
-    next(new UnauthorizedError('Invalid or expired token'));
+    next(new UnauthorizedError('Token de autenticação inválido ou expirado'));
   }
+}
+
+export function authorize(...allowedRoles: UserRole[]) {
+  return (req: AuthRequest, _res: Response, next: NextFunction) => {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      next(new ForbiddenError('Você não tem permissão para realizar esta ação.'));
+      return;
+    }
+    next();
+  };
 }

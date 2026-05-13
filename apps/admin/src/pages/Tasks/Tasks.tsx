@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import ConfirmModal from '../../components/ConfirmModal/ConfirmModal';
+import { ConfirmModal } from '@barber/ui';
 import { apiClient } from '../../api/client';
 import styles from './Tasks.module.scss';
 

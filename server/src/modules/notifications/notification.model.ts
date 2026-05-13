@@ -23,4 +23,9 @@ const notificationSchema = new Schema<INotification>(
   { timestamps: true }
 );
 
+// Auto-delete notifications older than 30 days
+notificationSchema.index({ createdAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+// Query index for unit-based lookups
+notificationSchema.index({ unitId: 1, createdAt: -1 });
+
 export const NotificationModel = mongoose.model<INotification>('Notification', notificationSchema);

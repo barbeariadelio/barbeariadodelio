@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { format } from 'date-fns';
+import { api } from '../../api/client';
 import styles from './Layout.module.scss';
 import logo from '../../assets/logo.png';
 
@@ -120,21 +123,51 @@ function IconMenu() {
     </svg>
   );
 }
+function IconBell() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+    </svg>
+  );
+}
+function IconX() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+    </svg>
+  );
+}
+function IconPlus() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+  );
+}
+function IconEdit() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    </svg>
+  );
+}
 
 const NAV_ITEMS = [
-  { path: '/',           label: 'Portal de Acesso', icon: <IconHome />, external: true, roles: ['owner', 'cashier', 'staff'] },
-  { path: '/dashboard',  label: 'Dashboard',     icon: <IconGrid />, roles: ['owner', 'cashier', 'staff'] },
+  { path: '/',           label: 'Portal de Acesso', icon: <IconHome />, external: true, roles: ['owner', 'cashier', 'employee'] },
+  { path: '/dashboard',  label: 'Dashboard',     icon: <IconGrid />, roles: ['owner', 'cashier', 'employee'] },
   { path: '/inventory',  label: 'Estoque',       icon: <IconBox />, roles: ['owner', 'cashier'] },
   { path: '/clients',    label: 'Clientes',       icon: <IconUsers />, roles: ['owner', 'cashier'] },
   { path: '/employees',  label: 'Funcionários',   icon: <IconScissors />, roles: ['owner'] },
   { path: '/services',   label: 'Serviços',       icon: <IconStar />, roles: ['owner'] },
-  { path: '/finance',    label: 'Financeiro',     icon: <IconDollarSign />, roles: ['owner', 'cashier', 'staff'] },
+  { path: '/finance',    label: 'Financeiro',     icon: <IconDollarSign />, roles: ['owner', 'cashier', 'employee'] },
   { path: '/permissions', label: 'Permissões',     icon: <IconShield />, roles: ['owner'] },
   { path: '/settings',   label: 'Configurações',  icon: <IconSettings />, roles: ['owner'] },
 ];
 
 export default function Layout() {
-  const { user, logout } = useAuth();
+  const { user, setUser, logout } = useAuth();
   const { theme, toggleTheme, updateTheme } = useTheme();
 
   const lastUserId = useRef<string | null>(null);
@@ -149,11 +182,51 @@ export default function Layout() {
   }, [user, theme, updateTheme]);
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+  const [notifsOpen, setNotifsOpen] = useState(false);
+  const notifsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (notifsRef.current && !notifsRef.current.contains(event.target as Node)) {
+        setNotifsOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const { data: notifications = [], refetch: refetchNotifs } = useQuery<any[]>({
+    queryKey: ['notifications'],
+    queryFn: () => api.get('/notifications').then(r => r.data),
+    enabled: !!user,
+    refetchInterval: 15000,
+  });
+
+  const markAsReadMutation = useMutation({
+    mutationFn: (id: string) => api.patch(`/notifications/${id}/read`),
+    onSuccess: () => refetchNotifs(),
+  });
+
+  const unreadCount = notifications.filter(n => !n.readBy?.includes(user?._id)).length;
 
   function handleLogout() {
     logout();
     navigate('/login');
   }
+
+  const handleToggleTheme = async () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    toggleTheme();
+    
+    try {
+      await api.put('/auth/theme', { theme: newTheme });
+      if (user) {
+        setUser({ ...user, theme: newTheme });
+      }
+    } catch (e) {
+      console.error('Failed to save theme preference', e);
+    }
+  };
 
   return (
     <div className={`${styles.shell} ${collapsed ? styles.collapsed : ''}`}>
@@ -216,13 +289,66 @@ export default function Layout() {
             <IconMenu />
           </button>
 
-          <button 
-            className={styles.themeToggle} 
-            onClick={() => toggleTheme()}
-            title={`Alternar para modo ${theme === 'dark' ? 'claro' : 'escuro'}`}
-          >
-            {theme === 'dark' ? <IconSun /> : <IconMoon />}
-          </button>
+          <div className={styles.topbarActions}>
+            <div className={styles.notifWrapper} ref={notifsRef}>
+              <button 
+                className={`${styles.topbarBtn} ${notifsOpen ? styles.activeBtn : ''}`} 
+                onClick={() => setNotifsOpen(!notifsOpen)}
+              >
+                <IconBell />
+                {unreadCount > 0 && <span className={styles.notifBadge}>{unreadCount}</span>}
+              </button>
+              {notifsOpen && (
+                <div className={styles.notifsDropdown}>
+                  <div className={styles.notifHeader}>
+                    <span>Notificações</span>
+                    <span className={styles.notifCount}>{unreadCount}</span>
+                  </div>
+                  <div className={styles.notifList}>
+                    {notifications.length > 0 ? (
+                      notifications.map(n => {
+                        const isRead = n.readBy?.includes(user?._id);
+                        return (
+                          <div 
+                            key={n._id} 
+                            className={`${styles.notifItem} ${!isRead ? styles.unread : ''}`}
+                            onClick={() => !isRead && markAsReadMutation.mutate(n._id)}
+                          >
+                            <div className={`${styles.notifIcon} ${styles[n.type]}`}>
+                              {n.type === 'cancellation' ? <IconX /> : n.type === 'edit' ? <IconEdit /> : <IconPlus />}
+                            </div>
+                            <div className={styles.notifContent}>
+                              <p className={styles.notifText}>{n.message}</p>
+                              {n.appointmentId && (
+                                <p className={styles.notifApptInfo}>
+                                  {n.appointmentId.date.split('-').reverse().join('/')} às {n.appointmentId.startTime} · {n.appointmentId.employeeId?.name || 'Profissional'}
+                                </p>
+                              )}
+                              <p className={styles.notifMeta}>
+                                Notificado {format(new Date(n.createdAt), "d/M 'às' HH:mm")}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className={styles.notifEmpty}>
+                        <p>Nenhuma notificação nova.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button 
+              className={styles.themeToggle} 
+              onClick={handleToggleTheme}
+              title={`Alternar para modo ${theme === 'dark' ? 'claro' : 'escuro'}`}
+            >
+              {theme === 'dark' ? <IconSun /> : <IconMoon />}
+            </button>
+          </div>
         </header>
         <main className={styles.content}>
           <Outlet />

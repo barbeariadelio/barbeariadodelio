@@ -8,6 +8,7 @@ import { UserModel } from '../auth/auth.model';
 import { UnitModel } from '../units/unit.model';
 import { env } from '../../config/env';
 import { NotFoundError, AppError } from '../../shared/errors/AppError';
+import { getSlotCache, setSlotCache, invalidateSlotCache } from '../../shared/cache/slotCache';
 import type { AppointmentStatus } from '@barber/types';
 
 interface GuestBookResult {
@@ -33,7 +34,6 @@ import { IClient } from '../clients/client.model';
 
 interface PopulatedService extends IService { _id: mongoose.Types.ObjectId }
 interface PopulatedClient extends IClient { _id: mongoose.Types.ObjectId }
-interface PopulatedUser { _id: mongoose.Types.ObjectId, name: string }
 
 export class AppointmentService {
   async findByUnitAndDate(unitId: string, date?: string, start?: string, end?: string, pagination?: { skip: number, limit: number }): Promise<IAppointment[]> {
@@ -87,13 +87,15 @@ export class AppointmentService {
     date: string,
     durationMinutes: number,
   ): Promise<string[]> {
+    const cached = getSlotCache(unitId, employeeId, date);
+    if (cached) return cached;
+
     const employee = await UserModel.findById(employeeId).select('workSchedule vacations blockedDays');
     if (!employee) throw new NotFoundError('Employee');
 
     const unit = await UnitModel.findById(unitId).select('slotInterval');
     const slotInterval = Number(unit?.slotInterval) || 0;
 
-    // Se o dia estiver bloqueado ou o profissional estiver de férias, retorna zero horários
     if (employee.blockedDays?.includes(date)) return [];
     if (employee.vacations?.some(v => date >= v.start && date <= v.end)) return [];
 
@@ -106,7 +108,6 @@ export class AppointmentService {
       status: { $nin: ['cancelled'] },
     }).select('startTime endTime');
 
-    // Intervalo de geração do grid pode ser 15min ou 30min
     const gridStep = slotInterval > 0 ? slotInterval : 15;
     const allSlots = this.generateSlots(schedule.start, schedule.end, gridStep);
     
@@ -114,45 +115,34 @@ export class AppointmentService {
     const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const nowMins = today.getHours() * 60 + today.getMinutes();
 
-    return allSlots.filter(slot => {
+    const result = allSlots.filter(slot => {
       const [sh, sm] = slot.split(':').map(Number);
       const slotStart = sh * 60 + sm;
       const slotEnd = slotStart + Number(durationMinutes);
 
-      // 0. Prevent past time for today
       if (date === todayISO && slotStart < nowMins) return false;
       if (date < todayISO) return false;
 
-      // 1. Check if it's within work hours
       const [wsh, wsm] = schedule.start.split(':').map(Number);
       const [weh, wem] = schedule.end.split(':').map(Number);
       const workStart = wsh * 60 + wsm;
       const workEnd = weh * 60 + wem;
       if (slotEnd > workEnd) return false;
 
-      // 2. Check lunch break
       if (schedule.lunchStart && schedule.lunchEnd) {
         const [lsh, lsm] = schedule.lunchStart.split(':').map(Number);
         const [leh, lem] = schedule.lunchEnd.split(':').map(Number);
         const lunchStart = lsh * 60 + lsm;
         const lunchEnd = leh * 60 + lem;
-        // Se o slot interceptar o almoço
         if (slotStart < lunchEnd && slotEnd > lunchStart) return false;
       }
 
-      // 3. Check bookings considering buffer time
       return !booked.some(b => {
         const [bsh, bsm] = b.startTime.split(':').map(Number);
         const [beh, bem] = b.endTime.split(':').map(Number);
-        
         const bookedStart = bsh * 60 + bsm;
-        // Extend booked End Time by the interval buffer
         const bookedEndWithBuffer = (beh * 60 + bem) + slotInterval;
-        
-        // Similarly, ensure that our proposed slot doesn't infringe on a booking's start time
-        // (i.e. our end time + buffer shouldn't exceed their start time if we are before them)
         const slotEndWithBuffer = slotEnd + slotInterval;
-
         return (
           (slotStart >= bookedStart && slotStart < bookedEndWithBuffer) ||
           (slotEnd > bookedStart && slotEnd <= bookedEndWithBuffer) ||
@@ -160,6 +150,9 @@ export class AppointmentService {
         );
       });
     });
+
+    setSlotCache(unitId, employeeId, date, result);
+    return result;
   }
 
   async findById(id: string): Promise<IAppointment> {
@@ -183,12 +176,10 @@ export class AppointmentService {
       if (svc) data.endTime = calcEndTime(data.startTime, svc.durationMinutes);
     }
 
-    // Past date/time validation — skip for admin-created blocks
     if (data.status !== 'blocked') {
       const today = new Date();
       const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
       const nowTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
-      
       if (data.date! < todayISO || (data.date === todayISO && data.startTime! < nowTime)) {
         throw new AppError('Não é possível agendar em uma data ou hora retroativa.', 400);
       }
@@ -222,7 +213,9 @@ export class AppointmentService {
       status: data.status || 'confirmed',
       isPackage: data.isPackage || svc?.type === 'package'
     };
-    return AppointmentModel.create(apptData);
+    const created = await AppointmentModel.create(apptData);
+    invalidateSlotCache(data.unitId!.toString(), data.employeeId!.toString(), data.date!);
+    return created;
   }
 
   async guestBook(payload: {
@@ -237,7 +230,6 @@ export class AppointmentService {
     notes?: string;
   }): Promise<GuestBookResult> {
     const { unitId, serviceId, employeeId, date, startTime, price, guestName, guestPhone, notes } = payload;
-
     const svc = await ServiceModel.findById(serviceId);
     if (!svc) throw new AppError('Service not found', 404);
 
@@ -251,9 +243,8 @@ export class AppointmentService {
 
     const endTime = calcEndTime(startTime, svc.durationMinutes);
     const cleanPhone = guestPhone.replace(/\D/g, '');
-    const guestEmail = `guest_${cleanPhone}@delio.guest`;
+    const guestEmail = `guest_${cleanPhone}_${unitId}@delio.guest`;
 
-    // Find or create Client record
     let client = await ClientModel.findOne({ phone: guestPhone, unitId });
     if (!client) {
       client = await ClientModel.create({ name: guestName, phone: guestPhone, email: guestEmail, unitId });
@@ -262,7 +253,6 @@ export class AppointmentService {
       await client.save();
     }
 
-    // Find or create User account (role: client) so they can log in later
     let userAccount = await UserModel.findOne({ email: guestEmail });
     if (!userAccount) {
       const passwordHash = await bcrypt.hash(cleanPhone.slice(-4), 10);
@@ -282,14 +272,12 @@ export class AppointmentService {
       await client.save();
     }
 
-    // Check if client has a package for THIS service
     const activeSub = client.packages?.find(p => 
       p.active && (p.packageId.toString() === serviceId || p.itemLimits?.some(il => il.serviceId.toString() === serviceId))
     );
 
     const isUsingPackage = !!activeSub && svc.type === 'single';
     const isBuyingPackage = svc.type === 'package';
-
     const finalIsPackage = isUsingPackage || isBuyingPackage;
     const finalPrice = isUsingPackage ? 0 : price;
 
@@ -315,7 +303,6 @@ export class AppointmentService {
       throw new AppError('Profissional indisponível: Em período de férias.', 400);
     }
 
-    // If booking a PACKAGE service, automatically subscribe the client
     if (svc.type === 'package') {
       const alreadyHas = client.packages?.some(p => p.packageId.toString() === serviceId && p.active);
       if (!alreadyHas) {
@@ -368,36 +355,68 @@ export class AppointmentService {
     if (!appt) throw new NotFoundError('Appointment');
 
     const oldStatus = appt.status;
-    appt.status = status;
     
+    if (oldStatus === 'cancelled' && status !== 'cancelled') {
+      const conflict = await AppointmentModel.findOne({
+        _id: { $ne: id },
+        employeeId: appt.employeeId,
+        date: appt.date,
+        status: { $nin: ['cancelled'] },
+        $or: [
+          { startTime: { $lt: appt.endTime, $gte: appt.startTime } },
+          { endTime: { $gt: appt.startTime, $lte: appt.endTime } },
+          { startTime: { $lte: appt.startTime }, endTime: { $gte: appt.endTime } },
+        ],
+      });
+      if (conflict) throw new AppError('Este horário já está ocupado por outro agendamento.', 409);
+    }
+
+    appt.status = status;
     if (options?.price != null) {
       appt.price = options.price;
     }
 
     await appt.save();
+    invalidateSlotCache(appt.unitId.toString(), appt.employeeId.toString(), appt.date);
 
-    // Automatically create transaction if completed
+    const { TransactionModel } = await import('../finance/transaction.model');
+
     if (status === 'completed' && oldStatus !== 'completed') {
-      const { TransactionModel } = await import('../finance/transaction.model');
-      
-      const exists = await TransactionModel.findOne({ appointmentId: appt._id });
+      const exists = await TransactionModel.findOne({ appointmentId: appt._id, type: 'income' });
       if (!exists) {
         await TransactionModel.create({
           unitId: appt.unitId,
           appointmentId: appt._id,
           type: 'income',
           category: 'service',
-          amount: options?.price ?? appt.price ?? (appt.serviceId as unknown as PopulatedService)?.price ?? 0,
-          description: `Atendimento: ${(appt.serviceId as unknown as PopulatedService)?.name || 'Serviço'}`,
+          amount: options?.price ?? appt.price ?? (appt.serviceId as any)?.price ?? 0,
+          description: `Atendimento: ${(appt.serviceId as any)?.name || 'Serviço'}`,
           date: appt.date,
           paymentMethod: options?.paymentMethod,
           createdBy: appt.employeeId
         });
       }
+
+      const employee = await UserModel.findById(appt.employeeId).select('commissionRate');
+      if (employee?.commissionRate && employee.commissionRate > 0) {
+        const commissionAmount = Math.round((options?.price ?? appt.price) * employee.commissionRate / 100 * 100) / 100;
+        const commExists = await TransactionModel.findOne({ appointmentId: appt._id, type: 'commission' });
+        if (!commExists) {
+          await TransactionModel.create({
+            unitId: appt.unitId,
+            appointmentId: appt._id,
+            employeeId: appt.employeeId,
+            type: 'commission',
+            category: 'commission',
+            amount: commissionAmount,
+            description: `Comissão: ${(appt.serviceId as any)?.name || 'Serviço'} (${employee.commissionRate}%)`,
+            date: appt.date,
+            createdBy: appt.employeeId
+          });
+        }
+      }
     } else if (status !== 'completed' && oldStatus === 'completed') {
-      // Remove transaction if no longer completed
-      const { TransactionModel } = await import('../finance/transaction.model');
-      await TransactionModel.deleteOne({ appointmentId: appt._id });
+      await TransactionModel.deleteMany({ appointmentId: appt._id });
     }
 
     return appt;
@@ -406,6 +425,7 @@ export class AppointmentService {
   async delete(id: string): Promise<void> {
     const appt = await AppointmentModel.findByIdAndDelete(id);
     if (!appt) throw new NotFoundError('Appointment');
+    invalidateSlotCache(appt.unitId.toString(), appt.employeeId.toString(), appt.date);
   }
 
   async update(id: string, data: Partial<IAppointment>): Promise<IAppointment> {
@@ -420,7 +440,6 @@ export class AppointmentService {
       }
     }
 
-    // Conflict check
     if (data.startTime || data.date || data.employeeId) {
       const checkDate = data.date || appt.date;
       const checkEmp  = data.employeeId || appt.employeeId;
@@ -442,7 +461,9 @@ export class AppointmentService {
     }
 
     Object.assign(appt, data);
-    return appt.save();
+    const saved = await appt.save();
+    invalidateSlotCache(saved.unitId.toString(), saved.employeeId.toString(), saved.date);
+    return saved;
   }
 
   private generateSlots(start: string, end: string, intervalMin: number): string[] {

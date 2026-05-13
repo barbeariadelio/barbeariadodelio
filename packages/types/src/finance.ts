@@ -1,5 +1,5 @@
-export type TransactionType = 'income' | 'expense' | 'royalty';
-export type TransactionCategory = 'service' | 'product' | 'salary' | 'rent' | 'voucher' | 'other';
+export type TransactionType = 'income' | 'expense' | 'royalty' | 'commission';
+export type TransactionCategory = 'service' | 'product' | 'salary' | 'rent' | 'voucher' | 'commission' | 'other';
 
 export interface Transaction {
   _id: string;
@@ -19,6 +19,8 @@ export interface FinanceSummary {
   totalIncome: number;
   totalExpense: number;
   netProfit: number;
+  realizedIncome: number;    // completed only
+  projectedIncome: number;   // confirmed (not yet completed)
   byUnit: UnitFinance[];
   byCategory: CategoryFinance[];
   byService: ServiceFinance[];
@@ -54,6 +56,8 @@ export interface EmployeeFinance {
   unitName: string;
   appointments: number;
   grossRevenue: number;
+  commissionRate?: number;
+  commissionAmount?: number;
   totalVouchers?: number;
 }
 

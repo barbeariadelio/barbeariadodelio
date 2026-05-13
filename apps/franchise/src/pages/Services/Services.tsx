@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import ServiceForm from './ServiceForm';
-import ConfirmModal from '../../components/ConfirmModal/ConfirmModal';
+import { ConfirmModal } from '@barber/ui';
 import styles from './Services.module.scss';
 import { addDays, addWeeks, addMonths, addYears, differenceInDays, format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';

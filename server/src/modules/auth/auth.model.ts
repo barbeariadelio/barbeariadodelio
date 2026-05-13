@@ -25,6 +25,7 @@ export interface IUser extends Document {
   allowedApps?: string[];
   theme?: 'light' | 'dark';
   commissionRate?: number;
+  tokenVersion: number;
 }
 
 const userSchema = new Schema<IUser>(
@@ -35,7 +36,7 @@ const userSchema = new Schema<IUser>(
     passwordPlain: { type: String },
     role:         {
       type: String,
-      enum: ['owner', 'employee', 'franchisor', 'franchisee', 'client'],
+      enum: ['owner', 'employee', 'franchisor', 'franchisee', 'client', 'admin', 'cashier'],
       required: true,
     },
     unitId:   { type: Schema.Types.ObjectId, ref: 'Unit' },
@@ -56,6 +57,7 @@ const userSchema = new Schema<IUser>(
     allowedApps: { type: [String], default: [] },
     theme: { type: String, enum: ['light', 'dark'], default: 'light' },
     commissionRate: { type: Number },
+    tokenVersion: { type: Number, default: 0 },
   },
   { timestamps: true },
 );

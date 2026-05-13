@@ -21,16 +21,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  const toggleTheme = async () => {
+  const toggleTheme = () => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
     setTheme(newTheme);
-    
-    try {
-      const { api } = await import('../api/client');
-      await api.put('/auth/theme', { theme: newTheme });
-    } catch (e) {
-      console.error('Failed to save theme preference', e);
-    }
   };
 
   return (

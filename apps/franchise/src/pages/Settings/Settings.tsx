@@ -10,10 +10,22 @@ interface Unit {
   address: string;
   phone: string;
   cnpj?: string;
+  workingDays?: number[];
+  workingHours?: { start: string; end: string; lunchStart?: string; lunchEnd?: string };
   slotInterval?: number;
 }
 
 type Tab = 'profile' | 'unit';
+
+const WEEK_DAYS = [
+  { label: 'Dom', value: 0 },
+  { label: 'Seg', value: 1 },
+  { label: 'Ter', value: 2 },
+  { label: 'Qua', value: 3 },
+  { label: 'Qui', value: 4 },
+  { label: 'Sex', value: 5 },
+  { label: 'Sáb', value: 6 },
+];
 
 export default function Settings() {
   const { user, setUser } = useAuth();
@@ -29,6 +41,11 @@ export default function Settings() {
   const [unitAddress, setUnitAddress] = useState('');
   const [unitPhone, setUnitPhone] = useState('');
   const [unitCnpj, setUnitCnpj] = useState('');
+  const [workingDays, setWorkingDays] = useState<number[]>([1, 2, 3, 4, 5, 6]);
+  const [whStart, setWhStart] = useState('08:00');
+  const [whEnd, setWhEnd] = useState('20:00');
+  const [whLunchStart, setWhLunchStart] = useState('');
+  const [whLunchEnd, setWhLunchEnd] = useState('');
   const [slotInterval, setSlotInterval] = useState<number>(0);
   const [unitSuccess, setUnitSuccess] = useState(false);
   const [unitError, setUnitError] = useState<string | null>(null);
@@ -50,6 +67,11 @@ export default function Settings() {
       setUnitAddress(unit.address);
       setUnitPhone(unit.phone);
       setUnitCnpj(unit.cnpj ?? '');
+      setWorkingDays(unit.workingDays ?? [1, 2, 3, 4, 5, 6]);
+      setWhStart(unit.workingHours?.start ?? '08:00');
+      setWhEnd(unit.workingHours?.end ?? '20:00');
+      setWhLunchStart(unit.workingHours?.lunchStart ?? '');
+      setWhLunchEnd(unit.workingHours?.lunchEnd ?? '');
       setSlotInterval(unit.slotInterval ?? 0);
     }
   }, [unit]);
@@ -86,7 +108,26 @@ export default function Settings() {
 
   function handleUnitSubmit(e: FormEvent) {
     e.preventDefault();
-    unitMutation.mutate({ name: unitName, address: unitAddress, phone: unitPhone, cnpj: unitCnpj, slotInterval });
+    unitMutation.mutate({
+      name: unitName,
+      address: unitAddress,
+      phone: unitPhone,
+      cnpj: unitCnpj,
+      workingDays,
+      workingHours: {
+        start: whStart,
+        end: whEnd,
+        lunchStart: whLunchStart || undefined,
+        lunchEnd: whLunchEnd || undefined,
+      },
+      slotInterval,
+    });
+  }
+
+  function toggleDay(day: number) {
+    setWorkingDays(prev =>
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
+    );
   }
 
   return (
@@ -150,6 +191,55 @@ export default function Settings() {
             <div className={styles.field}>
               <label className={styles.label}>CNPJ</label>
               <input className={styles.input} value={unitCnpj} onChange={e => setUnitCnpj(e.target.value)} placeholder="XX.XXX.XXX/XXXX-XX" />
+            </div>
+
+            {/* ── Working Days ── */}
+            <div className={styles.field}>
+              <label className={styles.label}>Dias de Funcionamento</label>
+              <div className={styles.dayPicker}>
+                {WEEK_DAYS.map(d => (
+                  <button
+                    key={d.value}
+                    type="button"
+                    className={`${styles.dayBtn} ${workingDays.includes(d.value) ? styles.dayBtnActive : ''}`}
+                    onClick={() => toggleDay(d.value)}
+                  >
+                    {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Working Hours ── */}
+            <div className={styles.field}>
+              <label className={styles.label}>Horário de Funcionamento</label>
+              <div className={styles.timeRow}>
+                <div className={styles.timeField}>
+                  <span className={styles.timeFieldLabel}>Abertura</span>
+                  <input type="time" className={styles.timeInput} value={whStart} onChange={e => setWhStart(e.target.value)} />
+                </div>
+                <span className={styles.timeSep}>até</span>
+                <div className={styles.timeField}>
+                  <span className={styles.timeFieldLabel}>Fechamento</span>
+                  <input type="time" className={styles.timeInput} value={whEnd} onChange={e => setWhEnd(e.target.value)} />
+                </div>
+              </div>
+            </div>
+
+            {/* ── Lunch Break ── */}
+            <div className={styles.field}>
+              <label className={styles.label}>Intervalo de Almoço <span className={styles.optional}>(opcional)</span></label>
+              <div className={styles.timeRow}>
+                <div className={styles.timeField}>
+                  <span className={styles.timeFieldLabel}>Início</span>
+                  <input type="time" className={styles.timeInput} value={whLunchStart} onChange={e => setWhLunchStart(e.target.value)} />
+                </div>
+                <span className={styles.timeSep}>até</span>
+                <div className={styles.timeField}>
+                  <span className={styles.timeFieldLabel}>Fim</span>
+                  <input type="time" className={styles.timeInput} value={whLunchEnd} onChange={e => setWhLunchEnd(e.target.value)} />
+                </div>
+              </div>
             </div>
 
             {/* ── Slot Interval ── */}
