@@ -10,7 +10,7 @@ export interface ITransaction extends Document {
   amount: number;
   description: string;
   date: string;
-  paymentMethod?: 'money' | 'card' | 'pix' | 'other';
+  paymentMethod?: 'money' | 'card' | 'pix' | 'package' | 'other';
   createdBy: mongoose.Types.ObjectId;
 }
 
@@ -20,11 +20,11 @@ const transactionSchema = new Schema<ITransaction>(
     appointmentId: { type: Schema.Types.ObjectId, ref: 'Appointment' },
     employeeId:    { type: Schema.Types.ObjectId, ref: 'User' },
     type:     { type: String, enum: ['income', 'expense', 'royalty', 'commission'], required: true },
-    category: { type: String, enum: ['service', 'product', 'salary', 'rent', 'voucher', 'commission', 'other'], required: true },
+    category: { type: String, enum: ['service', 'product', 'salary', 'rent', 'voucher', 'commission', 'package_use', 'package_sale', 'other'], required: true },
     amount:      { type: Number, required: true, min: 0 },
     description: { type: String, required: true },
     date:        { type: String, required: true },
-    paymentMethod: { type: String, enum: ['money', 'card', 'pix', 'other'] },
+    paymentMethod: { type: String, enum: ['money', 'card', 'pix', 'package', 'other'] },
     createdBy:   { type: Schema.Types.ObjectId, ref: 'User', required: true },
   },
   { timestamps: true },

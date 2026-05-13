@@ -55,6 +55,8 @@ app.use('/api', limiter);
 app.use(rtracer.expressMiddleware());
 app.use(pinoHttp({
   logger,
+  // Disable automatic request logging in development to keep terminal clean
+  autoLogging: env.nodeEnv !== 'development',
   genReqId: (req) => (rtracer.id() as string) || req.id,
   customLogLevel: (res, err) => {
     if (res.statusCode && res.statusCode >= 500 || err) return 'error';

@@ -25,12 +25,12 @@ function makeTimeToTop(startHour: number) {
 }
 
 const PALETTES = [
-  { bg: 'rgba(21,101,192,0.18)',  border: '#1565C0', text: '#90CAF9', avatar: '#1565C0' },
-  { bg: 'rgba(46,125,50,0.18)',   border: '#2E7D32', text: '#A5D6A7', avatar: '#2E7D32' },
-  { bg: 'rgba(106,27,154,0.18)',  border: '#6A1B9A', text: '#CE93D8', avatar: '#6A1B9A' },
-  { bg: 'rgba(230,81,0,0.18)',    border: '#E65100', text: '#FFCC80', avatar: '#E65100' },
-  { bg: 'rgba(0,96,100,0.18)',    border: '#006064', text: '#80DEEA', avatar: '#006064' },
-  { bg: 'rgba(136,14,79,0.18)',   border: '#880E4F', text: '#F48FB1', avatar: '#880E4F' },
+  { bg: 'rgba(21,101,192,0.12)',  border: '#1565C0', text: '#1565C0', avatar: '#1565C0' },
+  { bg: 'rgba(46,125,50,0.12)',   border: '#2E7D32', text: '#2E7D32', avatar: '#2E7D32' },
+  { bg: 'rgba(106,27,154,0.12)',  border: '#6A1B9A', text: '#6A1B9A', avatar: '#6A1B9A' },
+  { bg: 'rgba(230,81,0,0.12)',    border: '#E65100', text: '#E65100', avatar: '#E65100' },
+  { bg: 'rgba(0,96,100,0.12)',    border: '#006064', text: '#006064', avatar: '#006064' },
+  { bg: 'rgba(136,14,79,0.12)',   border: '#880E4F', text: '#880E4F', avatar: '#880E4F' },
 ];
 
 const STATUS_DOT: Record<string, string> = {
@@ -72,6 +72,9 @@ export interface ScheduleAppointment {
   price: number;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'blocked';
   notes?: string;
+  isBilled?: boolean;
+  isPackage?: boolean;
+  usedPackageId?: string;
 }
 
 function timeToHeight(s: string, e: string) {
@@ -260,12 +263,20 @@ function ApptModal({
         </div>
 
         <div className={styles.panelBottom}>
-          <button 
-            className={styles.faturarBtn}
-            onClick={() => setIsBilling(true)}
-          >
-            FATURAR
-          </button>
+          {appt.isBilled && (
+            <div className={styles.billedBadge}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              FATURADO
+            </div>
+          )}
+          {!appt.isBilled && (
+            <button 
+              className={styles.faturarBtn}
+              onClick={() => setIsBilling(true)}
+            >
+              FATURAR
+            </button>
+          )}
         </div>
 
         {appt.status !== 'blocked' && (
@@ -313,42 +324,49 @@ function ApptModal({
                   </div>
                 </div>
 
-                <div className={styles.billingField}>
-                  <label className={styles.billingLabel}>Forma de Pagamento</label>
-                  <div className={styles.paymentGrid}>
-                    {[
-                      { 
-                        id: 'money', 
-                        label: 'Dinheiro', 
-                        icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
-                      },
-                      { 
-                        id: 'card', 
-                        label: 'Cartão', 
-                        icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
-                      },
-                      { 
-                        id: 'pix', 
-                        label: 'Pix', 
-                        icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                      },
-                      { 
-                        id: 'other', 
-                        label: 'Outro', 
-                        icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-                      },
-                    ].map(pm => (
-                      <button
-                        key={pm.id}
-                        className={`${styles.paymentBtn} ${paymentMethod === pm.id ? styles.active : ''}`}
-                        onClick={() => setPaymentMethod(pm.id as any)}
-                      >
-                        <span className={styles.pmIcon}>{pm.icon}</span>
-                        <span className={styles.pmLabel}>{pm.label}</span>
-                      </button>
-                    ))}
+                {appt.usedPackageId ? (
+                  <div className={styles.packageNotice}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                    <span>Sessão de Pacote</span>
                   </div>
-                </div>
+                ) : (
+                  <div className={styles.billingField}>
+                    <label className={styles.billingLabel}>Forma de Pagamento</label>
+                    <div className={styles.paymentGrid}>
+                      {[
+                        { 
+                          id: 'money', 
+                          label: 'Dinheiro', 
+                          icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+                        },
+                        { 
+                          id: 'card', 
+                          label: 'Cartão', 
+                          icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                        },
+                        { 
+                          id: 'pix', 
+                          label: 'Pix', 
+                          icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                        },
+                        { 
+                          id: 'other', 
+                          label: 'Outro', 
+                          icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                        },
+                      ].map(pm => (
+                        <button
+                          key={pm.id}
+                          className={`${styles.paymentBtn} ${paymentMethod === pm.id ? styles.active : ''}`}
+                          onClick={() => setPaymentMethod(pm.id as any)}
+                        >
+                          <span className={styles.pmIcon}>{pm.icon}</span>
+                          <span className={styles.pmLabel}>{pm.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -358,10 +376,13 @@ function ApptModal({
                   <button 
                     className={styles.confirmBillingBtn} 
                     disabled={isPending}
-                    onClick={() => onStatusChange(appt._id, 'completed', { 
-                      price: parseFloat(localPrice.replace(',', '.')), 
-                      paymentMethod 
-                    })}
+                    onClick={async () => {
+                      await onStatusChange(appt._id, 'completed', { 
+                        price: parseFloat(localPrice.replace(',', '.')), 
+                        paymentMethod 
+                      });
+                      setIsBilling(false);
+                    }}
                   >
                     {isPending ? 'Processando...' : 'Confirmar e Concluir'}
                   </button>
@@ -705,11 +726,39 @@ export default function StaffSchedule({
                     }}
                     onClick={(e) => { e.stopPropagation(); setSelectedAppt(appt); }}
                   >
-                    <div className={styles.apptTime}>{appt.startTime} – {appt.endTime}</div>
-                    <div className={styles.apptClient}>{appt.status === 'blocked' ? 'BLOQUEADO' : (appt.clientId?.name ?? '—')}</div>
+                    <div className={styles.apptCardHeader}>
+                      <div className={styles.apptTime}>{appt.startTime} – {appt.endTime}</div>
+                      <div className={styles.apptIcons}>
+                        {/* Static Plane Icon (Notification) */}
+                        <svg className={styles.iconSm} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                        
+                        {/* Globe Icon (Booked Online - using clientId presence as proxy for now) */}
+                        {appt.clientId && (
+                          <svg className={styles.iconSm} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                        )}
+
+                        {/* Checks */}
+                        <div className={styles.checkGroup}>
+                          {/* First Check: Confirmed or better */}
+                          {(appt.status === 'confirmed' || appt.status === 'completed') && (
+                             <svg className={styles.iconCheck} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><polyline points="20 6 9 17 4 12"/></svg>
+                          )}
+                          {/* Second Check: Billed */}
+                          {appt.isBilled && (
+                             <svg className={styles.iconCheck} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" style={{ marginLeft: -6 }}><polyline points="20 6 9 17 4 12"/></svg>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={styles.apptClient}>
+                      {appt.status === 'blocked' ? 'BLOQUEADO' : (appt.clientId?.name ?? '—')}
+                    </div>
+                    
                     {appt.serviceId?.name && appt.status !== 'blocked' && (
                       <div className={styles.apptService}>{appt.serviceId.name}</div>
                     )}
+
                     <span className={styles.statusDot} style={{ background: STATUS_DOT[appt.status] }} />
                   </div>
                 ))}

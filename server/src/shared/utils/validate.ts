@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { AnyZodObject, ZodError } from 'zod';
 import { AppError } from '../errors/AppError';
+import { logger } from './logger';
 
 export function validate(schema: AnyZodObject) {
   return async (req: Request, _res: Response, next: NextFunction): Promise<void> => {
@@ -13,7 +14,7 @@ export function validate(schema: AnyZodObject) {
       next();
     } catch (err) {
       if (err instanceof ZodError) {
-        console.error('Zod Validation Error:', JSON.stringify(err.errors, null, 2));
+        logger.warn({ errors: err.errors }, 'Zod Validation Error');
         const message = err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
         next(new AppError(message, 422));
         return;

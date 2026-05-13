@@ -617,3 +617,212 @@
   &:hover:not(:disabled) { background: rgba(239, 68, 68, 0.08); border-color: #ef4444; }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
+
+.mainInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.infoRow {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.infoIcon {
+  color: var(--text-muted);
+  padding-top: 2px;
+}
+
+.infoText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  
+  span:first-child {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+  }
+}
+
+.statusBadgeRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.billedBadge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(34, 197, 94, 0.1);
+  color: #22C55E;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+.faturarBtn {
+  background: #1565C0;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  transition: all 0.2s;
+  &:hover { background: #0D47A1; box-shadow: 0 4px 12px rgba(21, 101, 192, 0.3); }
+}
+
+.deleteIconBtn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  &:hover { color: #ef4444; }
+}
+
+/* Billing styles */
+.billingInputRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  margin-top: 0.5rem;
+  span { font-weight: 700; color: var(--text-muted); }
+}
+
+.billingInput {
+  background: none;
+  border: none;
+  width: 100%;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.paymentGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.paymentBtn {
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-surface);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover { background: var(--bg-elevated); }
+}
+
+.pmActive {
+  background: #1565C0 !important;
+  color: white !important;
+  border-color: #1565C0 !important;
+}
+
+.statusBadgeRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.billedBadge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  background: rgba(46, 125, 50, 0.1);
+  color: #2E7D32;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  svg { color: #2E7D32; }
+}
+
+.faturarBtn {
+  width: 100%;
+  padding: 0.875rem;
+  background: #1565C0;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover { background: #0D47A1; transform: translateY(-1px); }
+  &:disabled { opacity: 0.6; cursor: not-allowed; }
+}
+
+.billingActions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.cancelBillingBtn {
+  flex: 1;
+  padding: 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-default);
+  background: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.confirmBillingBtn {
+  flex: 2;
+  padding: 0.75rem;
+  border-radius: 10px;
+  border: none;
+  background: #1565C0;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  &:disabled { opacity: 0.6; }
+}
+
+.pillCheckGroup {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.packageNotice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem 1rem;
+  background: var(--bg-elevated);
+  border: 2px dashed var(--border-subtle);
+  border-radius: 12px;
+  color: var(--text-secondary);
+  svg {
+    color: #1565C0;
+    opacity: 0.8;
+  }
+  span {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+}

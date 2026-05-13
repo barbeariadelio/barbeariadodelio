@@ -13,6 +13,8 @@ export interface IAppointment extends Document {
   notes?: string;
   price: number;
   isPackage?: boolean;
+  usedPackageId?: mongoose.Types.ObjectId;
+  isBilled?: boolean;
 }
 
 const appointmentSchema = new Schema<IAppointment>(
@@ -32,6 +34,8 @@ const appointmentSchema = new Schema<IAppointment>(
     notes: String,
     price: { type: Number, required: true, min: 0, default: 0 },
     isPackage: { type: Boolean, default: false },
+    usedPackageId: { type: Schema.Types.ObjectId, ref: 'Service' },
+    isBilled: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

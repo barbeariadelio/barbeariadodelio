@@ -12,8 +12,8 @@ export interface IClientPackageSubscription {
 
 export interface IClient extends Document {
   name: string;
-  email: string;
-  phone: string;
+  email?: string;
+  phone?: string;
   userId?: mongoose.Types.ObjectId;
   unitId: mongoose.Types.ObjectId;
   birthdate?: string;
@@ -24,8 +24,8 @@ export interface IClient extends Document {
 const clientSchema = new Schema<IClient>(
   {
     name:      { type: String, required: true, trim: true },
-    email:     { type: String, required: true, lowercase: true },
-    phone:     { type: String, required: true },
+    email:     { type: String, required: false, lowercase: true },
+    phone:     { type: String, required: false },
     userId:    { type: Schema.Types.ObjectId, ref: 'User' },
     unitId:    { type: Schema.Types.ObjectId, ref: 'Unit', required: true },
     birthdate: String,

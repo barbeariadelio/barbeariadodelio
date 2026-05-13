@@ -1,5 +1,5 @@
 export type TransactionType = 'income' | 'expense' | 'royalty' | 'commission';
-export type TransactionCategory = 'service' | 'product' | 'salary' | 'rent' | 'voucher' | 'commission' | 'other';
+export type TransactionCategory = 'service' | 'product' | 'salary' | 'rent' | 'voucher' | 'commission' | 'package_use' | 'package_sale' | 'other';
 
 export interface Transaction {
   _id: string;
@@ -11,6 +11,7 @@ export interface Transaction {
   amount: number;
   description: string;
   date: string;
+  paymentMethod?: 'money' | 'card' | 'pix' | 'package' | 'other';
   createdBy: string;
   createdAt: string;
 }

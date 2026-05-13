@@ -252,7 +252,8 @@ export default function Book() {
         logout();
         setBookError('Sua sessão expirou. Você pode preencher seus dados abaixo para continuar como visitante.');
       } else {
-        setBookError('Erro ao agendar. Tente outro horário.');
+        const serverMsg = error.response?.data?.message;
+        setBookError(serverMsg || 'Erro ao agendar. Tente outro horário.');
       }
     },
   });
@@ -546,7 +547,7 @@ export default function Book() {
                 {bookError && <div className={styles.error}>{bookError}</div>}
                 <button
                   className={styles.confirmBtn}
-                  disabled={isBooking || (!user && (!guestName.trim() || !guestPhone.trim()))}
+                  disabled={isBooking || !selectedTime || (!user && (!guestName.trim() || !guestPhone.trim()))}
                   onClick={handleBook}
                 >
                   {isBooking ? 'Agendando...' : 'Confirmar Agendamento'}

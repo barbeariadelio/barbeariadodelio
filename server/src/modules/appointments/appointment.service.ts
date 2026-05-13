@@ -9,7 +9,7 @@ import { UnitModel } from '../units/unit.model';
 import { env } from '../../config/env';
 import { NotFoundError, AppError } from '../../shared/errors/AppError';
 import { getSlotCache, setSlotCache, invalidateSlotCache } from '../../shared/cache/slotCache';
-import type { AppointmentStatus } from '@barber/types';
+import type { AppointmentStatus, TransactionCategory } from '@barber/types';
 
 interface GuestBookResult {
   appointment: IAppointment;
@@ -20,7 +20,9 @@ interface GuestBookResult {
 
 function calcEndTime(startTime: string, durationMinutes: number): string {
   const [h, m] = startTime.split(':').map(Number);
-  const total = h * 60 + m + durationMinutes;
+  // Use at least 30 minutes so endTime is always after startTime (handles packages with durationMinutes=0)
+  const dur = durationMinutes > 0 ? durationMinutes : 30;
+  const total = h * 60 + m + dur;
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
 
@@ -208,10 +210,32 @@ export class AppointmentService {
     if (conflict) throw new AppError('Horário já ocupado por outro agendamento.', 409);
     
     const svc = await ServiceModel.findById(data.serviceId);
+    
+    let finalPrice = data.price ?? svc?.price ?? 0;
+    let usedPackageId = undefined;
+    let isPackage = data.isPackage || svc?.type === 'package';
+
+    // If it's a single service, check if client is using an active package for it
+    if (svc?.type === 'single' && data.clientId) {
+      const client = await ClientModel.findById(data.clientId);
+      if (client) {
+        const { price: prorated, packageId } = await this.calculateProratedPrice(client, data.serviceId!.toString());
+        if (packageId) {
+          finalPrice = prorated;
+          usedPackageId = packageId;
+          isPackage = true;
+        }
+      }
+    }
+
     const apptData = { 
       ...data, 
+      price: finalPrice,
       status: data.status || 'confirmed',
-      isPackage: data.isPackage || svc?.type === 'package'
+      isPackage,
+      usedPackageId,
+      // If it's a package type service but NOT a use of an existing package, it's a sale
+      notes: svc?.type === 'package' && !usedPackageId ? `Venda de Pacote: ${svc.name}${data.notes ? ' | ' + data.notes : ''}` : data.notes
     };
     const created = await AppointmentModel.create(apptData);
     invalidateSlotCache(data.unitId!.toString(), data.employeeId!.toString(), data.date!);
@@ -241,7 +265,7 @@ export class AppointmentService {
       throw new AppError('Não é possível agendar em uma data ou hora retroativa.', 400);
     }
 
-    const endTime = calcEndTime(startTime, svc.durationMinutes);
+    const endTime = calcEndTime(startTime, svc.durationMinutes || 30);
     const cleanPhone = guestPhone.replace(/\D/g, '');
     const guestEmail = `guest_${cleanPhone}_${unitId}@delio.guest`;
 
@@ -276,10 +300,21 @@ export class AppointmentService {
       p.active && (p.packageId.toString() === serviceId || p.itemLimits?.some(il => il.serviceId.toString() === serviceId))
     );
 
-    const isUsingPackage = !!activeSub && svc.type === 'single';
     const isBuyingPackage = svc.type === 'package';
+    const isUsingPackage = !!activeSub && svc.type === 'single';
+
+    let finalPrice = isUsingPackage ? 0 : price;
+    let usedPackageId = undefined;
+
+    if (isUsingPackage) {
+      const { price: prorated, packageId } = await this.calculateProratedPrice(client, serviceId);
+      if (packageId) {
+        finalPrice = prorated;
+        usedPackageId = packageId;
+      }
+    }
+
     const finalIsPackage = isUsingPackage || isBuyingPackage;
-    const finalPrice = isUsingPackage ? 0 : price;
 
     const conflict = await AppointmentModel.findOne({
       employeeId,
@@ -331,6 +366,7 @@ export class AppointmentService {
       price: finalPrice, 
       status: 'confirmed',
       isPackage: finalIsPackage,
+      usedPackageId,
       notes: sanitize(notes)
     });
 
@@ -347,15 +383,16 @@ export class AppointmentService {
   }
 
   async updateStatus(
-    id: string, 
-    status: AppointmentStatus, 
+    id: string,
+    status: AppointmentStatus,
     options?: { price?: number; paymentMethod?: string }
   ): Promise<IAppointment> {
-    const appt = await AppointmentModel.findById(id).populate('serviceId', 'name price');
+    // Step 1: fetch raw document (no populate) to avoid save() issues with populated fields
+    const appt = await AppointmentModel.findById(id);
     if (!appt) throw new NotFoundError('Appointment');
 
     const oldStatus = appt.status;
-    
+
     if (oldStatus === 'cancelled' && status !== 'cancelled') {
       const conflict = await AppointmentModel.findOne({
         _id: { $ne: id },
@@ -381,42 +418,116 @@ export class AppointmentService {
 
     const { TransactionModel } = await import('../finance/transaction.model');
 
-    if (status === 'completed' && oldStatus !== 'completed') {
-      const exists = await TransactionModel.findOne({ appointmentId: appt._id, type: 'income' });
-      if (!exists) {
-        await TransactionModel.create({
-          unitId: appt.unitId,
-          appointmentId: appt._id,
-          type: 'income',
-          category: 'service',
-          amount: options?.price ?? appt.price ?? (appt.serviceId as any)?.price ?? 0,
-          description: `Atendimento: ${(appt.serviceId as any)?.name || 'Serviço'}`,
-          date: appt.date,
-          paymentMethod: options?.paymentMethod,
-          createdBy: appt.employeeId
-        });
-      }
+    if (status === 'completed') {
+      // Step 2: fetch with populate only for the financial logic
+      const populated = await AppointmentModel.findById(id).populate<{
+        serviceId: { _id: mongoose.Types.ObjectId; name: string; price: number; type: string; packageItems?: Array<{ serviceId: mongoose.Types.ObjectId; quantity: number }> }
+      }>('serviceId', 'name price type packageItems');
+      
+      if (!populated) throw new NotFoundError('Appointment');
+      
+      const svcDoc = populated.serviceId;
+      const isPackageUse = !!appt.usedPackageId;
+      const isPackageSale = !isPackageUse && svcDoc?.type === 'package';
 
-      const employee = await UserModel.findById(appt.employeeId).select('commissionRate');
-      if (employee?.commissionRate && employee.commissionRate > 0) {
-        const commissionAmount = Math.round((options?.price ?? appt.price) * employee.commissionRate / 100 * 100) / 100;
-        const commExists = await TransactionModel.findOne({ appointmentId: appt._id, type: 'commission' });
-        if (!commExists) {
+      // ── Financial records are created when paymentMethod is provided OR it's a package use
+      if (options?.paymentMethod || isPackageUse) {
+        let category: TransactionCategory = 'service';
+        if (isPackageUse)  category = 'package_use';
+        else if (isPackageSale) category = 'package_sale';
+
+        const svcName = svcDoc?.name || 'Serviço';
+        const description = isPackageUse
+          ? `Uso de Pacote: ${svcName}`
+          : isPackageSale
+            ? `Venda de Pacote: ${svcName}`
+            : `Atendimento: ${svcName}`;
+
+        const billedAmount = options?.price ?? appt.price ?? svcDoc?.price ?? 0;
+
+        // ── Income transaction ──
+        const exists = await TransactionModel.findOne({ appointmentId: appt._id, type: 'income' });
+        if (!exists) {
+          const pm = (isPackageUse ? 'package' : (options?.paymentMethod || 'other')).toLowerCase();
           await TransactionModel.create({
             unitId: appt.unitId,
             appointmentId: appt._id,
-            employeeId: appt.employeeId,
-            type: 'commission',
-            category: 'commission',
-            amount: commissionAmount,
-            description: `Comissão: ${(appt.serviceId as any)?.name || 'Serviço'} (${employee.commissionRate}%)`,
+            type: 'income',
+            category,
+            amount: billedAmount,
+            description,
             date: appt.date,
-            createdBy: appt.employeeId
+            paymentMethod: pm,
+            createdBy: appt.employeeId,
           });
+
+          // Mark as billed
+          appt.isBilled = true;
+          await appt.save();
+        }
+
+        // ── When a package SALE is billed, activate the subscription on the client ──
+        if (isPackageSale && appt.clientId && svcDoc) {
+          const client = await ClientModel.findById(appt.clientId);
+          if (client) {
+            const alreadyHas = client.packages?.some(
+              p => p.packageId.toString() === svcDoc._id.toString() && p.active
+            );
+            if (!alreadyHas) {
+              if (!client.packages) client.packages = [];
+              client.packages.push({
+                packageId: svcDoc._id as any,
+                startDate: new Date(),
+                active: true,
+                itemLimits: (svcDoc.packageItems || []).map(pi => ({
+                  serviceId: pi.serviceId,
+                  quantity: pi.quantity,
+                })),
+              });
+              await client.save();
+            }
+          }
+        }
+
+        // ── Employee commission ──
+        const employee = await UserModel.findById(appt.employeeId).select('commissionRate');
+        if (employee?.commissionRate && employee.commissionRate > 0) {
+          // Commission base:
+          //   • Package use  → appt.price (already prorated = totalPrice / totalSessions at booking time)
+          //   • Package sale → billedAmount / totalSessions (barber earns per-session, not on whole bundle)
+          //   • Regular      → billedAmount
+          let commissionBase = billedAmount;
+
+          if (isPackageUse) {
+            commissionBase = appt.price;
+          } else if (isPackageSale) {
+            const packageItems = svcDoc?.packageItems ?? [];
+            const totalSessions = packageItems.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1;
+            commissionBase = billedAmount / totalSessions;
+          }
+
+          const commissionAmount = Math.round(commissionBase * employee.commissionRate / 100 * 100) / 100;
+          const commExists = await TransactionModel.findOne({ appointmentId: appt._id, type: 'commission' });
+          if (!commExists) {
+            await TransactionModel.create({
+              unitId: appt.unitId,
+              appointmentId: appt._id,
+              employeeId: appt.employeeId,
+              type: 'commission',
+              category: 'commission',
+              amount: commissionAmount,
+              description: `Comissão (${isPackageUse ? 'Uso de Pacote' : isPackageSale ? 'Venda de Pacote' : 'Serviço'}): ${svcName} (${employee.commissionRate}%)`,
+              date: appt.date,
+              createdBy: appt.employeeId,
+            });
+          }
         }
       }
-    } else if (status !== 'completed' && oldStatus === 'completed') {
+    } else if (oldStatus === 'completed') {
+      // If un-completing a billed appointment, remove the financial records
       await TransactionModel.deleteMany({ appointmentId: appt._id });
+      appt.isBilled = false;
+      await appt.save();
     }
 
     return appt;
@@ -479,5 +590,25 @@ export class AppointmentService {
       current += intervalMin;
     }
     return slots;
+  }
+
+  private async calculateProratedPrice(client: IClient, serviceId: string): Promise<{ price: number, packageId?: mongoose.Types.ObjectId }> {
+    if (!client.packages || client.packages.length === 0) return { price: 0 };
+
+    // Find an active package that contains this service
+    const activeSub = client.packages.find(p => 
+      p.active && (p.packageId.toString() === serviceId || p.itemLimits?.some(il => il.serviceId.toString() === serviceId))
+    );
+
+    if (!activeSub) return { price: 0 };
+
+    // Fetch the package details to get total price and total items
+    const pkg = await ServiceModel.findById(activeSub.packageId);
+    if (!pkg || pkg.type !== 'package') return { price: 0 };
+
+    const totalItems = pkg.packageItems?.reduce((acc, item) => acc + item.quantity, 0) || 1;
+    const proratedPrice = Math.round((pkg.price / totalItems) * 100) / 100;
+
+    return { price: proratedPrice, packageId: pkg._id as mongoose.Types.ObjectId };
   }
 }

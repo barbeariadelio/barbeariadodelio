@@ -5,6 +5,7 @@ import { ok, created } from '../../shared/utils/responseHelper';
 import { notificationService } from '../notifications/notification.service';
 import { ClientModel } from '../clients/client.model';
 import { AppointmentModel } from './appointment.model';
+import { UserModel } from '../auth/auth.model';
 import { AppError } from '../../shared/errors/AppError';
 
 const service = new AppointmentService();
@@ -86,10 +87,25 @@ export async function createAppointment(req: AuthRequest, res: Response, next: N
       if (!client) {
         client = await ClientModel.findOne({ userId: req.user.id });
       }
+
+      if (!client) {
+        // If still no client, create one using user data
+        const user = await UserModel.findById(req.user.id);
+        if (user) {
+          client = await ClientModel.create({
+            name: user.name,
+            email: user.email || `user_${user._id}@delio.internal`,
+            phone: user.phone,
+            userId: user._id,
+            unitId: data.unitId,
+          });
+        }
+      }
+
       if (client) {
         data.clientId = client._id;
       } else {
-        throw new AppError('Client record not found for this user', 404);
+        throw new AppError('Client record not found and could not be created', 404);
       }
     }
     const appt = await service.create(data);

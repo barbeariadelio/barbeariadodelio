@@ -40,6 +40,7 @@ interface AppointmentItem {
   employeeId: { name: string } | null;
   status: string;
   price: number;
+  usedPackageId?: string;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -129,14 +130,13 @@ export default function Clients() {
     setSelectedId(prev => (prev === id ? null : id));
   }, []);
 
-  const now = new Date();
-  const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-  function calculateMonthlyUsage(serviceId: string) {
+  // Counts all completed appointments where the client used a specific session
+  // from a specific package (matched by usedPackageId = the package service _id).
+  function calculatePackageUsage(packageServiceId: string, itemServiceId: string) {
     return appointments.filter(a =>
       a.status === 'completed' &&
-      a.date.startsWith(currentMonthPrefix) &&
-      a.serviceId?._id === serviceId
+      a.usedPackageId === packageServiceId &&
+      a.serviceId?._id === itemServiceId
     ).length;
   }
 
@@ -235,7 +235,7 @@ export default function Clients() {
 
             {selectedClient.packages && selectedClient.packages.filter(p => p.active && p.packageId).length > 0 && (
               <div className={styles.clientPackages}>
-                <h3 className={styles.historyTitle}>Pacotes e Assinaturas (Uso no mês atual)</h3>
+                <h3 className={styles.historyTitle}>Pacotes e Assinaturas</h3>
                 <div className={styles.packageList}>
                   {selectedClient.packages.filter(p => p.active && p.packageId).map(pkg => (
                     <div key={pkg._id} className={styles.packageCard}>
@@ -245,7 +245,7 @@ export default function Clients() {
                       </div>
                       <div className={styles.packageUsage}>
                         {pkg.packageId.packageItems.map(item => {
-                          const used = calculateMonthlyUsage(item.serviceId._id);
+                          const used = calculatePackageUsage(pkg.packageId._id, item.serviceId._id);
                           const total = item.quantity;
                           const perc = Math.min(100, Math.round((used / total) * 100));
                           const isExhausted = used >= total;

@@ -45,6 +45,7 @@ export default function Dashboard() {
   const [selectedDay, setSelectedDay] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
   const [editAppt, setEditAppt] = useState<any>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   /* ── Month appointments (calendar view) ── */
   const monthStart = dateISO(startOfMonth(calendarMonth));
@@ -118,18 +119,32 @@ export default function Dashboard() {
 
   function handleScheduleUpdate() {
     qc.invalidateQueries({ queryKey: ['appointments-day'] });
+    qc.invalidateQueries({ queryKey: ['appointments-month'] });
     qc.invalidateQueries({ queryKey: ['unit-config', unitId] });
   }
 
   function handleMonthUpdate() {
     qc.invalidateQueries({ queryKey: ['appointments-month'] });
+    qc.invalidateQueries({ queryKey: ['appointments-day'] });
   }
 
   /* ── Mutations for Shared Components ── */
   const statusMut = useMutation({
     mutationFn: ({ id, status, options }: { id: string; status: string; options?: any }) =>
       api.patch(`/appointments/${id}/status`, { status, ...options }),
-    onSuccess: () => { handleScheduleUpdate(); handleMonthUpdate(); },
+    onSuccess: async () => { 
+      await Promise.all([
+        qc.refetchQueries({ queryKey: ['appointments-day'] }),
+        qc.refetchQueries({ queryKey: ['appointments-month'] })
+      ]);
+      handleScheduleUpdate(); 
+      handleMonthUpdate(); 
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || 'Erro ao atualizar agendamento. Tente novamente.';
+      setErrorMsg(msg);
+      setTimeout(() => setErrorMsg(null), 5000);
+    },
   });
 
   const deleteMut = useMutation({
@@ -151,6 +166,16 @@ export default function Dashboard() {
 
   return (
     <div className={styles.page}>
+      {errorMsg && (
+        <div style={{
+          position: 'fixed', top: '1rem', right: '1rem', zIndex: 9999,
+          background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px',
+          padding: '0.75rem 1rem', color: '#991B1B', fontSize: '0.875rem',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.1)', maxWidth: '360px'
+        }}>
+          ⚠️ {errorMsg}
+        </div>
+      )}
       <header className={styles.header}>
         <p className={styles.dateLabel}>{dateLabel}</p>
         <h1 className={styles.greeting}>{getGreeting(user?.name)}</h1>
@@ -186,7 +211,7 @@ export default function Dashboard() {
             onMonthChange={setCalendarMonth}
             onUpdate={handleMonthUpdate}
             onDayClick={handleDayClick}
-            onStatusChange={(id, s) => statusMut.mutateAsync({ id, status: s })}
+            onStatusChange={(id, s, opts) => statusMut.mutateAsync({ id, status: s, options: opts })}
             onDelete={(id) => deleteMut.mutateAsync(id)}
             isProcessing={statusMut.isPending || deleteMut.isPending}
           />

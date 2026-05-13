@@ -10,7 +10,7 @@ import styles from './CalendarView.module.scss';
 
 export interface CalendarAppointment {
   _id: string;
-  clientId: { name: string } | null;
+  clientId: { _id?: string; name: string } | null;
   employeeId: { name: string } | null;
   serviceId: { name: string } | null;
   date: string;
@@ -18,6 +18,10 @@ export interface CalendarAppointment {
   endTime: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'blocked';
   isPackage?: boolean;
+  isBilled?: boolean;
+  usedPackageId?: string;
+  price: number;
+  notes?: string;
 }
 
 export interface CalendarEmployee {
@@ -31,7 +35,7 @@ const PACKAGE_COLOR = { bg: 'rgba(255,109,0,0.12)', text: '#FF6D00', border: 'rg
 
 const STATUS_COLORS: Record<string, { bg: string; text: string; border: string; solid: string }> = {
   confirmed: { bg: 'rgba(34,197,94,0.12)',   text: '#22C55E', border: 'rgba(34,197,94,0.3)',   solid: '#22C55E' },
-  completed: { bg: 'rgba(21,101,192,0.12)',   text: '#1E88E5', border: 'rgba(21,101,192,0.3)',  solid: '#1565C0' },
+  completed: { bg: 'rgba(21,101,192,0.12)',   text: '#1565C0', border: 'rgba(21,101,192,0.3)',  solid: '#1565C0' },
   pending:   { bg: 'rgba(245,158,11,0.12)',   text: '#F59E0B', border: 'rgba(245,158,11,0.3)',  solid: '#F59E0B' },
   cancelled: { bg: 'rgba(239,68,68,0.12)',    text: '#EF4444', border: 'rgba(239,68,68,0.3)',   solid: '#C62828' },
   blocked:   { bg: 'rgba(107,114,128,0.15)',  text: '#6B7280', border: 'rgba(107,114,128,0.3)', solid: '#6B7280' },
@@ -60,7 +64,7 @@ interface Props {
   // Feature flags / permissions
   canEdit?: boolean;
   canDelete?: boolean;
-  onStatusChange?: (id: string, status: string) => Promise<void>;
+  onStatusChange?: (id: string, status: string, options?: any) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
   isProcessing?: boolean;
 }
@@ -91,7 +95,7 @@ function IconX() {
 interface ModalProps {
   appt: CalendarAppointment;
   onClose: () => void;
-  onStatusChange?: (id: string, status: string) => void;
+  onStatusChange?: (id: string, status: string, options?: any) => void;
   onDelete?: (id: string) => void;
   isPending: boolean;
   canEdit?: boolean;
@@ -99,59 +103,155 @@ interface ModalProps {
 }
 
 function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, canEdit, canDelete }: ModalProps) {
-  const c = appt.isPackage && appt.status !== 'cancelled' ? PACKAGE_COLOR : STATUS_COLORS[appt.status];
+  const c = appt.isPackage && appt.status !== 'cancelled' ? PACKAGE_COLOR : STATUS_COLORS[appt.status] || STATUS_COLORS.confirmed;
   const otherStatuses = (['confirmed', 'completed', 'cancelled'] as const).filter(s => s !== appt.status);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isBilling, setIsBilling] = useState(false);
+  const [localPrice, setLocalPrice] = useState(appt.price?.toString().replace('.', ',') || '0,00');
+  const [paymentMethod, setPaymentMethod] = useState<'money' | 'card' | 'pix' | 'other'>('pix');
+
+  const dateFmt = format(parseISO(appt.date), "EEEE, dd 'de' MMMM", { locale: ptBR });
+
+  if (isBilling) {
+    return (
+      <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
+        <div className={styles.panel} style={{ maxWidth: 400 }}>
+          <div className={styles.panelHeader}>
+            <div className={styles.panelTitle}>Finalizar Atendimento</div>
+            <button className={styles.closeBtn} onClick={() => setIsBilling(false)}><IconX /></button>
+          </div>
+          <div className={styles.panelBody}>
+            <div className={styles.billingField}>
+              <label className={styles.detailLabel}>Valor Final</label>
+              <div className={styles.billingInputRow}>
+                <span>R$</span>
+                <input 
+                  type="text" 
+                  className={styles.billingInput}
+                  value={localPrice}
+                  onChange={e => setLocalPrice(e.target.value.replace(/[^0-9,]/g, ''))}
+                  autoFocus
+                />
+              </div>
+            </div>
+            {appt.usedPackageId ? (
+              <div className={styles.packageNotice}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                <span>Sessão de Pacote</span>
+              </div>
+            ) : (
+              <div className={styles.billingField} style={{ marginTop: '1.5rem' }}>
+                <label className={styles.detailLabel}>Forma de Pagamento</label>
+                <div className={styles.paymentGrid}>
+                  {['money', 'card', 'pix', 'other'].map(pm => (
+                    <button
+                      key={pm}
+                      className={`${styles.paymentBtn} ${paymentMethod === pm ? styles.pmActive : ''}`}
+                      onClick={() => setPaymentMethod(pm as any)}
+                    >
+                      {pm === 'money' ? 'Dinheiro' : pm === 'card' ? 'Cartão' : pm === 'pix' ? 'Pix' : 'Outro'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className={styles.billingActions} style={{ marginTop: '2rem' }}>
+               <button className={styles.cancelBillingBtn} onClick={() => setIsBilling(false)}>Voltar</button>
+               <button 
+                 className={styles.confirmBillingBtn} 
+                 disabled={isPending}
+                 onClick={async () => {
+                   await onStatusChange?.(appt._id, 'completed', { 
+                     price: parseFloat(localPrice.replace(',', '.')), 
+                     paymentMethod 
+                   });
+                   setIsBilling(false);
+                 }}
+               >
+                 {isPending ? 'Processando...' : 'Confirmar e Concluir'}
+               </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className={styles.panel} style={{ borderLeftColor: c.solid }}>
+      <div className={styles.panel} style={{ borderTop: `4px solid ${c.solid}` }}>
         <div className={styles.panelHeader}>
-          <div className={styles.panelTitle}>
+          <div className={styles.panelTitle} style={{ fontSize: '1.5rem', fontWeight: 800 }}>
             {appt.clientId?.name ?? 'Cliente'}
           </div>
           <button className={styles.closeBtn} onClick={onClose}><IconX /></button>
         </div>
         <div className={styles.panelBody}>
-          <div className={styles.detailGrid}>
-            <div className={styles.detailItem}>
-              <span className={styles.detailLabel}>Data</span>
-              <span className={styles.detailValue}>
-                {format(parseISO(appt.date), "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
-              </span>
+          <div className={styles.mainInfo}>
+            <div className={styles.infoRow}>
+              <div className={styles.infoIcon}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+              <div className={styles.infoText}>
+                <span>{dateFmt} • {appt.startTime} até {appt.endTime}</span>
+                <span style={{ fontWeight: 600 }}>{appt.serviceId?.name ?? '—'}</span>
+                <span style={{ fontSize: '1.1rem', fontWeight: 800, color: '#1565C0' }}>R$ {appt.price?.toFixed(2).replace('.', ',')}</span>
+              </div>
             </div>
-            <div className={styles.detailItem}>
-              <span className={styles.detailLabel}>Horário</span>
-              <span className={styles.detailValue}>{appt.startTime} – {appt.endTime}</span>
+
+            <div className={styles.infoRow}>
+               <div className={styles.infoIcon}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
+               <div className={styles.infoText}>
+                 <span style={{ fontWeight: 600 }}>{appt.employeeId?.name ?? '—'}</span>
+               </div>
             </div>
-            <div className={styles.detailItem}>
-              <span className={styles.detailLabel}>Serviço</span>
-              <span className={styles.detailValue}>{appt.serviceId?.name ?? '—'}</span>
+
+            <div className={styles.infoRow}>
+              <div className={styles.infoIcon}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></div>
+              <div className={styles.statusBadgeRow}>
+                <span className={styles.statusBadge} style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}` }}>
+                  {STATUS_LABELS[appt.status]}
+                </span>
+                {appt.isBilled && (
+                  <span className={styles.billedBadge}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="20 6 9 17 4 12"/></svg>
+                    FATURADO
+                  </span>
+                )}
+              </div>
             </div>
-            <div className={styles.detailItem}>
-              <span className={styles.detailLabel}>Barbeiro</span>
-              <span className={styles.detailValue}>{appt.employeeId?.name ?? '—'}</span>
-            </div>
-            <div className={styles.detailItem}>
-              <span className={styles.detailLabel}>Status</span>
-              <span className={styles.statusBadge} style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}` }}>
-                {STATUS_LABELS[appt.status]}
-              </span>
-            </div>
+
+            {appt.notes && (
+              <div className={styles.infoRow}>
+                <div className={styles.infoIcon}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+                <div className={styles.infoText}>
+                  <p style={{ margin: 0, opacity: 0.8 }}>{appt.notes}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className={styles.panelActions} style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-subtle)' }}>
+            {!appt.isBilled && (
+              <button 
+                className={styles.faturarBtn}
+                onClick={() => setIsBilling(true)}
+              >
+                FATURAR
+              </button>
+            )}
           </div>
 
           {canEdit && otherStatuses.length > 0 && (
-            <div className={styles.statusActions}>
-              <span className={styles.statusActionsLabel}>Alterar para</span>
+            <div className={styles.statusActions} style={{ marginTop: '1.5rem' }}>
+              <span className={styles.detailLabel} style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.75rem' }}>Alterar Status</span>
               <div className={styles.statusActionsBtns}>
                 {otherStatuses.map(s => {
-                  const sc = STATUS_COLORS[s];
+                  const sc = STATUS_COLORS[s] || STATUS_COLORS.confirmed;
                   return (
                     <button
                       key={s}
                       className={styles.statusActionBtn}
-                      style={{ color: sc.text, borderColor: sc.border, background: sc.bg }}
+                      style={{ color: sc.text, borderColor: sc.border + '50' }}
                       onClick={() => s === 'cancelled' ? setConfirmCancel(true) : onStatusChange?.(appt._id, s)}
                       disabled={isPending}
                     >
@@ -163,15 +263,9 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
             </div>
           )}
           {canDelete && (
-            <div className={styles.deleteSection}>
-              <button
-                className={styles.deleteBtn}
-                onClick={() => setConfirmDelete(true)}
-                disabled={isPending}
-              >
-                Excluir agendamento
-              </button>
-            </div>
+             <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+                <button className={styles.deleteIconBtn} onClick={() => setConfirmDelete(true)}>Excluir Agendamento</button>
+             </div>
           )}
         </div>
       </div>
@@ -251,9 +345,9 @@ export default function CalendarView({
     setSelectedDay(t);
   };
 
-  const handleStatusChange = async (id: string, status: string) => {
+  const handleStatusChange = async (id: string, status: string, options?: any) => {
     if (onStatusChange) {
-      await onStatusChange(id, status);
+      await onStatusChange(id, status, options);
       setSelectedAppt(null);
     }
   };
@@ -362,11 +456,30 @@ export default function CalendarView({
                         <div
                           key={a._id}
                           className={styles.pill}
-                          style={{ background: c.bg, color: c.text, borderColor: c.border }}
+                          style={{ 
+                            background: c.bg, 
+                            color: c.text, 
+                            borderColor: c.border,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '4px'
+                          }}
                           title={`${a.startTime} ${a.clientId?.name ?? (a.status === 'blocked' ? 'Bloqueado' : '')}`}
                           onClick={e => { e.stopPropagation(); setSelectedAppt(a); }}
                         >
-                          {a.status === 'blocked' ? `Bloqueado ${a.startTime}` : `${a.startTime} ${a.clientId?.name ?? ''}`}
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                            {a.status === 'blocked' ? `Bloqueado ${a.startTime}` : `${a.startTime} ${a.clientId?.name ?? ''}`}
+                          </span>
+                          {a.isBilled && (
+                            <div className={styles.pillCheckGroup}>
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: -4 }}><polyline points="20 6 9 17 4 12"/></svg>
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                            </div>
+                          )}
+                          {!a.isBilled && a.status === 'confirmed' && (
+                             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                          )}
                         </div>
                       );
                     })}
@@ -380,7 +493,7 @@ export default function CalendarView({
 
         {selectedAppt && (
           <AppointmentModal
-            appt={selectedAppt}
+            appt={selectedAppt!}
             onClose={() => setSelectedAppt(null)}
             onStatusChange={handleStatusChange}
             onDelete={handleDelete}
