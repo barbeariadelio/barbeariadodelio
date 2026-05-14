@@ -50,7 +50,7 @@ export default function Settings() {
   const [unitSuccess, setUnitSuccess] = useState(false);
   const [unitError, setUnitError] = useState<string | null>(null);
 
-  const unitId = (user as unknown as { unitId?: string })?.unitId;
+  const unitId = localStorage.getItem('selectedUnitId') || (user as any)?.unitId;
 
   const { data: unit } = useQuery<Unit>({
     queryKey: ['unit', unitId],

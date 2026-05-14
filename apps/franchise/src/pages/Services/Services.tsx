@@ -526,7 +526,7 @@ export default function Services() {
   const [confirmDeactivate, setConfirmDeactivate] = useState<Service | null>(null);
   const [activeTab, setActiveTab]               = useState<'single' | 'package'>('single');
   const qc = useQueryClient();
-  const unitId = import.meta.env.VITE_UNIT_ID || '';
+  const unitId = localStorage.getItem('selectedUnitId') || import.meta.env.VITE_UNIT_ID || '';
 
   const { data: services = [], isLoading } = useQuery<Service[]>({
     queryKey: ['services', unitId],

@@ -18,11 +18,11 @@ apiClient.interceptors.request.use(config => {
   const hasUnitId = config.params?.unitId || config.url?.includes('unitId=');
 
   if (!hasUnitId) {
-    // Always use the app-scoped unit ID from env so each app (admin vs franchise)
-    // reads and writes data for its own unit only.
-    const envUnitId: string | undefined = import.meta.env.VITE_UNIT_ID;
-    if (envUnitId) {
-      config.params = { ...config.params, unitId: envUnitId };
+    // For Franchise apps, the unit ID should be retrieved from localStorage first
+    // (set dynamically when navigating from the portal), then fallback to env.
+    const dynamicUnitId = localStorage.getItem('selectedUnitId') || import.meta.env.VITE_UNIT_ID;
+    if (dynamicUnitId) {
+      config.params = { ...config.params, unitId: dynamicUnitId };
     }
   }
 
