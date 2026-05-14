@@ -31,7 +31,7 @@ function IconPackage() {
 
 export default function Inventory() {
   const { user } = useAuth();
-  const unitId = localStorage.getItem('selectedUnitId') || (user as any)?.unitId;
+  const unitId = localStorage.getItem('selectedUnitId') || import.meta.env.VITE_UNIT_ID || (user as any)?.unitId;
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
