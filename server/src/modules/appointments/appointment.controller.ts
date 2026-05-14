@@ -75,21 +75,24 @@ export async function createAppointment(req: AuthRequest, res: Response, next: N
       data.unitId = req.user.unitId;
     }
 
-    // Security check: must belong to the unit
-    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
-    if (!isOwnerOrFranchisor && data.unitId !== req.user!.unitId?.toString()) {
+    // Unit isolation check.
+    // Self-booking (no clientId supplied): any authenticated user may book at any unit —
+    //   the controller will create a client record in the target unit automatically.
+    // Staff-managed booking (clientId explicitly supplied): employee/franchisee/cashier
+    //   may only manage appointments that belong to their own unit.
+    const isSelfBooking = !data.clientId;
+    const isRestrictedStaff = ['employee', 'franchisee', 'cashier'].includes(req.user!.role);
+    if (!isSelfBooking && isRestrictedStaff && data.unitId !== req.user!.unitId?.toString()) {
       throw new AppError('Cannot create appointment for another unit', 403);
     }
 
     // For blocked slots, no client lookup needed
     if (data.status !== 'blocked' && !data.clientId && req.user) {
+      // Always look up (or create) a client record scoped to the target unit.
+      // This ensures cross-unit bookings get their own client entry in that unit.
       let client = await ClientModel.findOne({ userId: req.user.id, unitId: data.unitId });
-      if (!client) {
-        client = await ClientModel.findOne({ userId: req.user.id });
-      }
 
       if (!client) {
-        // If still no client, create one using user data
         const user = await UserModel.findById(req.user.id);
         if (user) {
           client = await ClientModel.create({

@@ -7,7 +7,7 @@ export const unitRoutes = Router();
 
 unitRoutes.get('/public', listPublicUnits);
 unitRoutes.get('/public/:id', getPublicUnit);
-unitRoutes.get('/', authenticate, requireRoles('owner', 'franchisor', 'franchisee', 'cashier'), listUnits);
-unitRoutes.get('/:unitId', authenticate, requireRoles('owner', 'franchisor', 'franchisee', 'employee', 'cashier'), requireSameUnit(), getUnit);
+unitRoutes.get('/', authenticate, requireRoles('owner', 'franchisor', 'admin', 'franchisee', 'cashier'), listUnits);
+unitRoutes.get('/:unitId', authenticate, requireRoles('owner', 'franchisor', 'admin', 'franchisee', 'employee', 'cashier'), requireSameUnit(), getUnit);
 unitRoutes.post('/', authenticate, requireRoles('owner'), createUnit);
 unitRoutes.patch('/:unitId', authenticate, requireRoles('owner'), requireSameUnit(), updateUnit);

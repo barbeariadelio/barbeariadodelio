@@ -38,6 +38,33 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
   }
 }
 
+export async function bookingLogin(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { name, phone } = req.body;
+    const { user, ...tokens } = await service.bookingLogin(name, phone);
+
+    const isProd = process.env.NODE_ENV === 'production';
+    
+    res.cookie('accessToken', tokens.accessToken, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax',
+      maxAge: 15 * 60 * 1000,
+    });
+
+    res.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    ok(res, user);
+  } catch (e) {
+    next(e);
+  }
+}
+
 export async function refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const refreshToken = req.cookies.refreshToken || req.body.refreshToken;

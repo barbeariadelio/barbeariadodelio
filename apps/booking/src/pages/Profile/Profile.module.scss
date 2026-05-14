@@ -515,32 +515,34 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  gap: 1rem;
+  gap: 0.5rem;
   text-align: center;
   padding: 2rem;
   background: var(--bg-base);
+  animation: fadeIn 0.4s ease-out;
 }
 
 .noAuthIcon {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
+  width: 80px;
+  height: 80px;
+  border-radius: 24px;
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
-  color: var(--text-muted);
+  color: var(--blue-600);
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 0.5rem;
+  margin-bottom: 1.5rem;
   box-shadow: var(--shadow-sm);
+  svg { opacity: 0.8; }
 }
 
 .noAuthText {
   font-family: 'Inter', sans-serif;
   color: var(--text-secondary);
   font-size: 1rem;
-  margin: 0;
-  max-width: 280px;
+  margin: 0 0 2rem;
+  max-width: 320px;
   line-height: 1.6;
 }
 
@@ -548,14 +550,20 @@
   background: var(--blue-600);
   color: white;
   border: none;
-  border-radius: 8px;
-  padding: 0.75rem 2rem;
+  border-radius: 12px;
+  padding: 0.875rem 2.5rem;
   font-family: 'Inter', sans-serif;
-  font-size: 0.9375rem;
+  font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
-  &:hover { background: var(--blue-700); transform: translateY(-1px); }
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+  &:hover { 
+    background: var(--blue-700); 
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
+  }
+  &:active { transform: translateY(0); }
 }
 
 .backLinkBtn {

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { login, refresh, logout, me, updateMe, updateTheme, changePassword, forgotPassword, resetPassword } from './auth.controller';
+import { login, bookingLogin, refresh, logout, me, updateMe, updateTheme, changePassword, forgotPassword, resetPassword } from './auth.controller';
 import { validate } from '../../shared/utils/validate';
 import { authenticate } from '../../shared/middlewares/auth.middleware';
 import { refreshSchema, loginSchema, updateMeSchema, updateThemeSchema, changePasswordSchema, forgotPasswordSchema, resetPasswordSchema } from './auth.schema';
@@ -7,6 +7,7 @@ import { refreshSchema, loginSchema, updateMeSchema, updateThemeSchema, changePa
 export const authRoutes = Router();
 
 authRoutes.post('/login', validate(loginSchema), login);
+authRoutes.post('/booking-login', bookingLogin);
 authRoutes.post('/refresh', validate(refreshSchema), refresh);
 authRoutes.post('/logout', authenticate, logout);
 authRoutes.get('/me', authenticate, me);

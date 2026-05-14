@@ -147,11 +147,16 @@ export default function Profile() {
 
   if (!user) {
     return (
-      <div className={styles.page}>
-        <div className={styles.noAuth}>
-          <p>Faça login para ver seu perfil.</p>
-          <button onClick={() => navigate('/login')}>Entrar</button>
+      <div className={styles.noAuth}>
+        <div className={styles.noAuthIcon}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+          </svg>
         </div>
+        <h1 className={styles.modalTitle}>Acesse seu perfil</h1>
+        <p className={styles.noAuthText}>Faça login para gerenciar seus agendamentos e ver seu histórico.</p>
+        <button className={styles.loginBtn} onClick={() => navigate('/login')}>Entrar na conta</button>
+        <button className={styles.backLinkBtn} onClick={() => navigate('/')}>Voltar ao início</button>
       </div>
     );
   }
@@ -177,13 +182,53 @@ export default function Profile() {
           </div>
         </div>
 
+        {nextAppt && (() => {
+          const [, nm, nd] = nextAppt.date.split('-').map(Number);
+          const [, ny] = nextAppt.date.split('-').map(Number);
+          const year = nextAppt.date.split('-')[0];
+          return (
+            <div className={styles.nextCard}>
+              <p className={styles.nextLabel}>Próximo Agendamento</p>
+              <div className={styles.nextMain}>
+                <div className={styles.nextDate}>
+                  <span className={styles.nextDay}>{nd}</span>
+                  <div>
+                    <span className={styles.nextMonth}>{MONTHS_LONG[nm - 1]}</span>
+                    <span className={styles.nextYear}>{year}</span>
+                  </div>
+                </div>
+                <div className={styles.nextInfo}>
+                  <span className={styles.nextService}>{nextAppt.serviceId?.name ?? 'Serviço'}</span>
+                  <span className={styles.nextMeta}>
+                    {nextAppt.startTime}{nextAppt.employeeId?.name && ` · ${nextAppt.employeeId.name}`}
+                  </span>
+                  {nextAppt.unitId && (
+                    <span className={styles.nextUnit}>
+                      {nextAppt.unitId.name} — {nextAppt.unitId.address}
+                    </span>
+                  )}
+                </div>
+                <span
+                  className={styles.nextBadge}
+                  style={{ color: SC[nextAppt.status], background: SC[nextAppt.status] + '18', borderColor: SC[nextAppt.status] + '40' }}
+                >
+                  {SL[nextAppt.status]}
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Seus Agendamentos</h2>
           {isLoading ? <p>Carregando...</p> : (
             <div className={styles.apptList}>
-              {upcoming.map(a => (
-                <ApptRow key={a._id} a={a} onCancel={setApptToCancel} onEdit={setApptToEdit} />
-              ))}
+              {upcoming.length === 0
+                ? <div className={styles.emptyState}><p>Nenhum agendamento futuro.</p></div>
+                : upcoming.map(a => (
+                    <ApptRow key={a._id} a={a} onCancel={setApptToCancel} onEdit={setApptToEdit} />
+                  ))
+              }
             </div>
           )}
         </section>

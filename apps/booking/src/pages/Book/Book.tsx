@@ -269,7 +269,10 @@ export default function Book() {
       }
       setSuccess(true);
     },
-    onError: () => setBookError('Erro ao agendar. Tente outro horário.'),
+    onError: (error: any) => {
+      const serverMsg = error.response?.data?.message;
+      setBookError(serverMsg || 'Erro ao agendar. Tente outro horário.');
+    },
   });
 
   function goBack() {

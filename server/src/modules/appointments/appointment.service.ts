@@ -279,6 +279,11 @@ export class AppointmentService {
 
     let userAccount = await UserModel.findOne({ email: guestEmail });
     if (!userAccount) {
+      // Phone may already belong to an existing account (different unit, prior booking, etc.)
+      // Reuse it instead of trying to create a duplicate and hitting the unique index.
+      userAccount = await UserModel.findOne({ phone: guestPhone });
+    }
+    if (!userAccount) {
       const passwordHash = await bcrypt.hash(cleanPhone.slice(-4), 10);
       userAccount = await UserModel.create({
         name: guestName,

@@ -1,10 +1,17 @@
+import mongoose from 'mongoose';
 import { UnitModel, IUnit } from './unit.model';
 import { NotFoundError } from '../../shared/errors/AppError';
 import { sharedCache } from '../../shared/utils/cache';
 
 export class UnitService {
   async findByOwner(ownerId: string): Promise<IUnit[]> {
-    return UnitModel.find({ ownerId, isActive: true });
+    const id = new mongoose.Types.ObjectId(ownerId);
+    return UnitModel.find({ ownerId: id, isActive: true });
+  }
+
+  async findByIds(ids: string[]): Promise<IUnit[]> {
+    const objectIds = ids.map(id => new mongoose.Types.ObjectId(id));
+    return UnitModel.find({ _id: { $in: objectIds }, isActive: true });
   }
 
   async findAll(): Promise<IUnit[]> {

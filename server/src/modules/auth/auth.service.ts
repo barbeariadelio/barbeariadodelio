@@ -45,6 +45,78 @@ export class AuthService {
     return { ...tokens, user: userObj as any };
   }
 
+  async bookingLogin(name: string, phone: string): Promise<LoginResponse> {
+    try {
+      const cleanPhone = phone.replace(/\D/g, '');
+      if (!name || cleanPhone.length < 10) {
+        throw new AppError('Informe seu nome e um telefone válido.', 400);
+      }
+
+      // Flexible search: match digits regardless of formatting in the DB
+      const phoneRegex = new RegExp(cleanPhone.split('').join('.*'));
+      
+      // Prioritize 'client' role to ensure booking history is correctly retrieved
+      let user = await UserModel.findOne({ phone: phoneRegex, role: 'client' });
+      
+      if (!user) {
+        user = await UserModel.findOne({ phone: phoneRegex });
+      }
+
+      if (!user) {
+        // Auto-create account for new customers
+        const passwordHash = await bcrypt.hash(cleanPhone.slice(-4), 10);
+        const guestEmail = `guest_${cleanPhone}_booking@delio.guest`;
+        
+        user = await UserModel.create({
+          name,
+          email: guestEmail,
+          phone: cleanPhone,
+          passwordHash,
+          role: 'client',
+          isActive: true,
+          allowedApps: ['booking'],
+        });
+
+        // Also create a Client document for this user to ensure system compatibility
+        const { ClientModel } = await import('../clients/client.model');
+        await ClientModel.create({
+          name,
+          phone: cleanPhone,
+          email: guestEmail,
+          userId: user._id,
+          isActive: true
+        });
+      } else {
+        // Ensure user is active
+        if (!user.isActive) {
+          throw new AppError('Esta conta está inativa. Entre em contato com a barbearia.', 403);
+        }
+
+        // Update name if it changed
+        if (user.name !== name) {
+          user.name = name;
+          await user.save();
+        }
+      }
+
+      const tokens = this.generateTokens(
+        user._id.toString(),
+        user.role,
+        user.tokenVersion,
+        user.unitId?.toString(),
+      );
+
+      const userObj = user.toObject();
+      delete (userObj as any).passwordHash;
+      delete (userObj as any).passwordPlain;
+
+      return { ...tokens, user: userObj as any };
+    } catch (e) {
+      console.error('[bookingLogin Error]:', e);
+      throw e;
+    }
+  }
+
   async refresh(refreshToken: string): Promise<Pick<AuthTokens, 'accessToken'>> {
     try {
       const payload = jwt.verify(refreshToken, env.jwtRefreshSecret) as {

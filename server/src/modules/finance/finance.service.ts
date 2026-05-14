@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { TransactionModel, ITransaction } from './transaction.model';
 import { UnitModel } from '../units/unit.model';
 import { AppointmentModel } from '../appointments/appointment.model';
@@ -31,7 +32,9 @@ export class FinanceService {
       .populate('employeeId', 'name commissionRate')
       .populate('unitId', 'name');
 
-    return this.buildSummary(transactions, appointments as any);
+    const unitsInfo = await UnitModel.find({ _id: { $in: unitIds } }).select('name');
+
+    return this.buildSummary(transactions, appointments as any, unitsInfo);
   }
 
   async getTransactions(userId: string, role: string, unitId: string, page: number, limit: number, filters?: { employeeId?: string; category?: string }): Promise<{ data: ITransaction[]; total: number }> {
@@ -107,19 +110,28 @@ export class FinanceService {
 
   private async getAllowedUnitIds(userId: string, role: string): Promise<string[]> {
     if (role === 'owner') {
-      const units = await UnitModel.find({ 
-        $or: [
-          { ownerId: userId },
-          { _id: (await UserModel.findById(userId).select('unitId'))?.unitId }
-        ],
-        isActive: true 
-      }).select('_id');
-      return units.map(u => u._id.toString());
+      const ownerObjectId = new mongoose.Types.ObjectId(userId);
+      const userDoc = await UserModel.findById(userId).select('unitId');
+      const orClause: any[] = [{ ownerId: ownerObjectId }];
+      if (userDoc?.unitId) orClause.push({ _id: userDoc.unitId });
+      const units = await UnitModel.find({ $or: orClause, isActive: true }).select('_id');
+      const ownIds = units.map(u => u._id.toString());
+
+      // Also include franchise units where this owner is listed as a franchisor
+      const { FranchiseModel } = await import('../franchise/franchise.model');
+      const franchise = await FranchiseModel.findOne({ franchisors: ownerObjectId });
+      if (franchise && franchise.units.length > 0) {
+        const franchiseIds = franchise.units.map(u => u.toString());
+        return [...new Set([...ownIds, ...franchiseIds])];
+      }
+
+      return ownIds;
     }
 
     if (role === 'franchisor') {
       const { FranchiseModel } = await import('../franchise/franchise.model');
-      const franchise = await FranchiseModel.findOne({ franchisors: userId });
+      const franchisorObjectId = new mongoose.Types.ObjectId(userId);
+      const franchise = await FranchiseModel.findOne({ franchisors: franchisorObjectId });
       return franchise ? franchise.units.map(u => u.toString()) : [];
     }
 
@@ -165,12 +177,24 @@ export class FinanceService {
     return { startDate: fmt(start), endDate: fmt(end) };
   }
 
-  private buildSummary(transactions: any[], appointments: any[]): FinanceSummary {
+  private buildSummary(transactions: any[], appointments: any[], unitsInfo: any[] = []): FinanceSummary {
     let totalIncome = 0;
     let totalExpense = 0;
     let realizedIncome = 0;   // completed only
     let projectedIncome = 0;  // confirmed (not yet completed)
     const byUnitMap = new Map<string, { unitId: string; name: string; income: number; expense: number; profit: number }>();
+    
+    // Pre-populate with all relevant units
+    for (const u of unitsInfo) {
+      byUnitMap.set(u._id.toString(), { 
+        unitId: u._id.toString(), 
+        name: u.name, 
+        income: 0, 
+        expense: 0, 
+        profit: 0 
+      });
+    }
+
     const byCategoryMap = new Map<TransactionCategory, number>();
     const byEmployeeMap = new Map<string, {
       id: string; name: string;

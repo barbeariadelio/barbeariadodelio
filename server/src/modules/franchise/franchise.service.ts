@@ -1,10 +1,11 @@
+import mongoose from 'mongoose';
 import { FranchiseModel, IFranchise } from './franchise.model';
 import { UnitModel } from '../units/unit.model';
 import { NotFoundError } from '../../shared/errors/AppError';
 
 export class FranchiseService {
   async findByFranchisor(userId: string): Promise<IFranchise | null> {
-    return FranchiseModel.findOne({ franchisors: userId });
+    return FranchiseModel.findOne({ franchisors: new mongoose.Types.ObjectId(userId) });
   }
 
   async getUnits(franchiseId: string) {
