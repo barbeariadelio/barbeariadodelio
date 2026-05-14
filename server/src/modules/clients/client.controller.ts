@@ -100,17 +100,17 @@ export async function removePackage(req: AuthRequest, res: Response, next: NextF
 export async function updatePackageItemLimit(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const { id, packageId, serviceId } = req.params;
-    const { quantity } = req.body;
+    const { quantity, used } = req.body;
 
     const client = await service.findById(id);
-    
+
     // Security check
     const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
     if (!isOwnerOrFranchisor && client.unitId?.toString() !== req.user!.unitId?.toString()) {
       throw new AppError('Access denied to this unit', 403);
     }
 
-    const result = await service.updatePackageItemLimit(id, packageId, serviceId, quantity);
+    const result = await service.updatePackageItemLimit(id, packageId, serviceId, quantity, used);
     ok(res, result);
   } catch (e) { next(e); }
 }

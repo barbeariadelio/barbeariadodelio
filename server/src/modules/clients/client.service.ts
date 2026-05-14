@@ -77,21 +77,30 @@ export class ClientService {
     return this.findById(id);
   }
 
-  async updatePackageItemLimit(id: string, packageId: string, serviceId: string, quantity: number | null): Promise<IClient> {
+  async updatePackageItemLimit(id: string, packageId: string, serviceId: string, quantity?: number | null, used?: number): Promise<IClient> {
     const client = await ClientModel.findById(id);
     if (!client) throw new NotFoundError('Client');
-    
+
     if (client.packages) {
-      const sub = client.packages.find(p => p.packageId.toString() === packageId && p.active);
+      // Allow editing active OR inactive packages (e.g. to correct session counts)
+      const sub = client.packages.find(p => p.packageId.toString() === packageId);
       if (sub) {
         if (!sub.itemLimits) sub.itemLimits = [];
-        
-        if (quantity === null || quantity < 0) {
+
+        if (quantity === null || (quantity !== undefined && quantity < 0)) {
           sub.itemLimits = sub.itemLimits.filter(l => l.serviceId.toString() !== serviceId);
         } else {
           const limit = sub.itemLimits.find(l => l.serviceId.toString() === serviceId);
-          if (limit) limit.quantity = quantity;
-          else sub.itemLimits.push({ serviceId: serviceId as any, quantity });
+          if (limit) {
+            if (quantity !== undefined && quantity !== null) limit.quantity = quantity;
+            if (used !== undefined) limit.used = Math.max(0, used);
+          } else {
+            sub.itemLimits.push({
+              serviceId: serviceId as any,
+              quantity: quantity ?? 0,
+              used: used !== undefined ? Math.max(0, used) : 0,
+            });
+          }
         }
         await client.save();
       }

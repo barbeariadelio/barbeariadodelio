@@ -15,6 +15,7 @@ export interface IAppointment extends Document {
   isPackage?: boolean;
   usedPackageId?: mongoose.Types.ObjectId;
   isBilled?: boolean;
+  billingSkipped?: boolean; // billed without financial transaction (package session — no charge)
 }
 
 const appointmentSchema = new Schema<IAppointment>(
@@ -36,6 +37,7 @@ const appointmentSchema = new Schema<IAppointment>(
     isPackage: { type: Boolean, default: false },
     usedPackageId: { type: Schema.Types.ObjectId, ref: 'Service' },
     isBilled: { type: Boolean, default: false },
+    billingSkipped: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

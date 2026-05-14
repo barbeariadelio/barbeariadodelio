@@ -95,7 +95,16 @@ export class AppointmentService {
     const employee = await UserModel.findById(employeeId).select('workSchedule vacations blockedDays');
     if (!employee) throw new NotFoundError('Employee');
 
-    const unit = await UnitModel.findById(unitId).select('slotInterval');
+    const unit = await UnitModel.findById(unitId).select('slotInterval workingDays');
+    if (!unit) throw new NotFoundError('Unit');
+
+    // Check if the day is a working day for the unit
+    // Use T12:00:00 to avoid timezone shifts that could change the day
+    const dayOfWeek = new Date(date + 'T12:00:00').getDay();
+    if (unit.workingDays && unit.workingDays.length > 0 && !unit.workingDays.includes(dayOfWeek)) {
+      return [];
+    }
+
     const slotInterval = Number(unit?.slotInterval) || 0;
 
     if (employee.blockedDays?.includes(date)) return [];
@@ -179,6 +188,14 @@ export class AppointmentService {
     }
 
     if (data.status !== 'blocked') {
+      const unit = await UnitModel.findById(data.unitId).select('workingDays');
+      if (unit?.workingDays && unit.workingDays.length > 0) {
+        const dayOfWeek = new Date(data.date! + 'T12:00:00').getDay();
+        if (!unit.workingDays.includes(dayOfWeek)) {
+          throw new AppError('A barbearia não funciona no dia selecionado.', 400);
+        }
+      }
+
       const today = new Date();
       const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
       const nowTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
@@ -353,7 +370,8 @@ export class AppointmentService {
           active: true,
           itemLimits: svc.packageItems?.map(pi => ({
             serviceId: pi.serviceId,
-            quantity: pi.quantity
+            quantity: pi.quantity,
+            used: 0,
           })) || []
         });
         await client.save();
@@ -390,7 +408,7 @@ export class AppointmentService {
   async updateStatus(
     id: string,
     status: AppointmentStatus,
-    options?: { price?: number; paymentMethod?: string }
+    options?: { price?: number; paymentMethod?: string; skipBilling?: boolean }
   ): Promise<IAppointment> {
     // Step 1: fetch raw document (no populate) to avoid save() issues with populated fields
     const appt = await AppointmentModel.findById(id);
@@ -434,9 +452,40 @@ export class AppointmentService {
       const svcDoc = populated.serviceId;
       const isPackageUse = !!appt.usedPackageId;
       const isPackageSale = !isPackageUse && svcDoc?.type === 'package';
+      // skipBilling: caller explicitly requested no financial transaction (package use only)
+      const skipBilling = isPackageUse && options?.skipBilling === true;
 
-      // ── Financial records are created when paymentMethod is provided OR it's a package use
-      if (options?.paymentMethod || isPackageUse) {
+      // ── When a package USE session is marked done without billing,
+      //    still decrement the session counter and mark as billed so it can't be re-processed.
+      if (skipBilling) {
+        // Decrement session counter only
+        if (appt.clientId && appt.usedPackageId && appt.serviceId) {
+          const client = await ClientModel.findById(appt.clientId);
+          if (client) {
+            const sub = client.packages?.find(
+              p => p.packageId.toString() === appt.usedPackageId!.toString()
+            );
+            if (sub?.itemLimits) {
+              const limit = sub.itemLimits.find(
+                l => l.serviceId.toString() === appt.serviceId!.toString()
+              );
+              if (limit) {
+                limit.used = (limit.used || 0) + 1;
+                const allExhausted = sub.itemLimits.every(l => (l.used || 0) >= (l.quantity || 0));
+                if (allExhausted) sub.active = false;
+                await client.save();
+              }
+            }
+          }
+        }
+        // Mark as billed (button disappears) + billingSkipped (exclude from commission metrics)
+        appt.isBilled = true;
+        (appt as any).billingSkipped = true;
+        await appt.save();
+      }
+
+      // ── Financial records are created when paymentMethod is provided OR it's a package use (without skipBilling)
+      if (!skipBilling && (options?.paymentMethod || isPackageUse)) {
         let category: TransactionCategory = 'service';
         if (isPackageUse)  category = 'package_use';
         else if (isPackageSale) category = 'package_sale';
@@ -480,16 +529,53 @@ export class AppointmentService {
             );
             if (!alreadyHas) {
               if (!client.packages) client.packages = [];
+
+              // ── Compute expiration date from packageValidity ──
+              let expiresAt: Date | undefined;
+              const validity = (svcDoc as any).packageValidity;
+              if (validity && validity.type && validity.type !== 'none' && validity.value) {
+                const exp = new Date();
+                if (validity.type === 'days')   exp.setDate(exp.getDate() + validity.value);
+                if (validity.type === 'weeks')  exp.setDate(exp.getDate() + validity.value * 7);
+                if (validity.type === 'months') exp.setMonth(exp.getMonth() + validity.value);
+                if (validity.type === 'years')  exp.setFullYear(exp.getFullYear() + validity.value);
+                expiresAt = exp;
+              }
+
               client.packages.push({
                 packageId: svcDoc._id as any,
                 startDate: new Date(),
                 active: true,
+                expiresAt,
                 itemLimits: (svcDoc.packageItems || []).map(pi => ({
                   serviceId: pi.serviceId,
                   quantity: pi.quantity,
+                  used: 0,
                 })),
               });
               await client.save();
+            }
+          }
+        }
+
+        // ── When a package USE is billed, increment the used session counter ──
+        if (isPackageUse && appt.clientId && appt.usedPackageId && appt.serviceId) {
+          const client = await ClientModel.findById(appt.clientId);
+          if (client) {
+            const sub = client.packages?.find(
+              p => p.packageId.toString() === appt.usedPackageId!.toString()
+            );
+            if (sub?.itemLimits) {
+              const limit = sub.itemLimits.find(
+                l => l.serviceId.toString() === appt.serviceId!.toString()
+              );
+              if (limit) {
+                limit.used = (limit.used || 0) + 1;
+                // Auto-deactivate if all sessions for every item are exhausted
+                const allExhausted = sub.itemLimits.every(l => (l.used || 0) >= (l.quantity || 0));
+                if (allExhausted) sub.active = false;
+                await client.save();
+              }
             }
           }
         }
@@ -529,18 +615,44 @@ export class AppointmentService {
         }
       }
     } else if (oldStatus === 'completed') {
-      // If un-completing a billed appointment, remove the financial records
+      // If un-completing a billed appointment, remove the financial records and reset flags
       await TransactionModel.deleteMany({ appointmentId: appt._id });
       appt.isBilled = false;
+      (appt as any).billingSkipped = false;
       await appt.save();
+
+      // ── Decrement used session counter when a package use is un-billed ──
+      if (appt.usedPackageId && appt.clientId && appt.serviceId) {
+        const client = await ClientModel.findById(appt.clientId);
+        if (client) {
+          const sub = client.packages?.find(
+            p => p.packageId.toString() === appt.usedPackageId!.toString()
+          );
+          if (sub?.itemLimits) {
+            const limit = sub.itemLimits.find(
+              l => l.serviceId.toString() === appt.serviceId!.toString()
+            );
+            if (limit && (limit.used || 0) > 0) {
+              limit.used = (limit.used || 0) - 1;
+              // Re-activate if it was auto-deactivated
+              if (!sub.active) sub.active = true;
+              await client.save();
+            }
+          }
+        }
+      }
     }
 
     return appt;
   }
 
   async delete(id: string): Promise<void> {
-    const appt = await AppointmentModel.findByIdAndDelete(id);
+    const appt = await AppointmentModel.findById(id);
     if (!appt) throw new NotFoundError('Appointment');
+    if (appt.isBilled) {
+      throw new AppError('Não é possível excluir um agendamento já faturado.', 400);
+    }
+    await AppointmentModel.findByIdAndDelete(id);
     invalidateSlotCache(appt.unitId.toString(), appt.employeeId.toString(), appt.date);
   }
 
@@ -558,6 +670,16 @@ export class AppointmentService {
 
     if (data.startTime || data.date || data.employeeId) {
       const checkDate = data.date || appt.date;
+
+      // Validate working days
+      const unit = await UnitModel.findById(appt.unitId).select('workingDays');
+      if (unit?.workingDays && unit.workingDays.length > 0) {
+        const dayOfWeek = new Date(checkDate + 'T12:00:00').getDay();
+        if (!unit.workingDays.includes(dayOfWeek)) {
+          throw new AppError('A barbearia não funciona no dia selecionado.', 400);
+        }
+      }
+
       const checkEmp  = data.employeeId || appt.employeeId;
       const checkStart = data.startTime || appt.startTime;
       const checkEnd   = data.endTime || appt.endTime;
@@ -600,10 +722,22 @@ export class AppointmentService {
   private async calculateProratedPrice(client: IClient, serviceId: string): Promise<{ price: number, packageId?: mongoose.Types.ObjectId }> {
     if (!client.packages || client.packages.length === 0) return { price: 0 };
 
-    // Find an active package that contains this service
-    const activeSub = client.packages.find(p => 
-      p.active && (p.packageId.toString() === serviceId || p.itemLimits?.some(il => il.serviceId.toString() === serviceId))
-    );
+    const now = new Date();
+
+    // Find an active, non-expired package that contains this service and still has sessions left
+    const activeSub = client.packages.find(p => {
+      if (!p.active) return false;
+      // Check expiration
+      if (p.expiresAt && new Date(p.expiresAt) < now) return false;
+      // Check if this service is in the package
+      const hasService = p.packageId.toString() === serviceId ||
+        p.itemLimits?.some(il => il.serviceId.toString() === serviceId);
+      if (!hasService) return false;
+      // Check if there are sessions remaining for this service
+      const limit = p.itemLimits?.find(il => il.serviceId.toString() === serviceId);
+      if (limit && (limit.used || 0) >= (limit.quantity || 0)) return false; // exhausted
+      return true;
+    });
 
     if (!activeSub) return { price: 0 };
 

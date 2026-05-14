@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -34,6 +35,7 @@ interface UnitConfig {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const unitId = (user as unknown as { unitId?: string })?.unitId;
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
@@ -54,7 +56,7 @@ export default function Dashboard() {
   const { data: monthAppointmentsRaw = [] } = useQuery<CalendarAppointment[]>({
     queryKey: ['appointments-month', monthStart, monthEnd, unitId],
     queryFn: () =>
-      api.get(`/appointments?start=${monthStart}&end=${monthEnd}`)
+      api.get(`/appointments?start=${monthStart}&end=${monthEnd}&limit=1000`)
          .then(r => Array.isArray(r.data) ? r.data : r.data?.appointments ?? []),
     enabled: !!user,
     refetchInterval: 15000, // Auto refresh every 15s
@@ -74,7 +76,7 @@ export default function Dashboard() {
   const { data: dayAppointmentsRaw = [] } = useQuery<ScheduleAppointment[]>({
     queryKey: ['appointments-day', dayISO, unitId],
     queryFn: () =>
-      api.get(`/appointments?date=${dayISO}`)
+      api.get(`/appointments?date=${dayISO}&limit=1000`)
          .then(r => Array.isArray(r.data) ? r.data : r.data?.appointments ?? []),
     enabled: view === 'schedule' && !!user,
     refetchInterval: 15000, // Auto refresh every 15s
@@ -211,8 +213,8 @@ export default function Dashboard() {
             onMonthChange={setCalendarMonth}
             onUpdate={handleMonthUpdate}
             onDayClick={handleDayClick}
-            onStatusChange={(id, s, opts) => statusMut.mutateAsync({ id, status: s, options: opts })}
-            onDelete={(id) => deleteMut.mutateAsync(id)}
+            onStatusChange={async (id, s, opts) => { await statusMut.mutateAsync({ id, status: s, options: opts }); }}
+            onDelete={async (id) => { await deleteMut.mutateAsync(id); }}
             isProcessing={statusMut.isPending || deleteMut.isPending}
           />
         </div>
@@ -237,13 +239,14 @@ export default function Dashboard() {
           unitId={unitId}
           workingDays={unitConfig?.workingDays}
           workingHours={unitConfig?.workingHours}
-          onStatusChange={(id, s, opts) => statusMut.mutateAsync({ id, status: s, options: opts })}
-          onDelete={(id) => deleteMut.mutateAsync(id)}
-          onBlock={(payload) => blockMut.mutateAsync(payload)}
-          onUpdateAppt={(id, data) => updateApptMut.mutateAsync({ id, data })}
+          onStatusChange={async (id, s, opts) => { await statusMut.mutateAsync({ id, status: s, options: opts }); }}
+          onDelete={async (id) => { await deleteMut.mutateAsync(id); }}
+          onBlock={async (payload) => { await blockMut.mutateAsync(payload); }}
+          onUpdateAppt={async (id, data) => { await updateApptMut.mutateAsync({ id, data }); }}
           isProcessing={statusMut.isPending || blockMut.isPending || updateApptMut.isPending}
           isDeleting={deleteMut.isPending}
           businessName="Barber Admin"
+          onProfileClick={(clientId) => navigate(`/clients?id=${clientId}`)}
         />
       )}
 

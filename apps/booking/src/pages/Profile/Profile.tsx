@@ -161,7 +161,13 @@ export default function Profile() {
     );
   }
 
-  const upcoming = appointments.filter(a => (a.status === 'pending' || a.status === 'confirmed') && a.date >= todayISO());
+  const today = todayISO();
+  const nowTime = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
+
+  const upcoming = appointments.filter(a => {
+    const isPast = a.date < today || (a.date === today && a.startTime < nowTime);
+    return !isPast && (a.status === 'pending' || a.status === 'confirmed');
+  });
   const nextAppt = [...upcoming].sort((a,b) => a.date.localeCompare(b.date) || a.startTime.localeCompare(b.startTime))[0];
 
   const cancelApptData = appointments.find(it => it._id === apptToCancel);

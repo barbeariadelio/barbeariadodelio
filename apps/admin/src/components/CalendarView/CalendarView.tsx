@@ -317,7 +317,7 @@ export default function CalendarView({ appointments, employees = [], month: cont
               const inMonth = isSameMonth(day, currentMonth);
               const todayCell = isToday(day);
               
-              const MAX_PILLS = 3;
+              const MAX_PILLS = 5;
               const totalItems = blockedStaff.length + da.length;
               
               return (

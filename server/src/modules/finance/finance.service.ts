@@ -300,9 +300,13 @@ export class FinanceService {
       const empEntry = byEmployeeMap.get(empId)!;
       if (!empEntry.name && appt.employeeId?.name) empEntry.name = appt.employeeId.name;
       if (!empEntry.unitName && appt.unitId?.name) empEntry.unitName = appt.unitId.name;
-      
-      empEntry.appointments += 1;
-      empEntry.grossRevenue += price;
+
+      // Only count billed appointments for commission/attendance metrics.
+      // Exclude billingSkipped (package sessions marked done without a financial transaction).
+      if ((appt as any).isBilled && !(appt as any).billingSkipped) {
+        empEntry.appointments += 1;
+        empEntry.grossRevenue += price;
+      }
 
       if (unitKey) {
         if (!byUnitMap.has(unitKey)) {

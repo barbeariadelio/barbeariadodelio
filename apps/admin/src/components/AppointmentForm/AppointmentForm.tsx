@@ -4,7 +4,7 @@ import axios from 'axios';
 import { api, resolveApiBaseUrl } from '../../api/client';
 import styles from './AppointmentForm.module.scss';
 
-interface Unit { _id: string; name: string; apiUrl?: string; }
+interface Unit { _id: string; name: string; apiUrl?: string; workingDays?: number[]; }
 interface Employee { _id: string; name: string; }
 interface Client {
   _id: string;
@@ -181,6 +181,14 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
     if (selectedDateTime < now) {
       setError('Não é possível agendar em uma data ou hora que já passou.');
       return;
+    }
+
+    if (selectedUnit?.workingDays && selectedUnit.workingDays.length > 0) {
+      const dayOfWeek = new Date(date + 'T12:00:00').getDay();
+      if (!selectedUnit.workingDays.includes(dayOfWeek)) {
+        setError('A barbearia não funciona no dia selecionado.');
+        return;
+      }
     }
     
     const finish = (finalIsPackage: boolean) => {

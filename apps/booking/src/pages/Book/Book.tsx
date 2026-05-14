@@ -6,7 +6,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { api, resolveApiBaseUrl, setupInterceptors } from '../../api/client';
 import styles from './Book.module.scss';
 
-interface Unit { _id: string; name: string; apiUrl?: string; }
+interface Unit { _id: string; name: string; apiUrl?: string; workingDays?: number[]; }
 interface Service { _id: string; name: string; description?: string; price: number; durationMinutes: number; isActive?: boolean; image?: string; }
 interface Employee { _id: string; name: string; avatar?: string; }
 
@@ -34,7 +34,7 @@ function fmtDateLong(iso: string) {
 }
 
 /* ── Calendar ── */
-function Calendar({ value, onChange }: { value: string; onChange: (d: string) => void }) {
+function Calendar({ value, onChange, workingDays }: { value: string; onChange: (d: string) => void; workingDays?: number[] }) {
   const today = new Date();
   const todayY = today.getFullYear(), todayM = today.getMonth(), todayD = today.getDate();
   const [viewYear, setViewYear] = useState(() => value ? parseInt(value.split('-')[0]) : todayY);
@@ -55,6 +55,11 @@ function Calendar({ value, onChange }: { value: string; onChange: (d: string) =>
   const isPast = (d: number) => new Date(viewYear, viewMonth, d) < new Date(todayY, todayM, todayD);
   const isSelected = (d: number) => viewYear === selY && viewMonth === selM && d === selD;
   const isToday = (d: number) => viewYear === todayY && viewMonth === todayM && d === todayD;
+  const isWorkingDay = (d: number) => {
+    if (!workingDays || workingDays.length === 0) return true;
+    const dow = new Date(viewYear, viewMonth, d).getDay();
+    return workingDays.includes(dow);
+  };
 
   const prevM = () => {
     if (viewYear === todayY && viewMonth === todayM) return;
@@ -86,13 +91,13 @@ function Calendar({ value, onChange }: { value: string; onChange: (d: string) =>
         {cells.map((d, i) => (
           <button
             key={i}
-            disabled={!d || isPast(d)}
+            disabled={!d || isPast(d) || !isWorkingDay(d)}
             onClick={() => pick(d!)}
             className={
               !d ? styles.calEmpty :
               isSelected(d) ? styles.calSel :
               isToday(d) ? styles.calToday :
-              isPast(d) ? styles.calPast :
+              isPast(d) || !isWorkingDay(d) ? styles.calPast :
               styles.calCell
             }
           >{d ?? ''}</button>
@@ -437,7 +442,11 @@ export default function Book() {
             {/* ── Date & Time ── */}
             {step === 'datetime' && (
               <div className={styles.dtWrap}>
-                <Calendar value={selectedDate} onChange={d => { setSelectedDate(d); setSelectedTime(''); }} />
+                <Calendar 
+                  value={selectedDate} 
+                  onChange={d => { setSelectedDate(d); setSelectedTime(''); }} 
+                  workingDays={unit?.workingDays}
+                />
                 <div className={styles.slotsWrap}>
                   <p className={styles.slotsLabel}>
                     Horários disponíveis

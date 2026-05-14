@@ -110,6 +110,7 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
   const [isBilling, setIsBilling] = useState(false);
   const [localPrice, setLocalPrice] = useState(appt.price?.toString().replace('.', ',') || '0,00');
   const [paymentMethod, setPaymentMethod] = useState<'money' | 'card' | 'pix' | 'other'>('pix');
+  const [registerPayment, setRegisterPayment] = useState(true);
 
   const dateFmt = format(parseISO(appt.date), "EEEE, dd 'de' MMMM", { locale: ptBR });
 
@@ -136,9 +137,59 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
               </div>
             </div>
             {appt.usedPackageId ? (
-              <div className={styles.packageNotice}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-                <span>Sessão de Pacote</span>
+              <div style={{ marginTop: '1.5rem' }}>
+                <div className={styles.packageNotice}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                  <span>Sessão de Pacote</span>
+                </div>
+                {/* Toggle: gerar ou não cobrança financeira */}
+                <div style={{ marginTop: '1.25rem', padding: '1rem', borderRadius: '10px', background: 'var(--surface-2, #f5f5f5)', border: '1px solid var(--border)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', userSelect: 'none' }}>
+                    <div
+                      onClick={() => setRegisterPayment(v => !v)}
+                      style={{
+                        width: '42px', height: '24px', borderRadius: '12px', flexShrink: 0,
+                        background: registerPayment ? '#1565C0' : '#D1D5DB',
+                        transition: 'background 0.2s', position: 'relative', cursor: 'pointer',
+                      }}
+                    >
+                      <div style={{
+                        position: 'absolute', top: '3px',
+                        left: registerPayment ? '21px' : '3px',
+                        width: '18px', height: '18px', borderRadius: '50%',
+                        background: '#fff', transition: 'left 0.2s',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                      }} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '14px' }}>
+                        {registerPayment ? 'Registrar pagamento' : 'Sem cobrança'}
+                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary, #6B7280)', marginTop: '2px' }}>
+                        {registerPayment
+                          ? 'Gera transação e comissão para o barbeiro'
+                          : 'Apenas desconta a sessão do pacote, sem transação'}
+                      </div>
+                    </div>
+                  </label>
+                </div>
+                {/* Forma de pagamento visível apenas se registerPayment */}
+                {registerPayment && (
+                  <div className={styles.billingField} style={{ marginTop: '1.25rem' }}>
+                    <label className={styles.detailLabel}>Forma de Pagamento</label>
+                    <div className={styles.paymentGrid}>
+                      {['money', 'card', 'pix', 'other'].map(pm => (
+                        <button
+                          key={pm}
+                          className={`${styles.paymentBtn} ${paymentMethod === pm ? styles.pmActive : ''}`}
+                          onClick={() => setPaymentMethod(pm as any)}
+                        >
+                          {pm === 'money' ? 'Dinheiro' : pm === 'card' ? 'Cartão' : pm === 'pix' ? 'Pix' : 'Outro'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className={styles.billingField} style={{ marginTop: '1.5rem' }}>
@@ -158,13 +209,14 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
             )}
             <div className={styles.billingActions} style={{ marginTop: '2rem' }}>
                <button className={styles.cancelBillingBtn} onClick={() => setIsBilling(false)}>Voltar</button>
-               <button 
-                 className={styles.confirmBillingBtn} 
+               <button
+                 className={styles.confirmBillingBtn}
                  disabled={isPending}
                  onClick={async () => {
-                   await onStatusChange?.(appt._id, 'completed', { 
-                     price: parseFloat(localPrice.replace(',', '.')), 
-                     paymentMethod 
+                   await onStatusChange?.(appt._id, 'completed', {
+                     price: parseFloat(localPrice.replace(',', '.')),
+                     paymentMethod,
+                     skipBilling: appt.usedPackageId ? !registerPayment : false,
                    });
                    setIsBilling(false);
                  }}
@@ -262,7 +314,7 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
               </div>
             </div>
           )}
-          {canDelete && (
+          {canDelete && !appt.isBilled && (
              <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
                 <button className={styles.deleteIconBtn} onClick={() => setConfirmDelete(true)}>Excluir Agendamento</button>
              </div>

@@ -17,8 +17,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Check for token in URL (SSO from Admin)
     const params = new URLSearchParams(window.location.search);
     const urlToken = params.get('token');
+    const urlUnitId = params.get('unitId');
+    
     if (urlToken) {
       localStorage.setItem('accessToken', urlToken);
+    }
+    if (urlUnitId) {
+      localStorage.setItem('selectedUnitId', urlUnitId);
+    }
+
+    if (urlToken || urlUnitId) {
       // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }

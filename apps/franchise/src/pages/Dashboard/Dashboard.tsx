@@ -35,7 +35,7 @@ interface UnitConfig {
 export default function Dashboard() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const unitId = (user as unknown as { unitId?: string })?.unitId;
+  const unitId = (user as any)?.unitId || localStorage.getItem('selectedUnitId');
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
   const isStaff = user?.role === 'employee';
   const userId = (user as any)?.id || (user as any)?._id;
@@ -54,7 +54,7 @@ export default function Dashboard() {
   const { data: monthAppointmentsRaw = [] } = useQuery<CalendarAppointment[]>({
     queryKey: ['appointments-month', monthStart, monthEnd, unitId],
     queryFn: () =>
-      api.get(`/appointments?start=${monthStart}&end=${monthEnd}`)
+      api.get(`/appointments?start=${monthStart}&end=${monthEnd}&unitId=${unitId}&limit=1000`)
          .then(r => Array.isArray(r.data) ? r.data : r.data?.appointments ?? []),
     enabled: !!user,
     refetchInterval: 15000, // Auto refresh every 15s
@@ -75,7 +75,7 @@ export default function Dashboard() {
   const { data: dayAppointmentsRaw = [] } = useQuery<ScheduleAppointment[]>({
     queryKey: ['appointments-day', dayISO, unitId],
     queryFn: () =>
-      api.get(`/appointments?date=${dayISO}`)
+      api.get(`/appointments?date=${dayISO}&unitId=${unitId}&limit=1000`)
          .then(r => Array.isArray(r.data) ? r.data : r.data?.appointments ?? []),
     enabled: view === 'schedule' && !!user,
     refetchInterval: 15000, // Auto refresh every 15s
@@ -213,8 +213,8 @@ export default function Dashboard() {
             onMonthChange={setCalendarMonth}
             onUpdate={handleMonthUpdate}
             onDayClick={handleDayClick}
-            onStatusChange={(id, s, opts) => statusMut.mutateAsync({ id, status: s, options: opts })}
-            onDelete={(id) => deleteMut.mutateAsync(id)}
+            onStatusChange={async (id, s, opts) => { await statusMut.mutateAsync({ id, status: s, options: opts }); }}
+            onDelete={async (id) => { await deleteMut.mutateAsync(id); }}
             isProcessing={statusMut.isPending || deleteMut.isPending}
           />
         </div>

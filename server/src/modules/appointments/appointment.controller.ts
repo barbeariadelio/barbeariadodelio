@@ -165,7 +165,7 @@ export async function guestBookAppointment(req: Request, res: Response, next: Ne
 export async function updateAppointmentStatus(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const { id } = req.params;
-    const { status, price, paymentMethod } = req.body;
+    const { status, price, paymentMethod, skipBilling } = req.body;
 
     const appt = await AppointmentModel.findById(id);
     if (!appt) throw new AppError('Appointment not found', 404);
@@ -186,7 +186,7 @@ export async function updateAppointmentStatus(req: AuthRequest, res: Response, n
       }
     }
 
-    const updated = await service.updateStatus(id, status, { price, paymentMethod });
+    const updated = await service.updateStatus(id, status, { price, paymentMethod, skipBilling });
 
     if (status === 'cancelled') {
       const fullAppt = await service.findById(id);

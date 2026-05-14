@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { format } from 'date-fns';
 import styles from './Layout.module.scss';
@@ -48,6 +48,8 @@ export default function Layout() {
   const [notifsOpen, setNotifsOpen] = useState(false);
   const notifsRef = useRef<HTMLDivElement>(null);
   const lastUserId = useRef<string | null>(null);
+  const qc = useQueryClient();
+  const lastNotifId = useRef<string | null>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -63,8 +65,23 @@ export default function Layout() {
     queryKey: ['notifications'],
     queryFn: () => api.get('/notifications').then(r => r.data),
     enabled: !!user,
-    refetchInterval: 15000,
+    refetchInterval: 10000, // Shorter interval for better real-time feel
   });
+
+  // Automatically invalidate appointment queries when new relevant notifications arrive
+  useEffect(() => {
+    if (notifications.length > 0) {
+      const latest = notifications[0];
+      if (latest._id !== lastNotifId.current) {
+        lastNotifId.current = latest._id;
+        // If it's a booking-related notification, refresh the dashboard data
+        if (['new', 'edit', 'cancellation'].includes(latest.type)) {
+          qc.invalidateQueries({ queryKey: ['appointments-day'] });
+          qc.invalidateQueries({ queryKey: ['appointments-month'] });
+        }
+      }
+    }
+  }, [notifications, qc]);
 
   const markAsReadMutation = useMutation({
     mutationFn: (id: string) => api.patch(`/notifications/${id}/read`),

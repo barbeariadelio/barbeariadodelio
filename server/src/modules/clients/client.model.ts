@@ -4,9 +4,11 @@ export interface IClientPackageSubscription {
   packageId: mongoose.Types.ObjectId;
   startDate: Date;
   active: boolean;
+  expiresAt?: Date;
   itemLimits?: {
     serviceId: mongoose.Types.ObjectId;
-    quantity: number;
+    quantity: number;   // total sessions allowed
+    used: number;       // sessions consumed (incremented on billing)
   }[];
 }
 
@@ -35,10 +37,12 @@ const clientSchema = new Schema<IClient>(
         packageId: { type: Schema.Types.ObjectId, ref: 'Service', required: true },
         startDate: { type: Date, required: true, default: Date.now },
         active:    { type: Boolean, default: true },
+        expiresAt: { type: Date },
         itemLimits: [
           {
             serviceId: { type: Schema.Types.ObjectId, ref: 'Service' },
-            quantity: { type: Number },
+            quantity:  { type: Number },
+            used:      { type: Number, default: 0 },
           }
         ]
       }
