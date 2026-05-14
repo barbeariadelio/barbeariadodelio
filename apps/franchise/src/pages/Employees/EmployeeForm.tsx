@@ -130,7 +130,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
               description: `Vale Inicial (na criação)`,
               date: new Date().toISOString().split('T')[0],
               employeeId: empId,
-              unitId: res.data?.unitId || res.data?.employee?.unitId || (user as any)?.unitId
+              unitId: res.data?.unitId || res.data?.employee?.unitId || localStorage.getItem('selectedUnitId') || (user as any)?.unitId
             });
           } catch (e) {
             console.error('Falha ao registrar vale inicial:', e);

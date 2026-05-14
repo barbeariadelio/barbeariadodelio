@@ -247,7 +247,7 @@ export default function Employees() {
 
       {formTarget !== null && (
         <EmployeeForm
-          employee={formTarget === 'new' ? null : formTarget}
+          employee={formTarget === 'new' ? null : (formTarget as any)}
           onClose={() => setFormTarget(null)}
           onSuccess={() => {
             setFormTarget(null);

@@ -146,7 +146,7 @@ function EmployeeDetail({ emp, onClose, onEdit, onToggle, isToggling }: DetailPr
 
 export default function Employees() {
   const { user } = useAuth();
-  const unitId = (user as any)?.unitId;
+  const unitId = localStorage.getItem('selectedUnitId') || (user as any)?.unitId;
   const [formTarget, setFormTarget]         = useState<Employee | null | 'new'>(null);
   const [detailTarget, setDetailTarget]     = useState<Employee | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<Employee | null>(null);

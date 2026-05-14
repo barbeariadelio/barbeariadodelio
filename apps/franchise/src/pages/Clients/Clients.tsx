@@ -75,7 +75,7 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export default function Clients() {
   const { user } = useAuth();
-  const unitId = (user as any)?.unitId;
+  const unitId = localStorage.getItem('selectedUnitId') || (user as any)?.unitId;
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('id'));

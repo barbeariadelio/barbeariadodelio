@@ -35,7 +35,7 @@ interface UnitConfig {
 export default function Dashboard() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const unitId = (user as any)?.unitId || localStorage.getItem('selectedUnitId');
+  const unitId = localStorage.getItem('selectedUnitId') || (user as any)?.unitId;
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
   const isStaff = user?.role === 'employee';
   const userId = (user as any)?.id || (user as any)?._id;
