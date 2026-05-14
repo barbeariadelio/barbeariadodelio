@@ -102,10 +102,8 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
 
   const unitApi = useMemo(() => {
     const base = resolveApiBaseUrl(selectedUnit?.apiUrl);
-    const instance = axios.create({ baseURL: base });
+    const instance = axios.create({ baseURL: base, withCredentials: true });
     instance.interceptors.request.use(config => {
-      const token = localStorage.getItem('accessToken');
-      if (token) config.headers.Authorization = `Bearer ${token}`;
       return config;
     });
     instance.interceptors.response.use(res => {

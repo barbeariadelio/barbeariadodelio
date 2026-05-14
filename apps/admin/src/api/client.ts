@@ -25,6 +25,7 @@ apiClient.interceptors.request.use(config => {
       config.params = { ...config.params, unitId: envUnitId };
     }
   }
+
   return config;
 });
 

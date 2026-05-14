@@ -8,7 +8,8 @@ const service = new ClientService();
 
 export async function listClients(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const unitId = req.user!.role === 'owner'
+    const isSuperUser = ['owner', 'franchisor', 'admin'].includes(req.user!.role);
+    const unitId = isSuperUser
       ? ((req.query.unitId as string) || req.user!.unitId)
       : req.user!.unitId;
     if (!unitId) { ok(res, []); return; }

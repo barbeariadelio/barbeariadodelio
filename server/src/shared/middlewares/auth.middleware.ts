@@ -35,7 +35,18 @@ export function authenticate(
   _res: Response,
   next: NextFunction,
 ): void {
-  const token = (req.headers.authorization?.startsWith('Bearer ') && req.headers.authorization.split(' ')[1]) || req.cookies?.accessToken;
+  let token: string | undefined = undefined;
+  
+  if (req.headers.authorization?.startsWith('Bearer ')) {
+    const headerToken = req.headers.authorization.split(' ')[1];
+    if (headerToken && headerToken !== 'null' && headerToken !== 'undefined') {
+      token = headerToken;
+    }
+  }
+  
+  if (!token && req.cookies?.accessToken) {
+    token = req.cookies.accessToken;
+  }
 
   if (!token) {
     next(new UnauthorizedError('Token de autenticação ausente ou inválido'));

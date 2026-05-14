@@ -299,13 +299,13 @@
     <script>
         // Production fallback (handled by server in Railway)
         const isProd = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-        
+
         if (isProd) {
-            document.getElementById('admin-card').href = '/admin';
-            document.getElementById('franchise-card').href = '/franchise';
-            document.getElementById('booking-card').href = '/booking';
+            document.getElementById('admin-card').href = '/admin/';
+            document.getElementById('franchise-card').href = '/franchise-app/';
+            document.getElementById('booking-card').href = '/booking/';
         }
     </script>
 </body>
 
-</html>
+</html>perfei
