@@ -10,7 +10,7 @@ import styles from './CalendarView.module.scss';
 
 export interface CalendarAppointment {
   _id: string;
-  clientId: { _id?: string; name: string } | null;
+  clientId: { _id?: string; name: string; phone?: string } | null;
   employeeId: { name: string } | null;
   serviceId: { name: string } | null;
   date: string;
@@ -67,6 +67,8 @@ interface Props {
   onStatusChange?: (id: string, status: string, options?: any) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
   isProcessing?: boolean;
+  onEdit?: (appt: CalendarAppointment) => void;
+  onViewProfile?: (clientId: string) => void;
 }
 
 function IconChevronLeft() {
@@ -100,14 +102,64 @@ interface ModalProps {
   isPending: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
+  onEdit?: (appt: CalendarAppointment) => void;
+  onViewProfile?: (clientId: string) => void;
 }
 
-function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, canEdit, canDelete }: ModalProps) {
+function WhatsAppModal({ appt, onClose }: { appt: CalendarAppointment, onClose: () => void }) {
+  const defaultMsg = `Olá, ${appt.clientId?.name}! Você tem um horário marcado para ${appt.date.split('-').reverse().join('/')} às ${appt.startTime}.\n\n${appt.serviceId?.name ?? 'Serviço'}\n\nPodemos confirmar o seu horário?\n\nObrigado!`;
+
+  const [message, setMessage] = useState(defaultMsg);
+
+  const handleSend = () => {
+    const phone = appt.clientId?.phone?.replace(/\D/g, '');
+    if (!phone) return;
+    const msg = encodeURIComponent(message);
+    window.open(`https://wa.me/55${phone}?text=${msg}`, '_blank');
+    onClose();
+  };
+
+  return (
+    <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()} style={{ zIndex: 1001 }}>
+      <div className={styles.panel} style={{ maxWidth: 400 }}>
+        <div className={styles.panelHeader}>
+          <div className={styles.panelTitle}>Personalizar Mensagem</div>
+          <button className={styles.closeBtn} onClick={onClose}><IconX /></button>
+        </div>
+        <div className={styles.panelBody}>
+            <div className={styles.billingField}>
+              <label className={styles.detailLabel} style={{ marginBottom: '8px', display: 'block' }}>Mensagem do WhatsApp</label>
+              <textarea 
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                rows={8}
+                autoFocus
+                style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg-base)', color: 'var(--text-primary)', resize: 'vertical', outline: 'none', fontFamily: 'inherit' }}
+              />
+            </div>
+            <div className={styles.billingActions} style={{ marginTop: '20px' }}>
+              <button className={styles.cancelBillingBtn} onClick={onClose}>Cancelar</button>
+              <button 
+                className={styles.confirmBillingBtn} 
+                onClick={handleSend}
+                style={{ background: '#25D366', border: 'none', color: '#fff', fontWeight: 600, padding: '10px 16px', borderRadius: '8px', cursor: 'pointer' }}
+              >
+                Abrir WhatsApp
+              </button>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, canEdit, canDelete, onEdit, onViewProfile }: ModalProps) {
   const c = appt.isPackage && appt.status !== 'cancelled' ? PACKAGE_COLOR : STATUS_COLORS[appt.status] || STATUS_COLORS.confirmed;
   const otherStatuses = (['confirmed', 'completed', 'cancelled'] as const).filter(s => s !== appt.status);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isBilling, setIsBilling] = useState(false);
+  const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [localPrice, setLocalPrice] = useState(appt.price?.toString().replace('.', ',') || '0,00');
   const [paymentMethod, setPaymentMethod] = useState<'money' | 'card' | 'pix' | 'other'>('pix');
   const [registerPayment, setRegisterPayment] = useState(true);
@@ -233,14 +285,34 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className={styles.panel} style={{ borderTop: `4px solid ${c.solid}` }}>
-        <div className={styles.panelHeader}>
-          <div className={styles.panelTitle} style={{ fontSize: '1.5rem', fontWeight: 800 }}>
-            {appt.clientId?.name ?? 'Cliente'}
+        <div className={styles.panelHeader} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div className={styles.panelActions} style={{ display: 'flex', gap: '4px' }}>
+            <button className={styles.actionIcon} title="Enviar WhatsApp" onClick={() => setShowWhatsApp(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-secondary)' }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+            {canEdit && (
+              <button className={styles.actionIcon} title="Editar" onClick={() => onEdit?.(appt)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-secondary)' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
+            )}
+            {canDelete && !appt.isBilled && (
+              <button className={styles.actionIcon} title="Excluir" onClick={() => setConfirmDelete(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-secondary)' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              </button>
+            )}
+            {appt.clientId?._id && (
+              <button className={styles.actionIcon} title="Perfil do Cliente" onClick={() => onViewProfile?.(appt.clientId!._id!)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-secondary)' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              </button>
+            )}
           </div>
           <button className={styles.closeBtn} onClick={onClose}><IconX /></button>
         </div>
         <div className={styles.panelBody}>
           <div className={styles.mainInfo}>
+            <div className={styles.panelTitle} style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '1rem', lineHeight: 1.2 }}>
+              {appt.clientId?.name ?? 'Cliente'}
+            </div>
             <div className={styles.infoRow}>
               <div className={styles.infoIcon}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
               <div className={styles.infoText}>
@@ -314,13 +386,11 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
               </div>
             </div>
           )}
-          {canDelete && !appt.isBilled && (
-             <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
-                <button className={styles.deleteIconBtn} onClick={() => setConfirmDelete(true)}>Excluir Agendamento</button>
-             </div>
-          )}
         </div>
       </div>
+      {showWhatsApp && (
+        <WhatsAppModal appt={appt} onClose={() => setShowWhatsApp(false)} />
+      )}
       {confirmDelete && (
         <ConfirmModal
           title="Excluir agendamento?"
@@ -359,6 +429,8 @@ export default function CalendarView({
   onStatusChange,
   onDelete,
   isProcessing = false,
+  onEdit,
+  onViewProfile,
 }: Props) {
   const [view, setView] = useState<ViewMode>('month');
   const [internalMonth, setInternalMonth] = useState(new Date());
@@ -552,6 +624,8 @@ export default function CalendarView({
             isPending={isProcessing}
             canEdit={canEdit}
             canDelete={canDelete}
+            onEdit={(a) => { setSelectedAppt(null); onEdit?.(a); }}
+            onViewProfile={onViewProfile}
           />
         )}
       </>
@@ -614,6 +688,8 @@ export default function CalendarView({
           isPending={isProcessing}
           canEdit={canEdit}
           canDelete={canDelete}
+          onEdit={(a) => { setSelectedAppt(null); onEdit?.(a); }}
+          onViewProfile={onViewProfile}
         />
       )}
     </>

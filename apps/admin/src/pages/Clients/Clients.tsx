@@ -94,6 +94,8 @@ export default function Clients() {
   const [billingPrice, setBillingPrice] = useState('');
   const [billingPaymentMethod, setBillingPaymentMethod] = useState<'money' | 'card' | 'pix' | 'other'>('pix');
   const [billingRegisterPayment, setBillingRegisterPayment] = useState(true);
+  const [whatsappClient, setWhatsappClient] = useState<{ phone: string; name: string } | null>(null);
+  const [whatsappMessage, setWhatsappMessage] = useState('');
   const debouncedSearch = useDebounce(search, 400);
   const qc = useQueryClient();
 
@@ -126,6 +128,11 @@ export default function Clients() {
     setBillingPrice(appt.price.toFixed(2).replace('.', ','));
     setBillingPaymentMethod('pix');
     setBillingRegisterPayment(true);
+  }
+
+  function openWhatsApp(client: Client) {
+    setWhatsappClient({ phone: client.phone!, name: client.name });
+    setWhatsappMessage(`Olá, ${client.name.split(' ')[0]}! Tudo bem?`);
   }
 
   function confirmBilling() {
@@ -195,6 +202,7 @@ export default function Clients() {
 
   const IconCopy = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
   const IconCheck = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
+  const IconWhatsApp = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>;
 
   return (
     <div className={styles.page}>
@@ -271,6 +279,14 @@ export default function Clients() {
                     <p className={styles.detailMeta}>{selectedClient.phone}</p>
                     <button className={styles.copyBtn} onClick={() => copyToClipboard(selectedClient.phone || '', 'phone')} title="Copiar telefone">
                       {copiedField === 'phone' ? <IconCheck /> : <IconCopy />}
+                    </button>
+                    <button
+                      onClick={() => openWhatsApp(selectedClient)}
+                      title="Enviar WhatsApp"
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(37, 211, 102, 0.1)', color: '#25D366', border: '1px solid rgba(37, 211, 102, 0.3)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', marginLeft: '6px', transition: 'all 0.2s' }}
+                    >
+                      <IconWhatsApp />
+                      WHATSAPP
                     </button>
                   </div>
                 )}
@@ -458,32 +474,32 @@ export default function Clients() {
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
           onClick={e => { if (e.target === e.currentTarget) setBillingAppt(null); }}
         >
-          <div style={{ background: '#ffffff', borderRadius: '14px', padding: '2rem', width: '100%', maxWidth: '400px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', position: 'relative' }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: '14px', padding: '2rem', width: '100%', maxWidth: '400px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-              <span style={{ fontWeight: 800, fontSize: '1.1rem' }}>Finalizar Atendimento</span>
-              <button onClick={() => setBillingAppt(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: '#6B7280' }}>✕</button>
+              <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)' }}>Finalizar Atendimento</span>
+              <button onClick={() => setBillingAppt(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--text-muted)' }}>✕</button>
             </div>
 
             {/* Appointment summary */}
-            <div style={{ marginBottom: '1.25rem', padding: '0.75rem 1rem', background: '#f5f5f5', borderRadius: '8px', fontSize: '13px' }}>
-              <div style={{ fontWeight: 600, color: '#111' }}>{billingAppt.serviceId?.name ?? 'Serviço'}</div>
-              <div style={{ color: '#6B7280', marginTop: '2px' }}>
+            <div style={{ marginBottom: '1.25rem', padding: '0.75rem 1rem', background: 'var(--bg-elevated)', borderRadius: '8px', fontSize: '13px' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{billingAppt.serviceId?.name ?? 'Serviço'}</div>
+              <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>
                 {formatDate(billingAppt.date)} — {billingAppt.startTime} · {billingAppt.employeeId?.name ?? 'Barbeiro'}
               </div>
             </div>
 
             {/* Price input */}
             <div style={{ marginBottom: '1.25rem' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6B7280', marginBottom: '6px' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>
                 Valor Final
               </label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #D1D5DB', borderRadius: '8px', padding: '8px 12px', background: '#fff' }}>
-                <span style={{ fontWeight: 600, color: '#6B7280' }}>R$</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '8px 12px', background: 'var(--bg-base)' }}>
+                <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>R$</span>
                 <input
                   type="text"
                   value={billingPrice}
                   onChange={e => setBillingPrice(e.target.value.replace(/[^0-9,]/g, ''))}
-                  style={{ flex: 1, border: 'none', outline: 'none', fontSize: '16px', fontWeight: 700, background: 'transparent', color: '#111' }}
+                  style={{ flex: 1, border: 'none', outline: 'none', fontSize: '16px', fontWeight: 700, background: 'transparent', color: 'var(--text-primary)' }}
                   autoFocus
                 />
               </div>
@@ -496,17 +512,17 @@ export default function Clients() {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF6D00" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
                   <span style={{ fontSize: '13px', fontWeight: 600, color: '#FF6D00' }}>Sessão de Pacote</span>
                 </div>
-                <div style={{ padding: '1rem', borderRadius: '10px', background: '#f5f5f5', border: '1px solid #E5E7EB', marginBottom: '1.25rem' }}>
+                <div style={{ padding: '1rem', borderRadius: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', marginBottom: '1.25rem' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', userSelect: 'none' }}>
                     <div
                       onClick={() => setBillingRegisterPayment(v => !v)}
-                      style={{ width: '42px', height: '24px', borderRadius: '12px', flexShrink: 0, background: billingRegisterPayment ? '#1565C0' : '#D1D5DB', transition: 'background 0.2s', position: 'relative', cursor: 'pointer' }}
+                      style={{ width: '42px', height: '24px', borderRadius: '12px', flexShrink: 0, background: billingRegisterPayment ? 'var(--gold)' : 'var(--border-default)', transition: 'background 0.2s', position: 'relative', cursor: 'pointer' }}
                     >
                       <div style={{ position: 'absolute', top: '3px', left: billingRegisterPayment ? '21px' : '3px', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
                     </div>
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '14px', color: '#111' }}>{billingRegisterPayment ? 'Registrar pagamento' : 'Sem cobrança'}</div>
-                      <div style={{ fontSize: '12px', color: '#6B7280', marginTop: '2px' }}>
+                      <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>{billingRegisterPayment ? 'Registrar pagamento' : 'Sem cobrança'}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                         {billingRegisterPayment ? 'Gera transação e comissão para o barbeiro' : 'Apenas desconta a sessão do pacote, sem transação'}
                       </div>
                     </div>
@@ -514,11 +530,11 @@ export default function Clients() {
                 </div>
                 {billingRegisterPayment && (
                   <div style={{ marginBottom: '1.25rem' }}>
-                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6B7280', marginBottom: '6px' }}>Forma de Pagamento</label>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Forma de Pagamento</label>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       {(['money', 'card', 'pix', 'other'] as const).map(pm => (
                         <button key={pm} onClick={() => setBillingPaymentMethod(pm)}
-                          style={{ padding: '8px', borderRadius: '8px', border: `2px solid ${billingPaymentMethod === pm ? '#1565C0' : '#E5E7EB'}`, background: billingPaymentMethod === pm ? 'rgba(21,101,192,0.08)' : '#fff', fontWeight: 600, fontSize: '13px', cursor: 'pointer', color: billingPaymentMethod === pm ? '#1565C0' : '#374151' }}>
+                          style={{ padding: '8px', borderRadius: '8px', border: `2px solid ${billingPaymentMethod === pm ? 'var(--gold)' : 'var(--border-default)'}`, background: billingPaymentMethod === pm ? 'var(--gold-dim)' : 'var(--bg-base)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', color: billingPaymentMethod === pm ? 'var(--gold)' : 'var(--text-primary)' }}>
                           {pm === 'money' ? 'Dinheiro' : pm === 'card' ? 'Cartão' : pm === 'pix' ? 'Pix' : 'Outro'}
                         </button>
                       ))}
@@ -529,11 +545,11 @@ export default function Clients() {
             ) : (
               /* Regular appointment: always show payment method */
               <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#6B7280', marginBottom: '6px' }}>Forma de Pagamento</label>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Forma de Pagamento</label>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                   {(['money', 'card', 'pix', 'other'] as const).map(pm => (
                     <button key={pm} onClick={() => setBillingPaymentMethod(pm)}
-                      style={{ padding: '8px', borderRadius: '8px', border: `2px solid ${billingPaymentMethod === pm ? '#1565C0' : '#E5E7EB'}`, background: billingPaymentMethod === pm ? 'rgba(21,101,192,0.08)' : '#fff', fontWeight: 600, fontSize: '13px', cursor: 'pointer', color: billingPaymentMethod === pm ? '#1565C0' : '#374151' }}>
+                      style={{ padding: '8px', borderRadius: '8px', border: `2px solid ${billingPaymentMethod === pm ? 'var(--gold)' : 'var(--border-default)'}`, background: billingPaymentMethod === pm ? 'var(--gold-dim)' : 'var(--bg-base)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', color: billingPaymentMethod === pm ? 'var(--gold)' : 'var(--text-primary)' }}>
                       {pm === 'money' ? 'Dinheiro' : pm === 'card' ? 'Cartão' : pm === 'pix' ? 'Pix' : 'Outro'}
                     </button>
                   ))}
@@ -544,12 +560,64 @@ export default function Clients() {
             {/* Actions */}
             <div style={{ display: 'flex', gap: '10px', marginTop: '0.5rem' }}>
               <button onClick={() => setBillingAppt(null)}
-                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid #E5E7EB', background: '#fff', fontWeight: 600, cursor: 'pointer', color: '#374151' }}>
+                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-elevated)', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>
                 Voltar
               </button>
               <button onClick={confirmBilling} disabled={billMutation.isPending}
-                style={{ flex: 2, padding: '10px', borderRadius: '8px', border: 'none', background: '#1565C0', color: '#fff', fontWeight: 700, cursor: 'pointer', opacity: billMutation.isPending ? 0.7 : 1 }}>
+                style={{ flex: 2, padding: '10px', borderRadius: '8px', border: 'none', background: 'var(--gold)', color: '#080808', fontWeight: 700, cursor: 'pointer', opacity: billMutation.isPending ? 0.7 : 1 }}>
                 {billMutation.isPending ? 'Processando...' : 'Confirmar e Concluir'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {whatsappClient && createPortal(
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={e => { if (e.target === e.currentTarget) setWhatsappClient(null); }}
+        >
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: '14px', padding: '2rem', width: '100%', maxWidth: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ background: '#25D366', color: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <IconWhatsApp />
+                </div>
+                <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)' }}>Enviar Mensagem</span>
+              </div>
+              <button onClick={() => setWhatsappClient(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--text-muted)' }}>✕</button>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                Mensagem para {whatsappClient.name}
+              </label>
+              <textarea
+                value={whatsappMessage}
+                onChange={e => setWhatsappMessage(e.target.value)}
+                rows={5}
+                style={{ width: '100%', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-default)', background: 'var(--bg-base)', color: 'var(--text-primary)', fontSize: '14.5px', resize: 'vertical', outline: 'none', lineHeight: 1.5, fontFamily: 'inherit' }}
+                autoFocus
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => setWhatsappClient(null)}
+                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-elevated)', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  let num = whatsappClient.phone.replace(/\D/g, '');
+                  if (!num.startsWith('55')) num = '55' + num;
+                  const url = `https://wa.me/${num}?text=${encodeURIComponent(whatsappMessage)}`;
+                  window.open(url, '_blank');
+                  setWhatsappClient(null);
+                }}
+                style={{ flex: 2, padding: '12px', borderRadius: '8px', border: 'none', background: '#25D366', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                <IconWhatsApp />
+                Abrir WhatsApp
               </button>
             </div>
           </div>

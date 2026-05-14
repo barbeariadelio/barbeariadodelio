@@ -1,9 +1,9 @@
-﻿$bg:         #111111;
-$bg-card:    #1A1A1A;
-$gold:       #1565C0;
-$text-main:  #F5F5F5;
-$text-dim:   #A3A3A3;
-$border:     #2C2C2C;
+$bg:         var(--bg-elevated);
+$bg-card:    var(--bg-surface);
+$gold:       var(--gold);
+$text-main:  var(--text-primary);
+$text-dim:   var(--text-muted);
+$border:     var(--border-default);
 
 .overlay {
   position: fixed;

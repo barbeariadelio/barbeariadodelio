@@ -216,6 +216,8 @@ export default function Dashboard() {
             onStatusChange={async (id, s, opts) => { await statusMut.mutateAsync({ id, status: s, options: opts }); }}
             onDelete={async (id) => { await deleteMut.mutateAsync(id); }}
             isProcessing={statusMut.isPending || deleteMut.isPending}
+            onEdit={(appt: any) => { setEditAppt(appt); setShowForm(true); }}
+            onViewProfile={(clientId) => navigate(`/clients?id=${clientId}`)}
           />
         </div>
       )}

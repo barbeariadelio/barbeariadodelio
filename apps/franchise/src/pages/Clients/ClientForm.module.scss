@@ -1,9 +1,9 @@
-$bg-card:    #111111;
-$bg-surface: #1A1A1A;
-$gold:       #1565C0;
-$text-main:  #F5F5F5;
-$text-dim:   #A0A0A0;
-$border:     rgba(255,255,255,0.06);
+$bg-card:    var(--bg-surface);
+$bg-surface: var(--bg-elevated);
+$gold:       var(--gold);
+$text-main:  var(--text-primary);
+$text-dim:   var(--text-muted);
+$border:     var(--border-default);
 
 .overlay {
   position: fixed;
@@ -99,11 +99,11 @@ $border:     rgba(255,255,255,0.06);
 }
 
 .input, .textarea {
-  background: #1A1A1A;
-  border: 1px solid #2C2C2C;
+  background: $bg-surface;
+  border: 1px solid $border;
   border-radius: 4px;
   padding: 0.75rem 1rem;
-  color: white;
+  color: $text-main;
   font-family: inherit;
   font-size: 0.875rem;
   outline: none;

@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { api } from '../../api/client';
 import { 
@@ -32,19 +33,46 @@ interface UnitConfig {
   workingHours?: { start: string; end: string; lunchStart?: string; lunchEnd?: string };
 }
 
+type EditableAppointment = CalendarAppointment | ScheduleAppointment;
+type StatusOptions = {
+  price?: number;
+  paymentMethod?: 'money' | 'card' | 'pix' | 'other';
+};
+type AppointmentPayload = Record<string, unknown>;
+
+function getRefId(value: unknown) {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number') return String(value);
+  if (value && typeof value === 'object' && '_id' in value) {
+    const id = (value as { _id?: unknown })._id;
+    if (typeof id === 'string') return id;
+    if (typeof id === 'number') return String(id);
+  }
+  return undefined;
+}
+
+function getErrorMessage(err: unknown) {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const response = (err as { response?: { data?: { message?: unknown } } }).response;
+    if (typeof response?.data?.message === 'string') return response.data.message;
+  }
+  return 'Erro ao atualizar agendamento. Tente novamente.';
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const unitId = localStorage.getItem('selectedUnitId') || import.meta.env.VITE_UNIT_ID || (user as any)?.unitId;
+  const navigate = useNavigate();
+  const unitId = localStorage.getItem('selectedUnitId') || import.meta.env.VITE_UNIT_ID || user?.unitId;
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
   const isStaff = user?.role === 'employee';
-  const userId = (user as any)?.id || (user as any)?._id;
+  const userId = user?._id;
 
   const [view, setView] = useState<'calendar' | 'schedule'>('calendar');
   const [calendarMonth, setCalendarMonth] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
-  const [editAppt, setEditAppt] = useState<any>(null);
+  const [editAppt, setEditAppt] = useState<EditableAppointment | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   /* ── Month appointments (calendar view) ── */
@@ -64,8 +92,8 @@ export default function Dashboard() {
     if (!isStaff || !userId) return monthAppointmentsRaw;
     const currentUserIdStr = userId.toString();
     return monthAppointmentsRaw.filter(a => {
-      const empId = (a.employeeId as any)?._id || a.employeeId;
-      return empId?.toString() === currentUserIdStr;
+      const empId = getRefId(a.employeeId);
+      return empId === currentUserIdStr;
     });
   }, [monthAppointmentsRaw, isStaff, userId]);
 
@@ -85,8 +113,8 @@ export default function Dashboard() {
     if (!isStaff || !userId) return dayAppointmentsRaw;
     const currentUserIdStr = userId.toString();
     return dayAppointmentsRaw.filter(a => {
-      const empId = (a.employeeId as any)?._id || a.employeeId;
-      return empId?.toString() === currentUserIdStr;
+      const empId = getRefId(a.employeeId);
+      return empId === currentUserIdStr;
     });
   }, [dayAppointmentsRaw, isStaff, userId]);
 
@@ -132,7 +160,7 @@ export default function Dashboard() {
 
   /* ── Mutations for Shared Components ── */
   const statusMut = useMutation({
-    mutationFn: ({ id, status, options }: { id: string; status: string; options?: any }) =>
+    mutationFn: ({ id, status, options }: { id: string; status: string; options?: StatusOptions }) =>
       api.patch(`/appointments/${id}/status`, { status, ...options }),
     onSuccess: async () => {
       await Promise.all([
@@ -142,9 +170,8 @@ export default function Dashboard() {
       handleScheduleUpdate();
       handleMonthUpdate();
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.message || 'Erro ao atualizar agendamento. Tente novamente.';
-      setErrorMsg(msg);
+    onError: (err: unknown) => {
+      setErrorMsg(getErrorMessage(err));
       setTimeout(() => setErrorMsg(null), 5000);
     },
   });
@@ -155,12 +182,12 @@ export default function Dashboard() {
   });
 
   const blockMut = useMutation({
-    mutationFn: (payload: any) => api.post('/appointments', payload),
+    mutationFn: (payload: AppointmentPayload) => api.post('/appointments', payload),
     onSuccess: () => { handleScheduleUpdate(); handleMonthUpdate(); },
   });
 
   const updateApptMut = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => api.patch(`/appointments/${id}`, data),
+    mutationFn: ({ id, data }: { id: string; data: AppointmentPayload }) => api.patch(`/appointments/${id}`, data),
     onSuccess: () => { handleScheduleUpdate(); handleMonthUpdate(); },
   });
 
@@ -216,6 +243,8 @@ export default function Dashboard() {
             onStatusChange={async (id, s, opts) => { await statusMut.mutateAsync({ id, status: s, options: opts }); }}
             onDelete={async (id) => { await deleteMut.mutateAsync(id); }}
             isProcessing={statusMut.isPending || deleteMut.isPending}
+            onEdit={(appt) => { setEditAppt(appt); setShowForm(true); }}
+            onViewProfile={(clientId) => navigate(`/clients?id=${clientId}`)}
           />
         </div>
       )}
