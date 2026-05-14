@@ -245,7 +245,7 @@
         <div class="grid">
             <!-- ADMIN -->
             <!-- Admin / Morada do Sol -->
-            <a href="http://localhost:5173" id="admin-card" class="card" target="_blank" rel="noopener noreferrer">
+            <a href="/admin/" id="admin-card" class="card" target="_blank" rel="noopener noreferrer">
                 <div class="card-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -259,7 +259,7 @@
             </a>
 
             <!-- Franchise / Nova Veneza -->
-            <a href="http://localhost:5174" id="franchise-card" class="card" target="_blank" rel="noopener noreferrer">
+            <a href="/franchise-app/" id="franchise-card" class="card" target="_blank" rel="noopener noreferrer">
                 <div class="card-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -274,7 +274,7 @@
             </a>
 
             <!-- Booking -->
-            <a href="http://localhost:5175" id="booking-card" class="card" target="_blank" rel="noopener noreferrer">
+            <a href="/booking/" id="booking-card" class="card" target="_blank" rel="noopener noreferrer">
                 <div class="card-icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
                         stroke-linecap="round" stroke-linejoin="round">
@@ -297,15 +297,14 @@
     </div>
 
     <script>
-        // Production fallback (handled by server in Railway)
-        const isProd = window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-
-        if (isProd) {
-            document.getElementById('admin-card').href = '/admin/';
-            document.getElementById('franchise-card').href = '/franchise-app/';
-            document.getElementById('booking-card').href = '/booking/';
+        // In development, the apps run on separate Vite dev servers
+        // We override the default production paths with local dev ports
+        if (window.location.hostname === 'localhost') {
+            document.getElementById('admin-card').href = 'http://localhost:5173';
+            document.getElementById('franchise-card').href = 'http://localhost:5174';
+            document.getElementById('booking-card').href = 'http://localhost:5175';
         }
     </script>
 </body>
 
-</html>perfei
+</html>
