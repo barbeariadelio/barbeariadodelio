@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
@@ -20,6 +21,12 @@ interface PackageSubscription {
   };
   startDate: string;
   active: boolean;
+}
+
+interface AvailablePackage {
+  _id: string;
+  name: string;
+  price: number;
 }
 
 interface Client {
@@ -63,6 +70,13 @@ function formatDate(iso: string) {
   return `${d}/${m}/${y}`;
 }
 function isGuestEmail(email?: string) { return email?.includes('@delio.guest') ?? false; }
+function getErrorMessage(err: unknown) {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const response = (err as { response?: { data?: { message?: unknown } } }).response;
+    if (typeof response?.data?.message === 'string') return response.data.message;
+  }
+  return 'Erro ao atribuir pacote';
+}
 
 function useDebounce<T>(value: T, delay: number): T {
   const [debounced, setDebounced] = useState(value);
@@ -75,7 +89,7 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export default function Clients() {
   const { user } = useAuth();
-  const unitId = localStorage.getItem('selectedUnitId') || import.meta.env.VITE_UNIT_ID || (user as any)?.unitId;
+  const unitId = localStorage.getItem('selectedUnitId') || import.meta.env.VITE_UNIT_ID || user?.unitId;
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('id'));
@@ -122,7 +136,7 @@ export default function Clients() {
     enabled: !!user,
   });
 
-  const { data: availablePackages = [] } = useQuery<any[]>({
+  const { data: availablePackages = [] } = useQuery<AvailablePackage[]>({
     queryKey: ['available-packages', unitId],
     queryFn: async () => {
       const { data } = await api.get('/services?type=package');
@@ -431,8 +445,8 @@ export default function Clients() {
                           setToast({ message: `Pacote "${pkg.name}" atribuído com sucesso!`, type: 'success' });
                           qc.invalidateQueries({ queryKey: ['clients'] });
                           setShowPackageModal(false);
-                        } catch (err: any) {
-                          setToast({ message: err.response?.data?.message || 'Erro ao atribuir pacote', type: 'error' });
+                        } catch (err: unknown) {
+                          setToast({ message: getErrorMessage(err), type: 'error' });
                         }
                       }}
                     >
