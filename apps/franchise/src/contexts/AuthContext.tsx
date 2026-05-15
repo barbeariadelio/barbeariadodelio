@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import type { User } from '@barber/types';
-import { api } from '../api/client';
+import { api, clearAuthStorage, getStoredAccessToken, storageKeys } from '../api/client';
 
 interface AuthContextValue {
   user: User | null;
@@ -20,10 +20,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const urlUnitId = params.get('unitId');
     
     if (urlToken) {
-      localStorage.setItem('accessToken', urlToken);
+      localStorage.setItem(storageKeys.accessToken, urlToken);
     }
     if (urlUnitId) {
-      localStorage.setItem('selectedUnitId', urlUnitId);
+      localStorage.setItem(storageKeys.selectedUnitId, urlUnitId);
     }
 
     if (urlToken || urlUnitId) {
@@ -32,7 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const stored = localStorage.getItem('user');
+      const stored = localStorage.getItem(storageKeys.user);
       return stored ? (JSON.parse(stored) as User) : null;
     } catch {
       return null;
@@ -41,13 +41,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     async function init() {
-      const token = localStorage.getItem('accessToken');
+      const token = getStoredAccessToken();
       if (token && !user) {
         try {
           const { data } = await api.get('/auth/me');
           handleSetUser(data);
         } catch {
-          localStorage.removeItem('accessToken');
+          localStorage.removeItem(storageKeys.accessToken);
         }
       }
       setLoading(false);
@@ -56,16 +56,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   function handleSetUser(u: User | null) {
-    if (u) localStorage.setItem('user', JSON.stringify(u));
+    if (u) localStorage.setItem(storageKeys.user, JSON.stringify(u));
     else {
-      localStorage.removeItem('user');
-      localStorage.removeItem('accessToken');
+      localStorage.removeItem(storageKeys.user);
+      localStorage.removeItem(storageKeys.accessToken);
     }
     setUser(u);
   }
 
   function logout() {
-    localStorage.clear();
+    clearAuthStorage();
     setUser(null);
   }
 

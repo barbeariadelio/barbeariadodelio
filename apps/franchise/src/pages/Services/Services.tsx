@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api/client';
+import { api, getSelectedUnitId } from '../../api/client';
 import ServiceForm from './ServiceForm';
 import { ConfirmModal } from '@barber/ui';
 import styles from './Services.module.scss';
@@ -526,7 +526,7 @@ export default function Services() {
   const [confirmDeactivate, setConfirmDeactivate] = useState<Service | null>(null);
   const [activeTab, setActiveTab]               = useState<'single' | 'package'>('single');
   const qc = useQueryClient();
-  const unitId = localStorage.getItem('selectedUnitId') || import.meta.env.VITE_UNIT_ID || '';
+  const unitId = getSelectedUnitId() || import.meta.env.VITE_UNIT_ID || '';
 
   const { data: services = [], isLoading } = useQuery<Service[]>({
     queryKey: ['services', unitId],

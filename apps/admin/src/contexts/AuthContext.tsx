@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import type { User } from '@barber/types';
+import { clearAuthStorage, storageKeys } from '../api/client';
 
 interface AuthContextValue {
   user: User | null;
@@ -12,7 +13,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     try {
-      const stored = localStorage.getItem('user');
+      const stored = localStorage.getItem(storageKeys.user);
       return stored ? (JSON.parse(stored) as User) : null;
     } catch {
       return null;
@@ -20,13 +21,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   function handleSetUser(u: User | null) {
-    if (u) localStorage.setItem('user', JSON.stringify(u));
-    else localStorage.removeItem('user');
+    if (u) localStorage.setItem(storageKeys.user, JSON.stringify(u));
+    else localStorage.removeItem(storageKeys.user);
     setUser(u);
   }
 
   function logout() {
-    localStorage.clear();
+    clearAuthStorage();
     setUser(null);
   }
 

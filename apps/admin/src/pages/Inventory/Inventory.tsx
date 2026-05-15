@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api/client';
+import { api, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { ConfirmModal } from '@barber/ui';
 import ProductForm from './ProductForm';
@@ -31,7 +31,7 @@ function IconPackage() {
 
 export default function Inventory() {
   const { user } = useAuth();
-  const unitId = localStorage.getItem('selectedUnitId') || (user as any)?.unitId;
+  const unitId = getSelectedUnitId() || (user as any)?.unitId;
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showDetails, setShowDetails] = useState(false);

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api/client';
+import { api, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import ClientForm from './ClientForm';
 import styles from './Clients.module.scss';
@@ -89,7 +89,7 @@ function useDebounce<T>(value: T, delay: number): T {
 
 export default function Clients() {
   const { user } = useAuth();
-  const unitId = localStorage.getItem('selectedUnitId') || import.meta.env.VITE_UNIT_ID || user?.unitId;
+  const unitId = getSelectedUnitId() || import.meta.env.VITE_UNIT_ID || user?.unitId;
   const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('id'));

@@ -2,7 +2,7 @@ import { FormEvent, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { api } from '../../api/client';
+import { api, storageKeys } from '../../api/client';
 import styles from './Login.module.scss';
 import logo from '../../assets/logo.png';
 
@@ -35,13 +35,13 @@ export default function Login() {
     setLoading(true); setError(null);
     try {
       const { data: auth } = await api.post('/auth/login', { identifier: email.trim(), password, appId: 'franchise' });
-      localStorage.setItem('accessToken', auth.accessToken);
-      localStorage.setItem('refreshToken', auth.refreshToken);
-      const { data: me } = await api.get('/auth/me');
+      localStorage.setItem(storageKeys.accessToken, auth.accessToken);
+      localStorage.setItem(storageKeys.refreshToken, auth.refreshToken);
+      const me = auth.user || (await api.get('/auth/me')).data;
       
       if (me.role === 'client') {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
+        localStorage.removeItem(storageKeys.accessToken);
+        localStorage.removeItem(storageKeys.refreshToken);
         setError('Acesso restrito. Use o aplicativo de agendamento.');
         return;
       }

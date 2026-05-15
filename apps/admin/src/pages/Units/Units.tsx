@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api/client';
+import { api, getStoredAccessToken } from '../../api/client';
 import styles from './Units.module.scss';
 
 interface Unit {
@@ -168,7 +168,7 @@ export default function Units() {
                         <div className={styles.unitActions}>
                           <button className={styles.editUnitBtn} onClick={() => handleEdit(unit)}>Editar</button>
                           <a 
-                            href={`${routes.franchise}?unitId=${unit._id}&token=${localStorage.getItem('accessToken')}`}
+                            href={`${routes.franchise}?unitId=${unit._id}&token=${getStoredAccessToken() ?? ''}`}
                             className={styles.enterUnitBtn}
                           >
                             Entrar no Sistema <IconExternal />

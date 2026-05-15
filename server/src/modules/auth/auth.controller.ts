@@ -32,7 +32,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    ok(res, user);
+    ok(res, { ...tokens, user });
   } catch (e) {
     next(e);
   }
@@ -59,7 +59,7 @@ export async function bookingLogin(req: Request, res: Response, next: NextFuncti
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    ok(res, user);
+    ok(res, { ...tokens, user });
   } catch (e) {
     next(e);
   }
@@ -80,7 +80,7 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
       maxAge: 15 * 60 * 1000,
     });
 
-    ok(res, { success: true });
+    ok(res, result);
   } catch (e) {
     next(e);
   }

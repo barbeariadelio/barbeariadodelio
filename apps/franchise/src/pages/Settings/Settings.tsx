@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
-import { api } from '../../api/client';
+import { api, getSelectedUnitId } from '../../api/client';
 import styles from './Settings.module.scss';
 
 interface Unit {
@@ -50,7 +50,7 @@ export default function Settings() {
   const [unitSuccess, setUnitSuccess] = useState(false);
   const [unitError, setUnitError] = useState<string | null>(null);
 
-  const unitId = localStorage.getItem('selectedUnitId') || import.meta.env.VITE_UNIT_ID || (user as any)?.unitId;
+  const unitId = getSelectedUnitId() || import.meta.env.VITE_UNIT_ID || (user as any)?.unitId;
 
   const { data: unit } = useQuery<Unit>({
     queryKey: ['unit', unitId],

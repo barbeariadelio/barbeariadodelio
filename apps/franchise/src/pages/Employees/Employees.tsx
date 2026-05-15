@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api/client';
+import { api, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import EmployeeForm from './EmployeeForm';
 import EmployeeVales from './EmployeeVales';
@@ -146,7 +146,7 @@ function EmployeeDetail({ emp, onClose, onEdit, onToggle, isToggling }: DetailPr
 
 export default function Employees() {
   const { user } = useAuth();
-  const unitId = localStorage.getItem('selectedUnitId') || import.meta.env.VITE_UNIT_ID || (user as any)?.unitId;
+  const unitId = getSelectedUnitId() || import.meta.env.VITE_UNIT_ID || (user as any)?.unitId;
   const [formTarget, setFormTarget]         = useState<Employee | null | 'new'>(null);
   const [detailTarget, setDetailTarget]     = useState<Employee | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<Employee | null>(null);

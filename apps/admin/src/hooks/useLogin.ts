@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { api } from '../api/client';
+import { api, storageKeys } from '../api/client';
 import type { User } from '@barber/types';
 
 interface LoginForm {
@@ -13,6 +13,7 @@ interface LoginForm {
 interface AuthResponse {
   accessToken: string;
   refreshToken: string;
+  user?: MeResponse;
 }
 
 interface MeResponse {
@@ -35,14 +36,14 @@ export function useLogin() {
     setError(null);
     try {
       const { data: auth } = await api.post<AuthResponse>('/auth/login', form);
-      localStorage.setItem('accessToken', auth.accessToken);
-      localStorage.setItem('refreshToken', auth.refreshToken);
+      localStorage.setItem(storageKeys.accessToken, auth.accessToken);
+      localStorage.setItem(storageKeys.refreshToken, auth.refreshToken);
 
-      const { data: me } = await api.get<MeResponse>('/auth/me');
+      const me = auth.user || (await api.get<MeResponse>('/auth/me')).data;
       
       if (me.role === 'client') {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
+        localStorage.removeItem(storageKeys.accessToken);
+        localStorage.removeItem(storageKeys.refreshToken);
         throw new Error('Acesso restrito. Use o aplicativo de agendamento.');
       }
 

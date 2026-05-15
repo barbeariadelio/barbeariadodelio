@@ -4,7 +4,7 @@ import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { api } from '../../api/client';
+import { api, getSelectedUnitId } from '../../api/client';
 import { 
   CalendarView, 
   StaffSchedule, 
@@ -63,7 +63,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const unitId = localStorage.getItem('selectedUnitId') || import.meta.env.VITE_UNIT_ID || user?.unitId;
+  const unitId = getSelectedUnitId() || import.meta.env.VITE_UNIT_ID || user?.unitId;
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
   const isStaff = user?.role === 'employee';
   const userId = user?._id;

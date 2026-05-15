@@ -1,7 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
-import { api } from '../../api/client';
+import { api, getSelectedUnitId } from '../../api/client';
 import styles from './EmployeeForm.module.scss';
 
 interface Employee {
@@ -130,7 +130,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
               description: `Vale Inicial (na criação)`,
               date: new Date().toISOString().split('T')[0],
               employeeId: empId,
-              unitId: res.data?.unitId || res.data?.employee?.unitId || localStorage.getItem('selectedUnitId') || (user as any)?.unitId
+              unitId: res.data?.unitId || res.data?.employee?.unitId || getSelectedUnitId() || (user as any)?.unitId
             });
           } catch (e) {
             console.error('Falha ao registrar vale inicial:', e);

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../../contexts/AuthContext';
-import { api } from '../../api/client';
+import { api, getSelectedUnitId } from '../../api/client';
 import { 
   CalendarView, 
   StaffSchedule, 
@@ -37,7 +37,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const unitId = localStorage.getItem('selectedUnitId') || (user as any)?.unitId;
+  const unitId = getSelectedUnitId() || (user as any)?.unitId;
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
   const isStaff = user?.role === 'employee';
   const userId = (user as any)?.id || (user as any)?._id;
