@@ -6,11 +6,14 @@ timeout /t 2 /nobreak >nul
 echo === Removendo index.lock ===
 del /f /q ".git\index.lock" 2>nul
 
+echo === Configurando repositorio remoto ===
+git remote set-url origin https://github.com/barbeariadelio/barbeariadodelio.git
+
 echo === Fazendo git add ===
 git add -A
 
 echo === Fazendo commit ===
-git commit -m "feat: major refactor across admin, franchise, booking apps and server modules"
+git commit -m "feat: atualiza calendário, agenda, agendamentos e configurações do servidor"
 
 echo === Fazendo push ===
 git push origin main
