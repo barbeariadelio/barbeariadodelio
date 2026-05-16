@@ -1,5 +1,5 @@
 import { FormEvent, useState, useRef, useEffect } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { api, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import styles from './AppointmentForm.module.scss';
@@ -16,19 +16,31 @@ interface Client {
     itemLimits?: { serviceId: string; quantity: number }[];
   }[];
 }
-interface Service { 
-  _id: string; 
-  name: string; 
-  durationMinutes: number; 
-  price: number; 
+interface Service {
+  _id: string;
+  name: string;
+  durationMinutes: number;
+  price: number;
   type: 'single' | 'package';
   packageItems?: { serviceId: string; quantity: number }[];
+}
+interface Product { _id: string; name: string; price: number; stockQuantity: number; isActive: boolean; }
+interface ApptProduct { productId: string; name: string; quantity: number; unitPrice: number; }
+
+function advanceDate(iso: string, freq: 'weekly' | 'biweekly' | 'monthly', times: number): string {
+  const d = new Date(iso + 'T12:00:00');
+  if (freq === 'weekly')   d.setDate(d.getDate() + times * 7);
+  else if (freq === 'biweekly') d.setDate(d.getDate() + times * 14);
+  else d.setMonth(d.getMonth() + times);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 interface Props {
   onClose: () => void;
   onSuccess: () => void;
   initialDate?: string;
+  initialEmployeeId?: string;
+  initialTime?: string;
   appointment?: any;
 }
 
@@ -53,7 +65,7 @@ function IconX() {
   );
 }
 
-export default function AppointmentForm({ onClose, onSuccess, initialDate, appointment }: Props) {
+export default function AppointmentForm({ onClose, onSuccess, initialDate, initialEmployeeId, initialTime, appointment }: Props) {
   const { user } = useAuth();
   const isStaff = user?.role === 'employee';
   const userId = (user as any)?._id || (user as any)?.id || '';
@@ -62,14 +74,25 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
   const [clientId, setClientId] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [showClientList, setShowClientList] = useState(false);
-  const [employeeId, setEmployeeId] = useState('');
+  const [employeeId, setEmployeeId] = useState(initialEmployeeId ?? '');
   const [serviceId, setServiceId] = useState('');
   const [date, setDate] = useState(initialDate ?? todayISO());
-  const [startTime, setStartTime] = useState('09:00');
+  const [startTime, setStartTime] = useState(initialTime ?? '09:00');
   const [notes, setNotes] = useState('');
   const [usePackage, setUsePackage] = useState(false);
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // Repeat
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
+  const [repeatFrequency, setRepeatFrequency] = useState<'weekly' | 'biweekly' | 'monthly'>('weekly');
+  const [repeatCount, setRepeatCount] = useState(3);
+  const [repeatProgress, setRepeatProgress] = useState<{ current: number; total: number } | null>(null);
+
+  // Products
+  const [apptProducts, setApptProducts] = useState<ApptProduct[]>([]);
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [productQty, setProductQty] = useState(1);
 
   const clientBoxRef = useRef<HTMLDivElement>(null);
 
@@ -137,6 +160,13 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
     enabled: !!unitId,
   });
 
+  const { data: products = [] } = useQuery<Product[]>({
+    queryKey: ['products', unitId],
+    queryFn: () => api.get(`/products?unitId=${unitId}`).then(r => Array.isArray(r.data) ? r.data : r.data?.products ?? []),
+    enabled: !!unitId,
+  });
+  const activeProducts = products.filter(p => p.isActive && p.stockQuantity > 0);
+
   const filteredClients = clientSearch.trim()
     ? clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase().trim()))
     : clients;
@@ -158,20 +188,9 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
     setSelectedPackageId('');
   }
 
-  const mutation = useMutation({
-    mutationFn: (payload: object) => {
-      if (appointment?._id) {
-        return api.patch(`/appointments/${appointment._id}`, payload);
-      }
-      return api.post('/appointments', payload);
-    },
-    onSuccess,
-    onError: (err: unknown) => {
-      setError(err instanceof Error ? err.message : `Erro ao ${appointment?._id ? 'atualizar' : 'criar'} agendamento.`);
-    },
-  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!unitId || !clientId || !employeeId || !serviceId) {
       setError('Preencha todos os campos obrigatórios.');
@@ -179,14 +198,12 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
     }
     const service = services.find(s => s._id === serviceId);
 
-    // Date/Time validation
     const now = new Date();
     const selectedDateTime = new Date(`${date}T${startTime}`);
     if (selectedDateTime < now) {
       setError('Não é possível agendar em uma data ou hora que já passou.');
       return;
     }
-
     if (selectedUnit?.workingDays && selectedUnit.workingDays.length > 0) {
       const dayOfWeek = new Date(date + 'T12:00:00').getDay();
       if (!selectedUnit.workingDays.includes(dayOfWeek)) {
@@ -194,28 +211,97 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
         return;
       }
     }
-    
-    const finish = (finalIsPackage: boolean) => {
-      mutation.mutate({
-        unitId,
-        clientId,
-        employeeId,
-        serviceId,
-        date,
-        startTime,
-        notes,
-        price: finalIsPackage ? 0 : (service?.price ?? 0),
-        isPackage: finalIsPackage
-      });
+
+    const buildPayload = (apptDate: string, finalIsPackage: boolean, seriesId?: string) => ({
+      unitId,
+      clientId,
+      employeeId,
+      serviceId,
+      date: apptDate,
+      startTime,
+      notes,
+      price: finalIsPackage ? 0 : (service?.price ?? 0),
+      isPackage: finalIsPackage,
+      products: apptProducts.length > 0 ? apptProducts : undefined,
+      seriesId,
+    });
+
+    const createOne = async (apptDate: string, finalIsPackage: boolean, seriesId?: string) => {
+      if (appointment?._id) {
+        await api.patch(`/appointments/${appointment._id}`, buildPayload(apptDate, finalIsPackage));
+      } else {
+        await api.post('/appointments', buildPayload(apptDate, finalIsPackage, seriesId));
+      }
+    };
+
+    const doCreate = async (finalIsPackage: boolean) => {
+      setError(null);
+      setIsSubmitting(true);
+      try {
+        if (!repeatEnabled || appointment?._id) {
+          await createOne(date, finalIsPackage);
+          onSuccess();
+        } else {
+          // Build full list of dates: original + repeatCount more
+          const total = repeatCount + 1;
+          const dates: string[] = [date];
+          for (let i = 1; i <= repeatCount; i++) {
+            dates.push(advanceDate(date, repeatFrequency, i));
+          }
+
+          // All appointments in this repeat series share the same seriesId
+          const seriesId = Date.now().toString(36) + Math.random().toString(36).slice(2);
+
+          setRepeatProgress({ current: 0, total });
+          let created = 0;
+          const skipped: string[] = [];
+
+          for (let i = 0; i < dates.length; i++) {
+            try {
+              await createOne(dates[i], finalIsPackage, seriesId);
+              created++;
+            } catch (err: any) {
+              // Skip conflicts (409) and non-working-day errors (400); abort on unexpected errors
+              const status = err?.response?.status;
+              if (status === 409 || status === 400) {
+                skipped.push(dates[i]);
+              } else {
+                throw err;
+              }
+            }
+            setRepeatProgress({ current: i + 1, total });
+          }
+
+          setRepeatProgress(null);
+
+          if (created === 0) {
+            setError('Nenhum agendamento foi criado. Verifique conflitos de horário.');
+            return;
+          }
+
+          if (skipped.length > 0) {
+            setError(`${created} agendamento(s) criado(s). ${skipped.length} data(s) pulada(s) por conflito: ${skipped.join(', ')}`);
+            // Still refresh the calendar but don't close — let the user see the partial result
+            return;
+          }
+
+          onSuccess();
+        }
+      } catch (err: any) {
+        setRepeatProgress(null);
+        const serverMsg = err?.response?.data?.message;
+        setError(serverMsg || err?.message || 'Erro ao criar agendamento.');
+      } finally {
+        setIsSubmitting(false);
+      }
     };
 
     if (selectedPackageId && !usePackage) {
-      // User chose to SIGN a new package during this booking
       api.post(`/clients/${clientId}/packages`, { packageId: selectedPackageId })
-        .then(() => finish(true))
+        .then(() => doCreate(true))
         .catch(err => setError(err.response?.data?.message || 'Erro ao assinar pacote.'));
     } else {
-      finish(usePackage);
+      void doCreate(usePackage);
     }
   }
 
@@ -420,12 +506,110 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
             <textarea className={styles.textarea} value={notes} onChange={e => setNotes(e.target.value)} rows={3} />
           </div>
 
+          {/* ── Products ── */}
+          {!appointment && (
+            <div className={styles.field}>
+              <label className={styles.label}>Produtos (opcional)</label>
+              {activeProducts.length > 0 && (
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: apptProducts.length > 0 ? '0.5rem' : 0 }}>
+                  <select
+                    className={styles.select}
+                    value={selectedProductId}
+                    onChange={e => setSelectedProductId(e.target.value)}
+                    style={{ flex: 1 }}
+                  >
+                    <option value="">Selecionar produto</option>
+                    {activeProducts.map(p => (
+                      <option key={p._id} value={p._id}>
+                        {p.name} — R$ {p.price.toFixed(2).replace('.', ',')} (estoque: {p.stockQuantity})
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min={1}
+                    value={productQty}
+                    onChange={e => setProductQty(Math.max(1, Number(e.target.value)))}
+                    className={styles.input}
+                    style={{ width: '64px' }}
+                  />
+                  <button
+                    type="button"
+                    className={styles.submitBtn}
+                    style={{ padding: '0 0.75rem', whiteSpace: 'nowrap' }}
+                    disabled={!selectedProductId}
+                    onClick={() => {
+                      const prod = activeProducts.find(p => p._id === selectedProductId);
+                      if (!prod) return;
+                      setApptProducts(prev => {
+                        const exists = prev.find(p => p.productId === prod._id);
+                        if (exists) return prev.map(p => p.productId === prod._id ? { ...p, quantity: p.quantity + productQty } : p);
+                        return [...prev, { productId: prod._id, name: prod.name, quantity: productQty, unitPrice: prod.price }];
+                      });
+                      setSelectedProductId('');
+                      setProductQty(1);
+                    }}
+                  >
+                    Adicionar
+                  </button>
+                </div>
+              )}
+              {apptProducts.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  {apptProducts.map(p => (
+                    <div key={p.productId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-surface,#F9FAFB)', border: '1px solid var(--border,#E5E7EB)', borderRadius: '6px', padding: '0.45rem 0.65rem', fontSize: '0.875rem' }}>
+                      <span style={{ fontWeight: 600, color: '#111827' }}>{p.name}</span>
+                      <span style={{ color: '#6B7280' }}>x{p.quantity} · R$ {(p.quantity * p.unitPrice).toFixed(2).replace('.', ',')}</span>
+                      <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: '0 0.25rem' }} onClick={() => setApptProducts(prev => prev.filter(x => x.productId !== p.productId))}>✕</button>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: '0.8rem', color: '#6B7280', textAlign: 'right', paddingRight: '0.25rem' }}>
+                    Sem comissão para o barbeiro
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Repeat ── */}
+          {!appointment && (
+            <div className={styles.field}>
+              <label className={styles.checkboxLabel} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 500, fontSize: '0.9rem' }}>
+                <input type="checkbox" checked={repeatEnabled} onChange={e => setRepeatEnabled(e.target.checked)} />
+                Repetir agendamento
+              </label>
+              {repeatEnabled && (
+                <div className={styles.row} style={{ marginTop: '0.5rem' }}>
+                  <div className={styles.field}>
+                    <label className={styles.label}>Frequência</label>
+                    <select className={styles.select} value={repeatFrequency} onChange={e => setRepeatFrequency(e.target.value as any)}>
+                      <option value="weekly">Semanal</option>
+                      <option value="biweekly">Quinzenal</option>
+                      <option value="monthly">Mensal</option>
+                    </select>
+                  </div>
+                  <div className={styles.field}>
+                    <label className={styles.label}>Repetições</label>
+                    <select className={styles.select} value={repeatCount} onChange={e => setRepeatCount(Number(e.target.value))}>
+                      {[1, 2, 3, 4, 5, 6, 8, 10, 12].map(n => <option key={n} value={n}>{n}×</option>)}
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {error && <p className={styles.error}>{error}</p>}
 
           <div className={styles.actions}>
-            <button type="button" className={styles.cancelBtn} onClick={onClose}>Cancelar</button>
-            <button type="submit" className={styles.submitBtn} disabled={mutation.isPending}>
-              {mutation.isPending ? 'Salvando...' : appointment ? 'Salvar Alterações' : 'Criar Agendamento'}
+            <button type="button" className={styles.cancelBtn} onClick={onClose} disabled={isSubmitting}>Cancelar</button>
+            <button type="submit" className={styles.submitBtn} disabled={isSubmitting}>
+              {repeatProgress
+                ? `Criando ${repeatProgress.current} de ${repeatProgress.total}...`
+                : isSubmitting ? 'Salvando...'
+                : appointment ? 'Salvar Alterações'
+                : repeatEnabled ? `Criar ${repeatCount + 1} Agendamentos`
+                : 'Criar Agendamento'}
             </button>
           </div>
         </form>

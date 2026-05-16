@@ -1,5 +1,6 @@
 export type TransactionType = 'income' | 'expense' | 'royalty' | 'commission';
 export type TransactionCategory = 'service' | 'product' | 'salary' | 'rent' | 'voucher' | 'commission' | 'package_use' | 'package_sale' | 'other';
+export type PaymentMethod = 'money' | 'debit' | 'credit' | 'pix' | 'package' | 'other';
 
 export interface Transaction {
   _id: string;
@@ -11,7 +12,7 @@ export interface Transaction {
   amount: number;
   description: string;
   date: string;
-  paymentMethod?: 'money' | 'card' | 'pix' | 'package' | 'other';
+  paymentMethod?: PaymentMethod;
   createdBy: string;
   createdAt: string;
 }
@@ -20,13 +21,28 @@ export interface FinanceSummary {
   totalIncome: number;
   totalExpense: number;
   netProfit: number;
-  realizedIncome: number;    // completed only
-  projectedIncome: number;   // confirmed (not yet completed)
+  realizedIncome: number;
+  projectedIncome: number;
   byUnit: UnitFinance[];
   byCategory: CategoryFinance[];
   byService: ServiceFinance[];
   byEmployee: EmployeeFinance[];
+  byPaymentMethod: PaymentMethodFinance[];
+  byProduct: ProductFinance[];
   chart: ChartPoint[];
+}
+
+export interface PaymentMethodFinance {
+  method: string;
+  amount: number;
+  count: number;
+}
+
+export interface ProductFinance {
+  name: string;
+  amount: number;
+  quantity: number;
+  count: number;
 }
 
 export interface UnitFinance {

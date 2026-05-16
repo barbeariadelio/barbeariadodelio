@@ -14,8 +14,19 @@ export interface IAppointment extends Document {
   price: number;
   isPackage?: boolean;
   usedPackageId?: mongoose.Types.ObjectId;
+  seriesId?: string;
+  source?: 'guest' | 'admin';
+  reminderSent?: boolean;
   isBilled?: boolean;
-  billingSkipped?: boolean; // billed without financial transaction (package session — no charge)
+  serviceBilled?: boolean;
+  productsBilled?: boolean;
+  billingSkipped?: boolean;
+  products?: Array<{
+    productId: mongoose.Types.ObjectId;
+    name: string;
+    quantity: number;
+    unitPrice: number;
+  }>;
 }
 
 const appointmentSchema = new Schema<IAppointment>(
@@ -36,8 +47,19 @@ const appointmentSchema = new Schema<IAppointment>(
     price: { type: Number, required: true, min: 0, default: 0 },
     isPackage: { type: Boolean, default: false },
     usedPackageId: { type: Schema.Types.ObjectId, ref: 'Service' },
+    seriesId: { type: String, index: true },
     isBilled: { type: Boolean, default: false },
+    serviceBilled: { type: Boolean, default: false },
+    productsBilled: { type: Boolean, default: false },
+    source: { type: String, enum: ['guest', 'admin'], default: undefined },
+    reminderSent: { type: Boolean, default: false },
     billingSkipped: { type: Boolean, default: false },
+    products: [{
+      productId: { type: Schema.Types.ObjectId, ref: 'Product', required: true },
+      name:      { type: String, required: true },
+      quantity:  { type: Number, required: true, min: 1 },
+      unitPrice: { type: Number, required: true, min: 0 },
+    }],
   },
   { timestamps: true },
 );

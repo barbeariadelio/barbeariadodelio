@@ -16,7 +16,8 @@ export interface IUnit extends Document {
     lunchStart?: string;
     lunchEnd?: string;
   };
-  slotInterval?: number; // Minutes between appointments
+  slotInterval?: number; // Minutes between appointments (client booking grid)
+  calendarGrid?: number; // Minutes per row in admin calendar grid
 }
 
 const unitSchema = new Schema<IUnit>(
@@ -40,6 +41,7 @@ const unitSchema = new Schema<IUnit>(
       default: () => ({ start: '08:00', end: '20:00' }),
     },
     slotInterval: { type: Number, default: 0 },
+    calendarGrid: { type: Number, default: 15 },
   },
   { timestamps: true },
 );

@@ -19,6 +19,9 @@ export interface CalendarAppointment {
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'blocked';
   isPackage?: boolean;
   isBilled?: boolean;
+  serviceBilled?: boolean;
+  productsBilled?: boolean;
+  seriesId?: string;
   usedPackageId?: string;
   price: number;
   notes?: string;
@@ -66,8 +69,9 @@ interface Props {
   canDelete?: boolean;
   canBill?: boolean;
   onStatusChange?: (id: string, status: string, options?: any) => Promise<void>;
-  onDelete?: (id: string) => Promise<void>;
+  onDelete?: (id: string, mode?: 'single' | 'this-and-future') => Promise<void>;
   isProcessing?: boolean;
+  isDeleting?: boolean;
   onEdit?: (appt: CalendarAppointment) => void;
   onViewProfile?: (clientId: string) => void;
 }
@@ -99,8 +103,9 @@ interface ModalProps {
   appt: CalendarAppointment;
   onClose: () => void;
   onStatusChange?: (id: string, status: string, options?: any) => void;
-  onDelete?: (id: string) => void;
+  onDelete?: (id: string, mode?: 'single' | 'this-and-future') => void;
   isPending: boolean;
+  isDeleting?: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
   canBill?: boolean;
@@ -155,15 +160,16 @@ function WhatsAppModal({ appt, onClose }: { appt: CalendarAppointment, onClose: 
   );
 }
 
-function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, canEdit, canDelete, canBill = true, onEdit, onViewProfile }: ModalProps) {
+function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, isDeleting, canEdit, canDelete, canBill = true, onEdit, onViewProfile }: ModalProps) {
   const c = appt.isPackage && appt.status !== 'cancelled' ? PACKAGE_COLOR : STATUS_COLORS[appt.status] || STATUS_COLORS.confirmed;
   const otherStatuses = (['confirmed', 'completed', 'cancelled'] as const).filter(s => s !== appt.status);
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmDeleteSeries, setConfirmDeleteSeries] = useState(false);
   const [isBilling, setIsBilling] = useState(false);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [localPrice, setLocalPrice] = useState(appt.price?.toString().replace('.', ',') || '0,00');
-  const [paymentMethod, setPaymentMethod] = useState<'money' | 'card' | 'pix' | 'other'>('pix');
+  const [paymentMethod, setPaymentMethod] = useState<'money' | 'debit' | 'credit' | 'pix' | 'other'>('pix');
   const [registerPayment, setRegisterPayment] = useState(true);
 
   const dateFmt = format(parseISO(appt.date), "EEEE, dd 'de' MMMM", { locale: ptBR });
@@ -232,13 +238,13 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
                   <div className={styles.billingField} style={{ marginTop: '1.25rem' }}>
                     <label className={styles.detailLabel}>Forma de Pagamento</label>
                     <div className={styles.paymentGrid}>
-                      {['money', 'card', 'pix', 'other'].map(pm => (
+                      {['money', 'debit', 'credit', 'pix', 'other'].map(pm => (
                         <button
                           key={pm}
                           className={`${styles.paymentBtn} ${paymentMethod === pm ? styles.pmActive : ''}`}
                           onClick={() => setPaymentMethod(pm as any)}
                         >
-                          {pm === 'money' ? 'Dinheiro' : pm === 'card' ? 'Cartão' : pm === 'pix' ? 'Pix' : 'Outro'}
+                          {pm === 'money' ? 'Dinheiro' : pm === 'debit' ? 'Débito' : pm === 'credit' ? 'Crédito' : pm === 'pix' ? 'Pix' : 'Outro'}
                         </button>
                       ))}
                     </div>
@@ -255,7 +261,7 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
                       className={`${styles.paymentBtn} ${paymentMethod === pm ? styles.pmActive : ''}`}
                       onClick={() => setPaymentMethod(pm as any)}
                     >
-                      {pm === 'money' ? 'Dinheiro' : pm === 'card' ? 'Cartão' : pm === 'pix' ? 'Pix' : 'Outro'}
+                      {pm === 'money' ? 'Dinheiro' : pm === 'debit' ? 'Débito' : pm === 'credit' ? 'Crédito' : pm === 'pix' ? 'Pix' : 'Outro'}
                     </button>
                   ))}
                 </div>
@@ -297,8 +303,8 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
               </button>
             )}
-            {canDelete && !appt.isBilled && (
-              <button className={styles.actionIcon} title="Excluir" onClick={() => setConfirmDelete(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-secondary)' }}>
+            {canDelete && !appt.isBilled && !appt.productsBilled && (
+              <button className={styles.actionIcon} title="Excluir" onClick={() => appt.seriesId ? setConfirmDeleteSeries(true) : setConfirmDelete(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '6px', color: 'var(--text-secondary)' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
               </button>
             )}
@@ -399,10 +405,41 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
           message={`O agendamento de ${appt.clientId?.name ?? 'cliente'} será excluído permanentemente.`}
           confirmLabel="Excluir"
           danger
-          onConfirm={() => { onDelete?.(appt._id); setConfirmDelete(false); }}
+          onConfirm={() => { onDelete?.(appt._id, 'single'); setConfirmDelete(false); }}
           onCancel={() => setConfirmDelete(false)}
           isPending={isPending}
         />
+      )}
+      {confirmDeleteSeries && (
+        <div className={styles.overlay} onClick={e => e.target === e.currentTarget && setConfirmDeleteSeries(false)} style={{ zIndex: 1001 }}>
+          <div className={styles.panel} style={{ maxWidth: 340 }}>
+            <div className={styles.panelHeader}>
+              <div className={styles.panelTitle}>Excluir Agendamento</div>
+              <button className={styles.closeBtn} onClick={() => setConfirmDeleteSeries(false)}><IconX /></button>
+            </div>
+            <div className={styles.panelBody} style={{ padding: '0.5rem 0' }}>
+              <button
+                onClick={() => { onDelete?.(appt._id, 'single'); setConfirmDeleteSeries(false); }}
+                disabled={isDeleting}
+                style={{ width: '100%', padding: '1rem 1.5rem', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: '0.9375rem', color: '#111827' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#F9FAFB')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                Remover somente este
+              </button>
+              <div style={{ height: '1px', background: '#F3F4F6', margin: '0 1rem' }} />
+              <button
+                onClick={() => { onDelete?.(appt._id, 'this-and-future'); setConfirmDeleteSeries(false); }}
+                disabled={isDeleting}
+                style={{ width: '100%', padding: '1rem 1.5rem', background: 'transparent', border: 'none', cursor: 'pointer', textAlign: 'left', fontSize: '0.9375rem', color: '#EF4444' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#FEF2F2')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                Remover este e os próximos
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {confirmCancel && (
         <ConfirmModal
@@ -432,6 +469,7 @@ export default function CalendarView({
   onStatusChange,
   onDelete,
   isProcessing = false,
+  isDeleting = false,
   onEdit,
   onViewProfile,
 }: Props) {
@@ -479,9 +517,9 @@ export default function CalendarView({
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, mode?: 'single' | 'this-and-future') => {
     if (onDelete) {
-      await onDelete(id);
+      await onDelete(id, mode);
       setSelectedAppt(null);
     }
   };
@@ -625,6 +663,7 @@ export default function CalendarView({
             onStatusChange={handleStatusChange}
             onDelete={handleDelete}
             isPending={isProcessing}
+            isDeleting={isDeleting}
             canEdit={canEdit}
             canDelete={canDelete}
             canBill={canBill}
@@ -690,6 +729,7 @@ export default function CalendarView({
           onStatusChange={handleStatusChange}
           onDelete={handleDelete}
           isPending={isProcessing}
+          isDeleting={isDeleting}
           canEdit={canEdit}
           canDelete={canDelete}
           onEdit={(a) => { setSelectedAppt(null); onEdit?.(a); }}

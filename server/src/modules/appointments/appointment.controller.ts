@@ -116,6 +116,7 @@ export async function createAppointment(req: AuthRequest, res: Response, next: N
         throw new AppError('Client record not found and could not be created', 404);
       }
     }
+    if (!data.source) data.source = 'admin';
     const appt = await service.create(data);
     
     // Create notification
@@ -170,7 +171,7 @@ export async function guestBookAppointment(req: Request, res: Response, next: Ne
 export async function updateAppointmentStatus(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const { id } = req.params;
-    const { status, price, paymentMethod, skipBilling } = req.body;
+    const { status, price, paymentMethod, skipBilling, billService, billProducts } = req.body;
 
     const appt = await AppointmentModel.findById(id);
     if (!appt) throw new AppError('Appointment not found', 404);
@@ -207,7 +208,7 @@ export async function updateAppointmentStatus(req: AuthRequest, res: Response, n
       return;
     }
 
-    const updated = await service.updateStatus(id, status, { price, paymentMethod, skipBilling });
+    const updated = await service.updateStatus(id, status, { price, paymentMethod, skipBilling, billService, billProducts });
     ok(res, updated);
   } catch (e) { next(e); }
 }
@@ -223,7 +224,8 @@ export async function deleteAppointment(req: AuthRequest, res: Response, next: N
       throw new AppError('Access denied to this unit', 403);
     }
 
-    await service.delete(id);
+    const mode = (req.query.mode as string) as 'single' | 'this-and-future' | undefined;
+    await service.delete(id, { mode });
     ok(res, { deleted: true });
   } catch (e) { next(e); }
 }

@@ -206,6 +206,8 @@ export class FinanceService {
     }
 
     const byCategoryMap = new Map<TransactionCategory, number>();
+    const byPaymentMap = new Map<string, { amount: number; count: number }>();
+    const byProductMap = new Map<string, { amount: number; quantity: number; count: number }>();
     const byEmployeeMap = new Map<string, {
       id: string; name: string;
       unitId: string; unitName: string;
@@ -238,6 +240,25 @@ export class FinanceService {
         realizedIncome += t.amount;
         unit.income += t.amount;
         day.income += t.amount;
+
+        if (t.paymentMethod && t.paymentMethod !== 'package') {
+          const pm = t.paymentMethod;
+          const prev = byPaymentMap.get(pm) ?? { amount: 0, count: 0 };
+          byPaymentMap.set(pm, { amount: prev.amount + t.amount, count: prev.count + 1 });
+        }
+
+        // Track product sales (description: "Produto: Name (xQty)")
+        if (t.category === 'product') {
+          const match = t.description?.match(/^Produto:\s*(.+?)\s*\(x(\d+)\)/);
+          const productName = match ? match[1] : (t.description || 'Produto');
+          const qty = match ? parseInt(match[2], 10) : 1;
+          const prev = byProductMap.get(productName) ?? { amount: 0, quantity: 0, count: 0 };
+          byProductMap.set(productName, {
+            amount: prev.amount + t.amount,
+            quantity: prev.quantity + qty,
+            count: prev.count + 1,
+          });
+        }
       } else if (t.type === 'expense' || t.type === 'commission') {
         totalExpense += t.amount;
         unit.expense += t.amount;
@@ -351,6 +372,10 @@ export class FinanceService {
       byCategory: Array.from(byCategoryMap.entries()).map(([category, amount]) => ({ category, amount })),
       byService: Array.from(byServiceMap.values()),
       byEmployee: Array.from(byEmployeeMap.values()),
+      byPaymentMethod: Array.from(byPaymentMap.entries()).map(([method, { amount, count }]) => ({ method, amount, count })),
+      byProduct: Array.from(byProductMap.entries())
+        .map(([name, { amount, quantity, count }]) => ({ name, amount, quantity, count }))
+        .sort((a, b) => b.amount - a.amount),
       chart,
     };
   }

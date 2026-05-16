@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const createAppointmentSchema = z.object({
   body: z.object({
     unitId: z.string().min(1, 'Unidade é obrigatória'),
-    serviceId: z.string().min(1, 'Serviço é obrigatório'),
+    serviceId: z.string().min(1, 'Serviço é obrigatório').optional(),
     employeeId: z.string().min(1, 'Profissional é obrigatório'),
     clientId: z.string().optional(),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Formato de data inválido (YYYY-MM-DD)'),
@@ -14,6 +14,17 @@ export const createAppointmentSchema = z.object({
     isPackage: z.boolean().optional(),
     usedPackageId: z.string().optional(),
     notes: z.string().optional(),
+    products: z.array(z.object({
+      productId: z.string().min(1),
+      name: z.string().min(1),
+      quantity: z.number().int().min(1),
+      unitPrice: z.number().min(0),
+    })).optional(),
+    seriesId: z.string().optional(),
+  }).superRefine((data, ctx) => {
+    if (data.status !== 'blocked' && !data.serviceId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['serviceId'], message: 'Serviço é obrigatório' });
+    }
   }),
 });
 

@@ -217,17 +217,20 @@ export class AppointmentService {
       throw new AppError('Profissional indisponível: Em período de férias.', 400);
     }
 
-    const conflict = await AppointmentModel.findOne({
-      employeeId: data.employeeId,
-      date: data.date,
-      status: { $nin: ['cancelled'] },
-      $or: [
-        { startTime: { $lt: data.endTime, $gte: data.startTime } },
-        { endTime: { $gt: data.startTime, $lte: data.endTime } },
-        { startTime: { $lte: data.startTime }, endTime: { $gte: data.endTime } },
-      ],
-    });
-    if (conflict) throw new AppError('Horário já ocupado por outro agendamento.', 409);
+    if (data.status !== 'blocked') {
+      const conflict = await AppointmentModel.findOne({
+        unitId: data.unitId,
+        employeeId: data.employeeId,
+        date: data.date,
+        status: { $nin: ['cancelled'] },
+        $or: [
+          { startTime: { $lt: data.endTime, $gte: data.startTime } },
+          { endTime: { $gt: data.startTime, $lte: data.endTime } },
+          { startTime: { $lte: data.startTime }, endTime: { $gte: data.endTime } },
+        ],
+      });
+      if (conflict) throw new AppError('Horário já ocupado por outro agendamento.', 409);
+    }
     
     const svc = await ServiceModel.findById(data.serviceId);
     
@@ -381,18 +384,19 @@ export class AppointmentService {
       }
     }
 
-    const appointment = await AppointmentModel.create({ 
-      clientId: client._id, 
-      employeeId, 
-      serviceId, 
-      unitId, 
-      date, 
-      startTime, 
-      endTime, 
-      price: finalPrice, 
+    const appointment = await AppointmentModel.create({
+      clientId: client._id,
+      employeeId,
+      serviceId,
+      unitId,
+      date,
+      startTime,
+      endTime,
+      price: finalPrice,
       status: 'confirmed',
       isPackage: finalIsPackage,
       usedPackageId,
+      source: 'guest',
       notes: sanitize(notes)
     });
 
@@ -411,7 +415,7 @@ export class AppointmentService {
   async updateStatus(
     id: string,
     status: AppointmentStatus,
-    options?: { price?: number; paymentMethod?: string; skipBilling?: boolean }
+    options?: { price?: number; paymentMethod?: string; skipBilling?: boolean; billService?: boolean; billProducts?: boolean }
   ): Promise<IAppointment> {
     // Step 1: fetch raw document (no populate) to avoid save() issues with populated fields
     const appt = await AppointmentModel.findById(id);
@@ -487,8 +491,13 @@ export class AppointmentService {
         await appt.save();
       }
 
-      // ── Financial records are created when paymentMethod is provided OR it's a package use (without skipBilling)
-      if (!skipBilling && (options?.paymentMethod || isPackageUse)) {
+      const hasBillingTrigger = !skipBilling && (options?.paymentMethod || isPackageUse);
+      const doService = hasBillingTrigger && options?.billService !== false && !appt.isBilled;
+      const products = (appt as any).products as Array<{ productId: mongoose.Types.ObjectId; name: string; quantity: number; unitPrice: number }> | undefined;
+      const doProducts = (options?.paymentMethod || isPackageUse) && options?.billProducts !== false && !(appt as any).productsBilled && products && products.length > 0;
+
+      // ── Service income + commission ──
+      if (doService) {
         let category: TransactionCategory = 'service';
         if (isPackageUse)  category = 'package_use';
         else if (isPackageSale) category = 'package_sale';
@@ -502,8 +511,8 @@ export class AppointmentService {
 
         const billedAmount = options?.price ?? appt.price ?? svcDoc?.price ?? 0;
 
-        // ── Income transaction ──
-        const exists = await TransactionModel.findOne({ appointmentId: appt._id, type: 'income' });
+        // Income transaction (dedup on service-category only)
+        const exists = await TransactionModel.findOne({ appointmentId: appt._id, type: 'income', category: { $ne: 'product' } });
         if (!exists) {
           const pm = (isPackageUse ? 'package' : (options?.paymentMethod || 'other')).toLowerCase();
           await TransactionModel.create({
@@ -518,8 +527,8 @@ export class AppointmentService {
             createdBy: appt.employeeId,
           });
 
-          // Mark as billed
           appt.isBilled = true;
+          (appt as any).serviceBilled = true;
           await appt.save();
         }
 
@@ -533,7 +542,6 @@ export class AppointmentService {
             if (!alreadyHas) {
               if (!client.packages) client.packages = [];
 
-              // ── Compute expiration date from packageValidity ──
               let expiresAt: Date | undefined;
               const validity = (svcDoc as any).packageValidity;
               if (validity && validity.type && validity.type !== 'none' && validity.value) {
@@ -574,7 +582,6 @@ export class AppointmentService {
               );
               if (limit) {
                 limit.used = (limit.used || 0) + 1;
-                // Auto-deactivate if all sessions for every item are exhausted
                 const allExhausted = sub.itemLimits.every(l => (l.used || 0) >= (l.quantity || 0));
                 if (allExhausted) sub.active = false;
                 await client.save();
@@ -586,12 +593,7 @@ export class AppointmentService {
         // ── Employee commission ──
         const employee = await UserModel.findById(appt.employeeId).select('commissionRate');
         if (employee?.commissionRate && employee.commissionRate > 0) {
-          // Commission base:
-          //   • Package use  → appt.price (already prorated = totalPrice / totalSessions at booking time)
-          //   • Package sale → billedAmount / totalSessions (barber earns per-session, not on whole bundle)
-          //   • Regular      → billedAmount
           let commissionBase = billedAmount;
-
           if (isPackageUse) {
             commissionBase = appt.price;
           } else if (isPackageSale) {
@@ -599,7 +601,6 @@ export class AppointmentService {
             const totalSessions = packageItems.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1;
             commissionBase = billedAmount / totalSessions;
           }
-
           const commissionAmount = Math.round(commissionBase * employee.commissionRate / 100 * 100) / 100;
           const commExists = await TransactionModel.findOne({ appointmentId: appt._id, type: 'commission' });
           if (!commExists) {
@@ -610,17 +611,53 @@ export class AppointmentService {
               type: 'commission',
               category: 'commission',
               amount: commissionAmount,
-              description: `Comissão (${isPackageUse ? 'Uso de Pacote' : isPackageSale ? 'Venda de Pacote' : 'Serviço'}): ${svcName} (${employee.commissionRate}%)`,
+              description: `Comissão (${isPackageUse ? 'Uso de Pacote' : isPackageSale ? 'Venda de Pacote' : 'Serviço'}): ${svcDoc?.name || 'Serviço'} (${employee.commissionRate}%)`,
               date: appt.date,
               createdBy: appt.employeeId,
             });
           }
         }
       }
+
+      // ── Product sales — no commission, deduct from stock ──
+      if (doProducts) {
+        const { ProductModel } = await import('../inventory/product.model');
+        for (const item of products!) {
+          const prodExists = await TransactionModel.findOne({ appointmentId: appt._id, category: 'product', description: `Produto: ${item.name}` });
+          if (!prodExists) {
+            await TransactionModel.create({
+              unitId: appt.unitId,
+              appointmentId: appt._id,
+              type: 'income',
+              category: 'product',
+              amount: Math.round(item.quantity * item.unitPrice * 100) / 100,
+              description: `Produto: ${item.name} (x${item.quantity})`,
+              date: appt.date,
+              paymentMethod: (options?.paymentMethod || 'other').toLowerCase(),
+              createdBy: appt.employeeId,
+            });
+            await ProductModel.findByIdAndUpdate(item.productId, { $inc: { stockQuantity: -item.quantity } });
+          }
+        }
+        (appt as any).productsBilled = true;
+        await appt.save();
+      }
     } else if (oldStatus === 'completed') {
       // If un-completing a billed appointment, remove the financial records and reset flags
+
+      // Restore product stock before deleting transactions
+      const products = (appt as any).products as Array<{ productId: mongoose.Types.ObjectId; quantity: number }> | undefined;
+      if (products && products.length > 0) {
+        const { ProductModel } = await import('../inventory/product.model');
+        for (const item of products) {
+          await ProductModel.findByIdAndUpdate(item.productId, { $inc: { stockQuantity: item.quantity } });
+        }
+      }
+
       await TransactionModel.deleteMany({ appointmentId: appt._id });
       appt.isBilled = false;
+      (appt as any).serviceBilled = false;
+      (appt as any).productsBilled = false;
       (appt as any).billingSkipped = false;
       await appt.save();
 
@@ -649,14 +686,29 @@ export class AppointmentService {
     return appt;
   }
 
-  async delete(id: string): Promise<void> {
+  async delete(id: string, options?: { mode?: 'single' | 'this-and-future' }): Promise<void> {
     const appt = await AppointmentModel.findById(id);
     if (!appt) throw new NotFoundError('Appointment');
     if (appt.isBilled) {
       throw new AppError('Não é possível excluir um agendamento já faturado.', 400);
     }
-    await AppointmentModel.findByIdAndDelete(id);
-    invalidateSlotCache(appt.unitId.toString(), appt.employeeId.toString(), appt.date);
+
+    const mode = options?.mode || 'single';
+
+    if (mode === 'this-and-future' && (appt as any).seriesId) {
+      const toDelete = await AppointmentModel.find({
+        seriesId: (appt as any).seriesId,
+        date: { $gte: appt.date },
+        isBilled: { $ne: true },
+      });
+      for (const a of toDelete) {
+        await AppointmentModel.findByIdAndDelete(a._id);
+        invalidateSlotCache(a.unitId.toString(), a.employeeId.toString(), a.date);
+      }
+    } else {
+      await AppointmentModel.findByIdAndDelete(id);
+      invalidateSlotCache(appt.unitId.toString(), appt.employeeId.toString(), appt.date);
+    }
   }
 
   async update(id: string, data: Partial<IAppointment>): Promise<IAppointment> {

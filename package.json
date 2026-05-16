@@ -2,7 +2,11 @@
   "name": "barber-system",
   "private": true,
   "packageManager": "npm@10.9.0",
-  "workspaces": ["apps/*", "packages/*", "server"],
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "server"
+  ],
   "scripts": {
     "dev": "turbo dev",
     "build": "turbo build",
@@ -23,5 +27,8 @@
     "prettier": "^3.3.0",
     "turbo": "^2.0.0",
     "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "rollup": "^4.60.4"
   }
 }

@@ -20,6 +20,7 @@ export interface CalendarAppointment {
   endTime: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'blocked';
   isPackage?: boolean;
+  source?: 'guest' | 'admin';
 }
 
 const PACKAGE_COLOR = { bg: 'rgba(255,109,0,0.12)', text: '#FF6D00', border: 'rgba(255,109,0,0.3)', solid: '#FF6D00' };
@@ -83,6 +84,15 @@ function IconX() {
     </svg>
   );
 }
+function IconGlobe({ size = 12 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+      <circle cx="12" cy="12" r="10" />
+      <line x1="2" y1="12" x2="22" y2="12" />
+      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+    </svg>
+  );
+}
 
 interface ModalProps {
   appt: CalendarAppointment;
@@ -103,7 +113,8 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className={styles.panel} style={{ borderLeftColor: c.solid }}>
         <div className={styles.panelHeader}>
-          <div className={styles.panelTitle}>
+          <div className={styles.panelTitle} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {appt.source === 'guest' && <IconGlobe size={15} />}
             {appt.clientId?.name ?? 'Cliente'}
           </div>
           <button className={styles.closeBtn} onClick={onClose}><IconX /></button>
@@ -346,10 +357,11 @@ export default function CalendarView({ appointments, employees = [], month: cont
                         <div
                           key={a._id}
                           className={styles.pill}
-                          style={{ background: c.bg, color: c.text, borderColor: c.border }}
+                          style={{ background: c.bg, color: c.text, borderColor: c.border, display: 'flex', alignItems: 'center', gap: '3px' }}
                           title={`${a.startTime} ${a.clientId?.name ?? (a.status === 'blocked' ? 'Bloqueado' : '')}`}
                           onClick={e => { e.stopPropagation(); setSelectedAppt(a); }}
                         >
+                          {a.source === 'guest' && <IconGlobe size={10} />}
                           {a.status === 'blocked' ? `Bloqueado ${a.startTime}` : `${a.startTime} ${a.clientId?.name ?? ''}`}
                         </div>
                       );
@@ -410,7 +422,10 @@ export default function CalendarView({ appointments, employees = [], month: cont
                 >
                   <div className={styles.dayApptTime}>{a.startTime} – {a.endTime}</div>
                   <div className={styles.dayApptInfo}>
-                    <span className={styles.dayApptClient}>{a.clientId?.name ?? '—'}</span>
+                    <span className={styles.dayApptClient} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      {a.source === 'guest' && <IconGlobe size={13} />}
+                      {a.clientId?.name ?? '—'}
+                    </span>
                     <span className={styles.dayApptMeta}>{a.serviceId?.name ?? '—'} · {a.employeeId?.name ?? '—'}</span>
                   </div>
                   <span className={styles.statusBadge} style={{ background: c.bg, color: c.text, border: `1px solid ${c.border}` }}>
