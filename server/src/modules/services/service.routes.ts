@@ -6,6 +6,6 @@ import { requireRoles } from '../../shared/middlewares/rbac.middleware';
 export const serviceRoutes = Router();
 
 serviceRoutes.get('/', optionalAuthenticate, listServices);
-serviceRoutes.post('/', authenticate, requireRoles('owner', 'franchisee', 'franchisor', 'cashier'), createService);
-serviceRoutes.patch('/:id', authenticate, requireRoles('owner', 'franchisee', 'franchisor', 'cashier'), updateService);
-serviceRoutes.patch('/:id/toggle', authenticate, requireRoles('owner', 'franchisee', 'franchisor', 'cashier'), toggleService);
+serviceRoutes.post('/', authenticate, requireRoles('owner', 'cashier'), createService);
+serviceRoutes.patch('/:id', authenticate, requireRoles('owner', 'cashier'), updateService);
+serviceRoutes.patch('/:id/toggle', authenticate, requireRoles('owner', 'cashier'), toggleService);

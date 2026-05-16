@@ -64,6 +64,7 @@ interface Props {
   // Feature flags / permissions
   canEdit?: boolean;
   canDelete?: boolean;
+  canBill?: boolean;
   onStatusChange?: (id: string, status: string, options?: any) => Promise<void>;
   onDelete?: (id: string) => Promise<void>;
   isProcessing?: boolean;
@@ -102,6 +103,7 @@ interface ModalProps {
   isPending: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
+  canBill?: boolean;
   onEdit?: (appt: CalendarAppointment) => void;
   onViewProfile?: (clientId: string) => void;
 }
@@ -153,7 +155,7 @@ function WhatsAppModal({ appt, onClose }: { appt: CalendarAppointment, onClose: 
   );
 }
 
-function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, canEdit, canDelete, onEdit, onViewProfile }: ModalProps) {
+function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, canEdit, canDelete, canBill = true, onEdit, onViewProfile }: ModalProps) {
   const c = appt.isPackage && appt.status !== 'cancelled' ? PACKAGE_COLOR : STATUS_COLORS[appt.status] || STATUS_COLORS.confirmed;
   const otherStatuses = (['confirmed', 'completed', 'cancelled'] as const).filter(s => s !== appt.status);
   const [confirmCancel, setConfirmCancel] = useState(false);
@@ -355,8 +357,8 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
           </div>
 
           <div className={styles.panelActions} style={{ marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-subtle)' }}>
-            {!appt.isBilled && (
-              <button 
+            {canBill && !appt.isBilled && (
+              <button
                 className={styles.faturarBtn}
                 onClick={() => setIsBilling(true)}
               >
@@ -426,6 +428,7 @@ export default function CalendarView({
   onDayClick,
   canEdit = true,
   canDelete = true,
+  canBill = true,
   onStatusChange,
   onDelete,
   isProcessing = false,
@@ -624,6 +627,7 @@ export default function CalendarView({
             isPending={isProcessing}
             canEdit={canEdit}
             canDelete={canDelete}
+            canBill={canBill}
             onEdit={(a) => { setSelectedAppt(null); onEdit?.(a); }}
             onViewProfile={onViewProfile}
           />

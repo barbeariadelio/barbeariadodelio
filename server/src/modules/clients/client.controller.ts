@@ -8,10 +8,7 @@ const service = new ClientService();
 
 export async function listClients(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const isSuperUser = ['owner', 'franchisor', 'admin'].includes(req.user!.role);
-    const unitId = isSuperUser
-      ? ((req.query.unitId as string) || req.user!.unitId)
-      : req.user!.unitId;
+    const unitId = (req.query.unitId as string) || req.user!.unitId;
     if (!unitId) { ok(res, []); return; }
     
     const q = req.query.q as string | undefined;
@@ -29,7 +26,7 @@ export async function getClient(req: AuthRequest, res: Response, next: NextFunct
     const client = await service.findById(req.params.id);
     
     // Security check: must belong to the unit
-    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor && client.unitId?.toString() !== req.user!.unitId?.toString()) {
       throw new AppError('Access denied to this unit', 403);
     }
@@ -43,7 +40,7 @@ export async function createClient(req: AuthRequest, res: Response, next: NextFu
     const unitId = req.body.unitId || req.user!.unitId;
 
     // Security check
-    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor && unitId !== req.user!.unitId?.toString()) {
       throw new AppError('Cannot create client for another unit', 403);
     }
@@ -58,7 +55,7 @@ export async function updateClient(req: AuthRequest, res: Response, next: NextFu
     const client = await service.findById(req.params.id);
     
     // Security check
-    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor && client.unitId?.toString() !== req.user!.unitId?.toString()) {
       throw new AppError('Access denied to this unit', 403);
     }
@@ -73,7 +70,7 @@ export async function assignPackage(req: AuthRequest, res: Response, next: NextF
     const client = await service.findById(req.params.id);
     
     // Security check
-    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor && client.unitId?.toString() !== req.user!.unitId?.toString()) {
       throw new AppError('Access denied to this unit', 403);
     }
@@ -88,7 +85,7 @@ export async function removePackage(req: AuthRequest, res: Response, next: NextF
     const client = await service.findById(req.params.id);
     
     // Security check
-    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor && client.unitId?.toString() !== req.user!.unitId?.toString()) {
       throw new AppError('Access denied to this unit', 403);
     }
@@ -106,7 +103,7 @@ export async function updatePackageItemLimit(req: AuthRequest, res: Response, ne
     const client = await service.findById(id);
 
     // Security check
-    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor && client.unitId?.toString() !== req.user!.unitId?.toString()) {
       throw new AppError('Access denied to this unit', 403);
     }

@@ -1,5 +1,6 @@
 import { UserModel, IUser } from '../auth/auth.model';
 import { NotFoundError } from '../../shared/errors/AppError';
+import { sharedCache } from '../../shared/utils/cache';
 import bcrypt from 'bcryptjs';
 
 export class EmployeeService {
@@ -22,12 +23,15 @@ export class EmployeeService {
   }
 
   async create(data: any): Promise<IUser> {
-    const passwordHash = await bcrypt.hash(data.password, 10);
+    const rawPhone = (data.phone || '').replace(/\D/g, '');
+    const autoPassword = rawPhone.length >= 4 ? rawPhone.slice(-4) : '1234';
+    const password = data.password || autoPassword;
+    const passwordHash = await bcrypt.hash(password, 10);
     const emp = await UserModel.create({
       name: data.name,
       email: data.email,
       passwordHash,
-      passwordPlain: data.password,
+      passwordPlain: password,
       phone: data.phone,
       unitId: data.unitId,
       role: 'employee',
@@ -38,6 +42,9 @@ export class EmployeeService {
       isActive: true,
       allowedApps: ['admin'],
     });
+    sharedCache.delete(`users:list:${data.unitId || 'all'}`);
+    sharedCache.delete('users:list:all');
+
     return UserModel.findById(emp._id).select('-passwordHash') as Promise<IUser>;
   }
 

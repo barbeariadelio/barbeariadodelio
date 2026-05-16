@@ -34,7 +34,6 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
         }
 
         /* Animated Background */
@@ -106,8 +105,51 @@
         @media (max-width: 968px) {
             .grid {
                 grid-template-columns: 1fr;
-                max-width: 400px;
+                max-width: 420px;
                 margin: 0 auto;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 1.5rem 1rem;
+            }
+
+            .branding {
+                margin-bottom: 2rem;
+            }
+
+            .branding h1 {
+                font-size: 2.2rem;
+            }
+
+            .branding p {
+                font-size: 0.85rem;
+                letter-spacing: 0.12em;
+            }
+
+            .card {
+                padding: 2rem 1.5rem;
+                border-radius: 18px;
+            }
+
+            .card-icon {
+                width: 64px;
+                height: 64px;
+                margin-bottom: 1.25rem;
+            }
+
+            .card h2 {
+                font-size: 1.25rem;
+            }
+
+            .card p {
+                font-size: 0.875rem;
+                margin-bottom: 1.5rem;
+            }
+
+            .footer {
+                margin-top: 2.5rem;
             }
         }
 
@@ -224,7 +266,7 @@
         }
 
         .footer {
-            margin-top: 5rem;
+            margin-top: 3rem;
             color: #333;
             font-size: 0.8rem;
             letter-spacing: 0.1em;

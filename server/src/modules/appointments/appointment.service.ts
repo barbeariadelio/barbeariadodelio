@@ -38,14 +38,17 @@ interface PopulatedService extends IService { _id: mongoose.Types.ObjectId }
 interface PopulatedClient extends IClient { _id: mongoose.Types.ObjectId }
 
 export class AppointmentService {
-  async findByUnitAndDate(unitId: string, date?: string, start?: string, end?: string, pagination?: { skip: number, limit: number }): Promise<IAppointment[]> {
-    const filter: Record<string, unknown> = { unitId };
+  async findByUnitAndDate(unitId: string, date?: string, start?: string, end?: string, pagination?: { skip: number, limit: number }, employeeId?: string): Promise<IAppointment[]> {
+    const filter: Record<string, unknown> = { unitId, status: { $ne: 'cancelled' } };
     if (date) {
       filter.date = date;
     } else if (start && end) {
       filter.date = { $gte: start, $lte: end };
     }
-    
+    if (employeeId) {
+      filter.employeeId = new mongoose.Types.ObjectId(employeeId);
+    }
+
     let query = AppointmentModel.find(filter)
       .populate('clientId', 'name phone')
       .populate('employeeId', 'name')

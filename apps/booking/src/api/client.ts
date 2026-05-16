@@ -11,7 +11,6 @@ export function resolveApiBaseUrl(unitApiUrl?: string): string {
 
 export const apiClient = axios.create({
   baseURL: apiBaseUrl,
-  withCredentials: true,
 });
 
 apiClient.interceptors.request.use(config => {
@@ -23,15 +22,11 @@ apiClient.interceptors.request.use(config => {
 });
 
 export function setupInterceptors(instance: any) {
-  // Attach the JWT from localStorage to every request (unless flagged to skip,
-  // which happens after a token refresh so we rely on the fresh cookie instead).
   instance.interceptors.request.use((config: any) => {
-    if (!config._skipAuthHeader) {
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        config.headers = config.headers || {};
-        config.headers['Authorization'] = `Bearer ${token}`;
-      }
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers['Authorization'] = `Bearer ${token}`;
     }
     return config;
   });
@@ -45,7 +40,6 @@ export function setupInterceptors(instance: any) {
     },
     async (error: any) => {
       const config = error.config;
-      // Only attempt a single refresh cycle (prevent infinite retry loop).
       if (
         error.response?.status === 401 &&
         !config?._retry &&
@@ -53,17 +47,16 @@ export function setupInterceptors(instance: any) {
       ) {
         config._retry = true;
         try {
-          // Ask the server for a new access token via the refresh cookie.
-          await axios.post(`${apiBaseUrl}/auth/refresh`, {}, { withCredentials: true });
-          // After refresh the server sets a new httpOnly cookie.
-          // Skip the stale localStorage token on the retry so the fresh cookie is used.
-          config._skipAuthHeader = true;
-          delete config.headers?.['Authorization'];
+          const refreshToken = localStorage.getItem('refreshToken');
+          const { data } = await axios.post(`${apiBaseUrl}/auth/refresh`, { refreshToken });
+          const accessToken = data?.data?.accessToken || data?.accessToken;
+          if (accessToken) {
+            localStorage.setItem('accessToken', accessToken);
+            config.headers = config.headers || {};
+            config.headers['Authorization'] = `Bearer ${accessToken}`;
+          }
           return instance(config);
         } catch {
-          // Refresh also failed — clear stale local state.
-          // Do NOT redirect: the booking app has no /login page; let bookMutation
-          // onError handle the 401 (it calls logout() and shows the guest form).
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('user');

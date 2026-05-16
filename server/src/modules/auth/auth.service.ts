@@ -21,9 +21,9 @@ export class AuthService {
     // Restriction Logic
     if (user.role !== 'owner' && appId) {
       // Use allowedApps if defined, otherwise fallback to role-based defaults
-      const allowed = user.allowedApps && user.allowedApps.length > 0 
-        ? user.allowedApps 
-        : (user.role === 'franchisor' || user.role === 'franchisee' ? ['franchise'] : ['admin']);
+      const allowed = user.allowedApps && user.allowedApps.length > 0
+        ? user.allowedApps
+        : ['admin'];
 
       if (!allowed.includes(appId)) {
         const systemName = appId === 'admin' ? 'Administrativo' : 'Franquia';

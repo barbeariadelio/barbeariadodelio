@@ -7,8 +7,8 @@ import { createTransactionSchema, updateTransactionSchema } from './finance.sche
 
 export const financeRoutes = Router();
 
-financeRoutes.get('/summary', authenticate, requireRoles('owner', 'franchisor', 'franchisee', 'employee', 'cashier'), getSummary);
-financeRoutes.get('/transactions', authenticate, requireRoles('owner', 'franchisee', 'franchisor', 'employee', 'cashier'), requireSameUnit(), listTransactions);
+financeRoutes.get('/summary', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), getSummary);
+financeRoutes.get('/transactions', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), listTransactions);
 financeRoutes.post('/transactions', authenticate, requireRoles('owner', 'employee', 'cashier'), validate(createTransactionSchema), createTransaction);
 financeRoutes.patch('/transactions/:id', authenticate, requireRoles('owner', 'employee', 'cashier'), validate(updateTransactionSchema), updateTransaction);
 financeRoutes.delete('/transactions/:id', authenticate, requireRoles('owner', 'employee', 'cashier'), deleteTransaction);

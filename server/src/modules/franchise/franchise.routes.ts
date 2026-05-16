@@ -5,8 +5,8 @@ import { requireRoles } from '../../shared/middlewares/rbac.middleware';
 
 export const franchiseRoutes = Router();
 
-franchiseRoutes.get('/', authenticate, requireRoles('franchisor', 'franchisee'), getFranchise);
-franchiseRoutes.get('/:id/units', authenticate, requireRoles('franchisor', 'franchisee'), getFranchiseUnits);
-franchiseRoutes.post('/', authenticate, requireRoles('owner', 'franchisor'), createFranchise);
-franchiseRoutes.patch('/:id', authenticate, requireRoles('franchisor'), updateFranchise);
-franchiseRoutes.post('/:id/units', authenticate, requireRoles('franchisor'), addUnit);
+franchiseRoutes.get('/', authenticate, requireRoles('owner'), getFranchise);
+franchiseRoutes.get('/:id/units', authenticate, requireRoles('owner'), getFranchiseUnits);
+franchiseRoutes.post('/', authenticate, requireRoles('owner'), createFranchise);
+franchiseRoutes.patch('/:id', authenticate, requireRoles('owner'), updateFranchise);
+franchiseRoutes.post('/:id/units', authenticate, requireRoles('owner'), addUnit);

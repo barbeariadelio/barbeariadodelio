@@ -1,7 +1,7 @@
-import { FormEvent, useState, useRef, useEffect, useMemo } from 'react';
+import { FormEvent, useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import axios from 'axios';
-import { api, resolveApiBaseUrl } from '../../api/client';
+import { api, getSelectedUnitId } from '../../api/client';
+import { useAuth } from '../../contexts/AuthContext';
 import styles from './AppointmentForm.module.scss';
 
 interface Unit { _id: string; name: string; apiUrl?: string; workingDays?: number[]; }
@@ -54,7 +54,11 @@ function IconX() {
 }
 
 export default function AppointmentForm({ onClose, onSuccess, initialDate, appointment }: Props) {
-  const [unitId, setUnitId] = useState(import.meta.env.VITE_UNIT_ID || '');
+  const { user } = useAuth();
+  const isStaff = user?.role === 'employee';
+  const userId = (user as any)?._id || (user as any)?.id || '';
+
+  const [unitId, setUnitId] = useState(getSelectedUnitId() || import.meta.env.VITE_UNIT_ID || '');
   const [clientId, setClientId] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [showClientList, setShowClientList] = useState(false);
@@ -72,7 +76,8 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
   // Pre-fill if editing
   useEffect(() => {
     if (appointment) {
-      setUnitId(appointment.unitId || import.meta.env.VITE_UNIT_ID || '');
+      const apptUnitId = appointment.unitId?._id || appointment.unitId || getSelectedUnitId() || import.meta.env.VITE_UNIT_ID || '';
+      setUnitId(apptUnitId);
       setClientId(appointment.clientId?._id || appointment.clientId || '');
       setEmployeeId(appointment.employeeId?._id || appointment.employeeId || '');
       setServiceId(appointment.serviceId?._id || appointment.serviceId || '');
@@ -82,6 +87,13 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
       setUsePackage(!!appointment.isPackage);
     }
   }, [appointment]);
+
+  // Lock barber to the logged-in employee
+  useEffect(() => {
+    if (isStaff && userId && !appointment) {
+      setEmployeeId(userId);
+    }
+  }, [isStaff, userId, appointment]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -98,36 +110,30 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
     queryFn: () => api.get('/units').then(r => Array.isArray(r.data) ? r.data : r.data?.units ?? []),
   });
 
-  const selectedUnit = units.find(u => u._id === unitId);
+  // Auto-select when only one unit is available (e.g. employee role)
+  useEffect(() => {
+    if (units.length === 1 && !unitId) {
+      setUnitId(units[0]._id);
+    }
+  }, [units, unitId]);
 
-  const unitApi = useMemo(() => {
-    const base = resolveApiBaseUrl(selectedUnit?.apiUrl);
-    const instance = axios.create({ baseURL: base, withCredentials: true });
-    instance.interceptors.request.use(config => {
-      return config;
-    });
-    instance.interceptors.response.use(res => {
-      if (res.data && typeof res.data === 'object' && 'data' in res.data) res.data = res.data.data;
-      return res;
-    });
-    return instance;
-  }, [selectedUnit?.apiUrl]);
+  const selectedUnit = units.find(u => u._id === unitId);
 
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ['employees', unitId],
-    queryFn: () => unitApi.get(`/employees${unitId ? `?unitId=${unitId}` : ''}`).then(r => Array.isArray(r.data) ? r.data : r.data?.employees ?? []),
+    queryFn: () => api.get(`/employees?unitId=${unitId}`).then(r => Array.isArray(r.data) ? r.data : r.data?.employees ?? []),
     enabled: !!unitId,
   });
 
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ['clients', unitId],
-    queryFn: () => unitApi.get(`/clients${unitId ? `?unitId=${unitId}` : ''}`).then(r => Array.isArray(r.data) ? r.data : r.data?.clients ?? []),
+    queryFn: () => api.get(`/clients?unitId=${unitId}&limit=1000`).then(r => Array.isArray(r.data) ? r.data : r.data?.clients ?? []),
     enabled: !!unitId,
   });
 
   const { data: services = [] } = useQuery<Service[]>({
     queryKey: ['services', unitId],
-    queryFn: () => unitApi.get(`/services${unitId ? `?unitId=${unitId}` : ''}`).then(r => Array.isArray(r.data) ? r.data : r.data?.services ?? []),
+    queryFn: () => api.get(`/services?unitId=${unitId}`).then(r => Array.isArray(r.data) ? r.data : r.data?.services ?? []),
     enabled: !!unitId,
   });
 
@@ -155,9 +161,9 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
   const mutation = useMutation({
     mutationFn: (payload: object) => {
       if (appointment?._id) {
-        return unitApi.patch(`/appointments/${appointment._id}`, payload);
+        return api.patch(`/appointments/${appointment._id}`, payload);
       }
-      return unitApi.post('/appointments', payload);
+      return api.post('/appointments', payload);
     },
     onSuccess,
     onError: (err: unknown) => {
@@ -205,7 +211,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
 
     if (selectedPackageId && !usePackage) {
       // User chose to SIGN a new package during this booking
-      unitApi.post(`/clients/${clientId}/packages`, { packageId: selectedPackageId })
+      api.post(`/clients/${clientId}/packages`, { packageId: selectedPackageId })
         .then(() => finish(true))
         .catch(err => setError(err.response?.data?.message || 'Erro ao assinar pacote.'));
     } else {
@@ -217,7 +223,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className={styles.modal}>
         <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Novo Agendamento</h2>
+          <h2 className={styles.modalTitle}>{appointment ? 'Editar Agendamento' : 'Novo Agendamento'}</h2>
           <button className={styles.closeBtn} onClick={onClose}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -293,13 +299,25 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
             </div>
           </div>
 
-          <div className={styles.field} style={{ opacity: unitId ? 1 : 0.5, pointerEvents: unitId ? 'auto' : 'none' }}>
-            <label className={styles.label}>Barbeiro *</label>
-            <select className={styles.select} value={employeeId} onChange={e => setEmployeeId(e.target.value)} required>
-              <option value="">Selecione um barbeiro</option>
-              {employees.map(emp => <option key={emp._id} value={emp._id}>{emp.name}</option>)}
-            </select>
-          </div>
+          {isStaff ? (
+            <div className={styles.field}>
+              <label className={styles.label}>Barbeiro</label>
+              <input
+                className={styles.input}
+                value={employees.find(e => e._id === employeeId)?.name || user?.name || ''}
+                readOnly
+                style={{ background: 'var(--bg-surface)', color: 'var(--text-muted)', cursor: 'default' }}
+              />
+            </div>
+          ) : (
+            <div className={styles.field} style={{ opacity: unitId ? 1 : 0.5, pointerEvents: unitId ? 'auto' : 'none' }}>
+              <label className={styles.label}>Barbeiro *</label>
+              <select className={styles.select} value={employeeId} onChange={e => setEmployeeId(e.target.value)} required>
+                <option value="">Selecione um barbeiro</option>
+                {employees.map(emp => <option key={emp._id} value={emp._id}>{emp.name}</option>)}
+              </select>
+            </div>
+          )}
 
           <div className={styles.field} style={{ opacity: unitId ? 1 : 0.5, pointerEvents: unitId ? 'auto' : 'none' }}>
             <label className={styles.label}>Serviço *</label>
@@ -407,7 +425,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, appoi
           <div className={styles.actions}>
             <button type="button" className={styles.cancelBtn} onClick={onClose}>Cancelar</button>
             <button type="submit" className={styles.submitBtn} disabled={mutation.isPending}>
-              {mutation.isPending ? 'Salvando...' : 'Criar Agendamento'}
+              {mutation.isPending ? 'Salvando...' : appointment ? 'Salvar Alterações' : 'Criar Agendamento'}
             </button>
           </div>
         </form>

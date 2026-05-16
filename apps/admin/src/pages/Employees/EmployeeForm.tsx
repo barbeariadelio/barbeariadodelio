@@ -58,6 +58,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
   const [newBlockedDay, setNewBlockedDay] = useState('');
   const [initialVale, setInitialVale] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null);
 
   const mutation = useMutation({
     mutationFn: (payload: object) =>
@@ -91,7 +92,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    const finalEmail = email || `${name.replace(/\s+/g, '').toLowerCase()}_${Date.now()}@delio.staff`;
+    const finalEmail = email || `${name.replace(/\s+/g, '').toLowerCase()}@barbeariadodelio`;
     
     const vacations = (vacationStart && vacationEnd) ? [{ start: vacationStart, end: vacationEnd }] : [];
 
@@ -115,11 +116,12 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
       vacations,
       blockedDays: finalBlockedDays.sort()
     };
-    if (!isEdit || password) payload.password = password;
-    
+    if (password) payload.password = password;
+
     mutation.mutate(payload, {
       onSuccess: async (res: any) => {
-        const empId = res.data?._id || res.data?.employee?._id;
+        const emp = res.data;
+        const empId = emp?._id || emp?.employee?._id;
         if (!isEdit && initialVale && empId) {
           try {
             await api.post('/finance/transactions', {
@@ -129,15 +131,50 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
               description: `Vale Inicial (na criação)`,
               date: new Date().toISOString().split('T')[0],
               employeeId: empId,
-              unitId: res.data?.unitId || res.data?.employee?.unitId
+              unitId: emp?.unitId || emp?.employee?.unitId
             });
           } catch (e) {
             console.error('Falha ao registrar vale inicial:', e);
           }
         }
-        onSuccess();
+        if (!isEdit && emp?.passwordPlain) {
+          setCreatedCredentials({ email: emp.email, password: emp.passwordPlain });
+        } else {
+          onSuccess();
+        }
       }
     });
+  }
+
+  if (createdCredentials) {
+    return (
+      <div className={styles.overlay}>
+        <div className={styles.modal} style={{ maxWidth: '420px', textAlign: 'center' }}>
+          <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>✅</div>
+          <h2 className={styles.modalTitle} style={{ marginBottom: '0.5rem' }}>Funcionário Criado!</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+            Compartilhe as credenciais abaixo com o funcionário para que ele possa acessar o sistema.
+          </p>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '1rem', textAlign: 'left', marginBottom: '1.5rem' }}>
+            <div style={{ marginBottom: '0.75rem' }}>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Login (Email)</p>
+              <p style={{ fontFamily: 'monospace', fontSize: '0.95rem', color: 'var(--text-primary)', wordBreak: 'break-all' }}>{createdCredentials.email}</p>
+            </div>
+            <div>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '2px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Senha</p>
+              <p style={{ fontFamily: 'monospace', fontSize: '1.25rem', color: 'var(--text-primary)', letterSpacing: '0.15em', fontWeight: 700 }}>{createdCredentials.password}</p>
+            </div>
+          </div>
+          <button
+            className={styles.submitBtn}
+            onClick={onSuccess}
+            style={{ width: '100%' }}
+          >
+            Concluir
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -273,15 +310,16 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
           <hr style={{ borderColor: 'var(--border-subtle)', margin: '0.5rem 0' }} />
 
           <div className={styles.field}>
-            <label className={styles.label}>{isEdit ? 'Nova Senha (deixe em branco para não alterar)' : 'Senha *'}</label>
+            <label className={styles.label}>
+              {isEdit ? 'Nova Senha (deixe em branco para não alterar)' : 'Senha (opcional — gerada automaticamente se vazia)'}
+            </label>
             <div className={styles.passwordWrap}>
               <input
                 type={showPassword ? 'text' : 'password'}
                 className={styles.input}
                 value={password || (isEdit ? employee?.passwordPlain || '' : '')}
                 onChange={e => setPassword(e.target.value)}
-                required={!isEdit}
-                placeholder="••••••••"
+                placeholder={isEdit ? '••••••••' : 'Deixe vazio para gerar automaticamente'}
               />
               <button 
                 type="button" 

@@ -510,11 +510,11 @@ export default function Finance() {
                         <span>Profissional</span>
                         <span>Atend.</span>
                         <span>Receita Gerada</span>
-                        <span style={{ textAlign: 'center' }}>%</span>
+                        {!isStaff && <span style={{ textAlign: 'center' }}>%</span>}
                         <span>Comissão</span>
                         <span>Vales</span>
                         <span>A Pagar</span>
-                        <span>Parte Loja</span>
+                        {!isStaff && <span>Parte Loja</span>}
                       </div>
                       {employees.map(emp => {
                         const rate = individualRates[emp.id] ?? commissionRate;
@@ -528,22 +528,23 @@ export default function Finance() {
                             </div>
                             <span className={styles.commissionCell}>{emp.appointments}</span>
                             <span className={`${styles.commissionCell} ${styles.amber}`}>{formatCurrency(emp.grossRevenue)}</span>
-                            <div className={styles.miniRateInputWrap}>
-                              <input
-                                type="number"
-                                className={styles.miniRateInput}
-                                value={rate}
-                                min={0} max={100} step={1}
-                                onChange={e => setIndividualRates(prev => ({ ...prev, [emp.id]: Number(e.target.value) }))}
-                                onWheel={e => (e.target as HTMLInputElement).blur()}
-                                disabled={isStaff}
-                              />
-                              <span className={styles.miniRateSuffix}>%</span>
-                            </div>
+                            {!isStaff && (
+                              <div className={styles.miniRateInputWrap}>
+                                <input
+                                  type="number"
+                                  className={styles.miniRateInput}
+                                  value={rate}
+                                  min={0} max={100} step={1}
+                                  onChange={e => setIndividualRates(prev => ({ ...prev, [emp.id]: Number(e.target.value) }))}
+                                  onWheel={e => (e.target as HTMLInputElement).blur()}
+                                />
+                                <span className={styles.miniRateSuffix}>%</span>
+                              </div>
+                            )}
                             <span className={`${styles.commissionCell} ${styles.blue}`}>{formatCurrency(emp.grossRevenue * (rate / 100))}</span>
                             <span className={`${styles.commissionCell} ${styles.red}`}>{formatCurrency(emp.totalVouchers || 0)}</span>
                             <span className={`${styles.commissionCell} ${styles.green}`} style={{ fontWeight: 800 }}>{formatCurrency((emp.grossRevenue * (rate / 100)) - (emp.totalVouchers || 0))}</span>
-                            <span className={styles.commissionCell}>{formatCurrency(emp.grossRevenue - (emp.grossRevenue * (rate / 100)))}</span>
+                            {!isStaff && <span className={styles.commissionCell}>{formatCurrency(emp.grossRevenue - (emp.grossRevenue * (rate / 100)))}</span>}
                           </div>
                         );
                       })}

@@ -18,13 +18,13 @@ import { createAppointmentSchema, guestBookSchema } from './appointment.schema';
 
 export const appointmentRoutes = Router();
 
-appointmentRoutes.get('/', authenticate, requireRoles('owner', 'employee', 'franchisee', 'franchisor', 'cashier'), requireSameUnit(), listAppointments);
+appointmentRoutes.get('/', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), listAppointments);
 appointmentRoutes.get('/slots', getSlots);
 appointmentRoutes.get('/my', authenticate, getMyAppointments);
-appointmentRoutes.get('/client/:clientId', authenticate, requireRoles('owner', 'employee', 'franchisee', 'franchisor', 'client', 'cashier'), getClientAppointments);
+appointmentRoutes.get('/client/:clientId', authenticate, requireRoles('owner', 'employee', 'client', 'cashier'), getClientAppointments);
 appointmentRoutes.get('/:id', authenticate, getAppointment);
 appointmentRoutes.post('/', authenticate, validate(createAppointmentSchema), createAppointment);
 appointmentRoutes.post('/guest', validate(guestBookSchema), guestBookAppointment);
-appointmentRoutes.patch('/:id/status', authenticate, requireRoles('owner', 'employee', 'franchisee', 'franchisor', 'client', 'cashier'), updateAppointmentStatus);
-appointmentRoutes.patch('/:id', authenticate, requireRoles('owner', 'employee', 'franchisee', 'franchisor', 'client', 'cashier'), updateAppointment);
-appointmentRoutes.delete('/:id', authenticate, requireRoles('owner', 'employee', 'franchisee', 'franchisor', 'cashier'), deleteAppointment);
+appointmentRoutes.patch('/:id/status', authenticate, requireRoles('owner', 'employee', 'client', 'cashier'), updateAppointmentStatus);
+appointmentRoutes.patch('/:id', authenticate, requireRoles('owner', 'employee', 'client', 'cashier'), updateAppointment);
+appointmentRoutes.delete('/:id', authenticate, requireRoles('owner', 'employee', 'cashier'), deleteAppointment);

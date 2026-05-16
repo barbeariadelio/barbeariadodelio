@@ -17,7 +17,7 @@ export async function listPublicEmployees(req: Request, res: Response, next: Nex
 
 export async function listEmployees(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const isSuperUser = ['owner', 'franchisor', 'admin'].includes(req.user!.role);
+    const isSuperUser = req.user!.role === 'owner';
     const unitId = isSuperUser
       ? ((req.query.unitId as string) || req.user!.unitId)
       : req.user!.unitId;
@@ -32,7 +32,7 @@ export async function getEmployee(req: AuthRequest, res: Response, next: NextFun
     const emp = await service.findById(req.params.id);
 
     // Security check
-    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor && emp.unitId?.toString() !== req.user!.unitId?.toString()) {
       throw new AppError('Access denied to this unit', 403);
     }
@@ -43,10 +43,10 @@ export async function getEmployee(req: AuthRequest, res: Response, next: NextFun
 
 export async function createEmployee(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const unitId = req.body.unitId || req.user!.unitId;
+    const unitId = req.body.unitId || (req.query.unitId as string) || req.user!.unitId;
 
     // Security check
-    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor && unitId !== req.user!.unitId?.toString()) {
       throw new AppError('Cannot create employee for another unit', 403);
     }
@@ -61,7 +61,7 @@ export async function updateEmployee(req: AuthRequest, res: Response, next: Next
     const emp = await service.findById(req.params.id);
 
     // Security check
-    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor && emp.unitId?.toString() !== req.user!.unitId?.toString()) {
       throw new AppError('Access denied to this unit', 403);
     }
@@ -76,7 +76,7 @@ export async function deactivateEmployee(req: AuthRequest, res: Response, next: 
     const emp = await service.findById(req.params.id);
 
     // Security check
-    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor && emp.unitId?.toString() !== req.user!.unitId?.toString()) {
       throw new AppError('Access denied to this unit', 403);
     }

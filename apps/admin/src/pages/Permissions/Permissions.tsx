@@ -44,7 +44,7 @@ export default function Permissions() {
   const [pendingPhone, setPendingPhone] = useState<string>('');
   const [pendingLoginType, setPendingLoginType] = useState<'email' | 'phone'>('email');
   const [showModal, setShowModal] = useState(false);
-  const [confirmModal, setConfirmModal] = useState<{ show: boolean; userId: string; userName: string; isActive: boolean } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ show: boolean; userId: string; userName: string; isActive: boolean; action: 'toggle' | 'delete' } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   
   const [newUser, setNewUser] = useState({ name: '', email: '', phone: '19', password: '', role: 'employee', allowedApps: ['admin'] });
@@ -81,11 +81,12 @@ export default function Permissions() {
         setPendingRole(role);
         const initialApps = u.allowedApps && u.allowedApps.length > 0 
           ? u.allowedApps 
-          : (role === 'franchisor' || role === 'franchisee' ? ['franchise'] : ['admin']);
+          : ['admin'];
         setPendingAllowedApps(initialApps);
         setPendingEmail(u.email || '');
         setPendingPhone(u.phone || '');
-        setPendingLoginType(u.email ? 'email' : 'phone');
+        const isAutoEmail = !u.email || u.email.includes('@barbeariadodelio') || u.email.includes('@delio.staff') || u.email.includes('@delio.internal') || u.email.includes('@delio.guest');
+        setPendingLoginType(u.phone && isAutoEmail ? 'phone' : u.email ? 'email' : 'phone');
       }
     }
   }, [expandedRow, users]);
@@ -308,7 +309,7 @@ export default function Permissions() {
                           </div>
                           <button className={`${styles.btnAction} ${styles.btnActionDanger}`} title="Excluir" onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm(`Excluir ${u.name}?`)) deleteMutation.mutate(u._id);
+                            setConfirmModal({ show: true, userId: u._id, userName: u.name, isActive: u.isActive !== false, action: 'delete' });
                           }}>
                             <IconTrash />
                           </button>
@@ -333,10 +334,9 @@ export default function Permissions() {
                                   <button 
                                     type="button" 
                                     className={`${styles.toggleBtn} ${pendingLoginType === 'phone' ? styles.active : ''}`} 
-                                    onClick={(e) => { 
-                                      e.stopPropagation(); 
-                                      setPendingLoginType('phone'); 
-                                      if (!pendingPhone) setPendingPhone('19');
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPendingLoginType('phone');
                                     }}
                                   >
                                     Telefone
@@ -403,7 +403,7 @@ export default function Permissions() {
                                           setPendingRole(role);
                                           const initialApps = u.allowedApps && u.allowedApps.length > 0 
                                             ? u.allowedApps 
-                                            : (role === 'franchisor' || role === 'franchisee' ? ['franchise'] : ['admin']);
+                                            : ['admin'];
                                           setPendingAllowedApps(initialApps);
                                         }}
                                       >
@@ -433,7 +433,7 @@ export default function Permissions() {
                                   style={{ padding: '0.625rem 1rem', width: 'fit-content' }}
                                   onClick={(e) => { 
                                     e.stopPropagation(); 
-                                    setConfirmModal({ show: true, userId: u._id, userName: u.name, isActive: u.isActive !== false });
+                                    setConfirmModal({ show: true, userId: u._id, userName: u.name, isActive: u.isActive !== false, action: 'toggle' });
                                   }}
                                 >
                                   {u.isActive !== false ? 'Desativar Usuário' : 'Reativar Usuário'}
@@ -442,7 +442,7 @@ export default function Permissions() {
                             </div>
                             
                             <div className={styles.includedModules}>
-                              <label className={styles.label}>Módulos Inclusos ({pendingRole})</label>
+                              <label className={styles.label}>Módulos Inclusos ({ROLE_LABELS[pendingRole] || pendingRole})</label>
                               <div className={styles.permList} style={{ marginTop: '0.5rem' }}>
                                 {ROLE_PERMISSIONS[pendingRole]?.map(p => <span key={p} className={styles.badge}>{p}</span>)}
                               </div>
@@ -465,7 +465,9 @@ export default function Permissions() {
         <div className={styles.modalOverlay}>
           <div className={styles.modal} style={{ maxWidth: '380px' }}>
             <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>{confirmModal.isActive ? 'Desativar Usuário' : 'Reativar Usuário'}</h2>
+              <h2 className={styles.modalTitle}>
+                {confirmModal.action === 'delete' ? 'Excluir Usuário' : confirmModal.isActive ? 'Desativar Usuário' : 'Reativar Usuário'}
+              </h2>
               <button className={styles.btnClose} onClick={() => setConfirmModal(null)}>
                 <span style={{ display: 'flex', transform: 'rotate(45deg)' }}><IconPlus /></span>
               </button>
@@ -473,22 +475,34 @@ export default function Permissions() {
             <div className={styles.modalBody} style={{ textAlign: 'center', padding: '2rem 1.5rem' }}>
               <div style={{ marginBottom: '1rem' }}><IconAlert /></div>
               <p style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '1rem', margin: 0 }}>
-                Tem certeza que deseja {confirmModal.isActive ? 'desativar' : 'reativar'} o acesso de <strong>{confirmModal.userName}</strong>?
+                {confirmModal.action === 'delete'
+                  ? <>Tem certeza que deseja excluir permanentemente a conta de <strong>{confirmModal.userName}</strong>?</>
+                  : <>Tem certeza que deseja {confirmModal.isActive ? 'desativar' : 'reativar'} o acesso de <strong>{confirmModal.userName}</strong>?</>
+                }
               </p>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', marginTop: '0.5rem' }}>
-                {confirmModal.isActive ? 'O usuário não conseguirá mais realizar login no sistema.' : 'O usuário voltará a ter acesso normal ao sistema.'}
+                {confirmModal.action === 'delete'
+                  ? 'Esta ação é irreversível. Todos os dados do usuário serão removidos.'
+                  : confirmModal.isActive
+                    ? 'O usuário não conseguirá mais realizar login no sistema.'
+                    : 'O usuário voltará a ter acesso normal ao sistema.'
+                }
               </p>
             </div>
             <div className={styles.modalFooter}>
               <button className={styles.btnSecondary} onClick={() => setConfirmModal(null)}>Cancelar</button>
-              <button 
-                className={confirmModal.isActive ? styles.btnDanger : styles.btnPrimary} 
+              <button
+                className={styles.btnDanger}
                 onClick={() => {
-                  updateMutation.mutate({ id: confirmModal.userId, isActive: !confirmModal.isActive });
+                  if (confirmModal.action === 'delete') {
+                    deleteMutation.mutate(confirmModal.userId);
+                  } else {
+                    updateMutation.mutate({ id: confirmModal.userId, isActive: !confirmModal.isActive });
+                  }
                   setConfirmModal(null);
                 }}
               >
-                Sim, {confirmModal.isActive ? 'Desativar' : 'Reativar'}
+                {confirmModal.action === 'delete' ? 'Sim, Excluir' : confirmModal.isActive ? 'Sim, Desativar' : 'Sim, Reativar'}
               </button>
             </div>
           </div>

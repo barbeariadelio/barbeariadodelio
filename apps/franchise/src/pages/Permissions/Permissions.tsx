@@ -8,7 +8,7 @@ type AppUser = {
   name: string;
   email?: string;
   phone?: string;
-  role: 'owner' | 'cashier' | 'employee' | 'client' | 'franchisor' | 'franchisee';
+  role: 'owner' | 'cashier' | 'employee' | 'client';
   password?: string;
   passwordPlain?: string;
   isActive: boolean;
@@ -32,7 +32,6 @@ function normalizeRole(role: string): string {
   const r = role?.toLowerCase();
   if (r === 'staff' || r === 'employee' || r === 'funcionario' || r === 'funcionário') return 'employee';
   if (r === 'cashier' || r === 'caixa') return 'cashier';
-  if (r === 'owner' || r === 'admin') return 'owner';
   return r;
 }
 
@@ -84,7 +83,7 @@ export default function Permissions() {
         setPendingRole(role);
         const initialApps = u.allowedApps && u.allowedApps.length > 0 
           ? u.allowedApps 
-          : (role === 'franchisor' || role === 'franchisee' ? ['franchise'] : ['admin']);
+          : ['admin'];
         setPendingAllowedApps(initialApps);
         setPendingEmail(u.email || '');
         setPendingPhone(u.phone || '');
@@ -414,7 +413,7 @@ export default function Permissions() {
                                           setPendingRole(role);
                                           const initialApps = u.allowedApps && u.allowedApps.length > 0 
                                             ? u.allowedApps 
-                                            : (role === 'franchisor' || role === 'franchisee' ? ['franchise'] : ['admin']);
+                                            : ['admin'];
                                           setPendingAllowedApps(initialApps);
                                         }}
                                       >

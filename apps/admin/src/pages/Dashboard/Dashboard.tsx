@@ -218,6 +218,7 @@ export default function Dashboard() {
             isProcessing={statusMut.isPending || deleteMut.isPending}
             onEdit={(appt: any) => { setEditAppt(appt); setShowForm(true); }}
             onViewProfile={(clientId) => navigate(`/clients?id=${clientId}`)}
+            canBill={!isStaff}
           />
         </div>
       )}
@@ -249,6 +250,7 @@ export default function Dashboard() {
           isDeleting={deleteMut.isPending}
           businessName="Barber Admin"
           onProfileClick={(clientId) => navigate(`/clients?id=${clientId}`)}
+          canBill={!isStaff}
         />
       )}
 

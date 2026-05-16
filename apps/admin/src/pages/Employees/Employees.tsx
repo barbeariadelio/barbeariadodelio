@@ -39,10 +39,9 @@ function XIcon() {
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  owner:      'Proprietário',
-  employee:   'Funcionário',
-  franchisee: 'Franqueado',
-  franchisor: 'Franqueador',
+  owner:    'Proprietário',
+  cashier:  'Caixa',
+  employee: 'Funcionário',
 };
 
 interface DetailProps {
@@ -252,6 +251,7 @@ export default function Employees() {
           onSuccess={() => {
             setFormTarget(null);
             qc.invalidateQueries({ queryKey: ['employees'] });
+            qc.invalidateQueries({ queryKey: ['users'] });
           }}
         />
       )}

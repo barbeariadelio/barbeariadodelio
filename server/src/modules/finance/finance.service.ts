@@ -94,14 +94,9 @@ export class FinanceService {
 
   private async resolveUnitIds(userId: string, role: string, unitId?: string): Promise<string[]> {
     const allowedIds = await this.getAllowedUnitIds(userId, role);
-    
-    if (unitId && unitId !== 'all') {
-      const isPrivileged = ['owner', 'franchisor', 'admin'].includes(role);
-      if (isPrivileged) return [unitId];
-      
-      const user = await UserModel.findById(userId).select('unitId');
-      if (user?.unitId?.toString() === unitId) return [unitId];
 
+    if (unitId && unitId !== 'all') {
+      if (allowedIds.includes(unitId)) return [unitId];
       return [];
     }
 
@@ -128,21 +123,36 @@ export class FinanceService {
       return ownIds;
     }
 
-    if (role === 'franchisor') {
-      const { FranchiseModel } = await import('../franchise/franchise.model');
-      const franchisorObjectId = new mongoose.Types.ObjectId(userId);
-      const franchise = await FranchiseModel.findOne({ franchisors: franchisorObjectId });
-      return franchise ? franchise.units.map(u => u.toString()) : [];
-    }
-
-    if (role === 'admin') {
-      const units = await UnitModel.find({ isActive: true }).select('_id');
-      return units.map(u => u._id.toString());
-    }
-
-    if (role === 'franchisee' || role === 'employee' || role === 'cashier') {
+    if (role === 'employee') {
       const user = await UserModel.findById(userId).select('unitId');
       return user?.unitId ? [user.unitId.toString()] : [];
+    }
+
+    if (role === 'cashier') {
+      const user = await UserModel.findById(userId).select('unitId allowedApps');
+      const allowedApps: string[] = user?.allowedApps || [];
+      const primaryUnitId = user?.unitId?.toString();
+
+      if (allowedApps.length === 0) return primaryUnitId ? [primaryUnitId] : [];
+
+      const primaryUnit = primaryUnitId ? await UnitModel.findById(primaryUnitId).select('ownerId') : null;
+      const ownerId = primaryUnit?.ownerId;
+      if (!ownerId) return primaryUnitId ? [primaryUnitId] : [];
+
+      const unitIds = new Set<string>();
+
+      if (allowedApps.includes('admin')) {
+        const adminUnits = await UnitModel.find({ ownerId, isActive: true }).select('_id');
+        adminUnits.forEach(u => unitIds.add(u._id.toString()));
+      }
+
+      if (allowedApps.includes('franchise')) {
+        const { FranchiseModel } = await import('../franchise/franchise.model');
+        const franchise = await FranchiseModel.findOne({ franchisors: ownerId });
+        if (franchise?.units.length) franchise.units.forEach(u => unitIds.add(u.toString()));
+      }
+
+      return unitIds.size > 0 ? [...unitIds] : (primaryUnitId ? [primaryUnitId] : []);
     }
 
     return [];

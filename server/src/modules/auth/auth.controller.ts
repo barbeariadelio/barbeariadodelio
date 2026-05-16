@@ -15,23 +15,6 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       return;
     }
     const { user, ...tokens } = await service.login(loginId, password, appId);
-
-    const isProd = process.env.NODE_ENV === 'production';
-    
-    res.cookie('accessToken', tokens.accessToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: 'lax',
-      maxAge: 15 * 60 * 1000, // 15 min
-    });
-
-    res.cookie('refreshToken', tokens.refreshToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
-
     ok(res, { ...tokens, user });
   } catch (e) {
     next(e);
@@ -42,23 +25,6 @@ export async function bookingLogin(req: Request, res: Response, next: NextFuncti
   try {
     const { name, phone } = req.body;
     const { user, ...tokens } = await service.bookingLogin(name, phone);
-
-    const isProd = process.env.NODE_ENV === 'production';
-    
-    res.cookie('accessToken', tokens.accessToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: 'lax',
-      maxAge: 15 * 60 * 1000,
-    });
-
-    res.cookie('refreshToken', tokens.refreshToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
     ok(res, { ...tokens, user });
   } catch (e) {
     next(e);
@@ -71,15 +37,6 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
     if (!refreshToken) throw new AppError('Refresh token missing', 401);
 
     const result = await service.refresh(refreshToken);
-
-    const isProd = process.env.NODE_ENV === 'production';
-    res.cookie('accessToken', result.accessToken, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: 'lax',
-      maxAge: 15 * 60 * 1000,
-    });
-
     ok(res, result);
   } catch (e) {
     next(e);
@@ -90,8 +47,6 @@ export async function logout(req: AuthRequest, res: Response): Promise<void> {
   if (req.user?.id) {
     await service.logout(req.user.id);
   }
-  res.clearCookie('accessToken');
-  res.clearCookie('refreshToken');
   ok(res, { success: true });
 }
 

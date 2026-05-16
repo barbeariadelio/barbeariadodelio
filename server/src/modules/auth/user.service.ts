@@ -34,10 +34,18 @@ export class UserService {
   async updateAccount(id: string, data: Partial<IUser>): Promise<IUser> {
     const user = await UserModel.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: true }).select('-passwordHash');
     if (!user) throw new NotFoundError('User');
-    
+
     sharedCache.delete(`users:list:${user.unitId || 'all'}`);
     sharedCache.delete('users:list:all');
-    
+
     return user;
+  }
+
+  async deleteAccount(id: string): Promise<void> {
+    const user = await UserModel.findByIdAndDelete(id);
+    if (!user) throw new NotFoundError('User');
+
+    sharedCache.delete(`users:list:${user.unitId || 'all'}`);
+    sharedCache.delete('users:list:all');
   }
 }

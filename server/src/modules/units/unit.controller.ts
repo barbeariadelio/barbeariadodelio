@@ -25,15 +25,12 @@ export async function listUnits(req: AuthRequest, res: Response, next: NextFunct
     let units: IUnit[];
     const { role, id, unitId } = req.user!;
 
-    if (role === 'admin' || role === 'franchisor') {
-      units = await service.findAll();
-    } else if (role === 'owner') {
+    if (role === 'owner') {
       const ownUnits = await service.findByOwner(id);
-      // Also include franchise units where this owner is listed as a franchisor
       const { FranchiseModel } = await import('../franchise/franchise.model');
       const { default: mongoose } = await import('mongoose');
       const franchise = await FranchiseModel.findOne({ franchisors: new mongoose.Types.ObjectId(id) });
-      
+
       if (franchise && franchise.units.length > 0) {
         const franchiseUnits = await service.findByIds(franchise.units.map(u => u.toString()));
         const ownIds = new Set(ownUnits.map(u => u._id.toString()));
@@ -41,14 +38,53 @@ export async function listUnits(req: AuthRequest, res: Response, next: NextFunct
       } else {
         units = ownUnits;
       }
+    } else if (role === 'cashier') {
+      units = await resolveCashierUnits(id, unitId);
     } else if (unitId) {
       units = [await service.findById(unitId)];
     } else {
       units = [];
     }
-    
+
     ok(res, units);
   } catch (e) { next(e); }
+}
+
+async function resolveCashierUnits(userId: string, primaryUnitId?: string): Promise<IUnit[]> {
+  const { UserModel } = await import('../auth/auth.model');
+  const { FranchiseModel } = await import('../franchise/franchise.model');
+  const { default: mongoose } = await import('mongoose');
+
+  const userDoc = await UserModel.findById(userId).select('unitId allowedApps');
+  const allowedApps: string[] = userDoc?.allowedApps || [];
+  const effectiveUnitId = primaryUnitId || userDoc?.unitId?.toString();
+
+  if (allowedApps.length === 0) {
+    return effectiveUnitId ? [await service.findById(effectiveUnitId)] : [];
+  }
+
+  const primaryUnit = effectiveUnitId ? await service.findById(effectiveUnitId).catch(() => null) : null;
+  const ownerId = primaryUnit?.ownerId;
+
+  const resolved: IUnit[] = [];
+  const seen = new Set<string>();
+
+  const add = (u: IUnit) => { const key = u._id.toString(); if (!seen.has(key)) { seen.add(key); resolved.push(u); } };
+
+  if (ownerId && allowedApps.includes('admin')) {
+    const adminUnits = await service.findByOwner(ownerId.toString());
+    adminUnits.forEach(add);
+  }
+
+  if (allowedApps.includes('franchise') && ownerId) {
+    const franchise = await FranchiseModel.findOne({ franchisors: new mongoose.Types.ObjectId(ownerId.toString()) });
+    if (franchise?.units.length) {
+      const franchiseUnits = await service.findByIds(franchise.units.map(u => u.toString()));
+      franchiseUnits.forEach(add);
+    }
+  }
+
+  return resolved.length > 0 ? resolved : (primaryUnit ? [primaryUnit] : []);
 }
 
 export async function getUnit(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {

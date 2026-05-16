@@ -36,7 +36,7 @@ const userSchema = new Schema<IUser>(
     passwordPlain: { type: String },
     role:         {
       type: String,
-      enum: ['owner', 'employee', 'franchisor', 'franchisee', 'client', 'admin', 'cashier'],
+      enum: ['owner', 'employee', 'client', 'cashier'],
       required: true,
     },
     unitId:   { type: Schema.Types.ObjectId, ref: 'Unit' },

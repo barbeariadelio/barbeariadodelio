@@ -12,16 +12,20 @@ const service = new AppointmentService();
 
 export async function listAppointments(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const isSuperUser = ['owner', 'franchisor', 'admin'].includes(req.user!.role);
+    const { role, id: userId } = req.user!;
+    const isSuperUser = role === 'owner';
     const unitId = isSuperUser
       ? ((req.query.unitId as string) || req.user!.unitId)
       : req.user!.unitId;
     if (!unitId) { ok(res, []); return; }
-    
+
     const { date, start, end } = req.query as Record<string, string | undefined>;
     const { page, limit, skip } = (await import('../../shared/utils/pagination')).parsePagination(req.query as any);
-    
-    const appointments = await service.findByUnitAndDate(unitId, date, start, end, { skip, limit });
+
+    // Employees only see their own appointments
+    const employeeFilter = role === 'employee' ? userId : undefined;
+
+    const appointments = await service.findByUnitAndDate(unitId, date, start, end, { skip, limit }, employeeFilter);
     ok(res, appointments);
   } catch (e) { next(e); }
 }
@@ -32,7 +36,7 @@ export async function getAppointment(req: AuthRequest, res: Response, next: Next
     const appt = await service.findById(id);
 
     // Security check
-    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    const isOwnerOrFranchisor = req.user!.role === 'owner';
     
     if (!isOwnerOrFranchisor) {
       // If client, must be the owner of the appointment
@@ -43,7 +47,7 @@ export async function getAppointment(req: AuthRequest, res: Response, next: Next
           throw new AppError('Access denied', 403);
         }
       } else {
-        // If employee/franchisee, must belong to the same unit
+        // If employee/cashier, must belong to the same unit
         if (appt.unitId?.toString() !== req.user!.unitId?.toString()) {
           throw new AppError('Access denied to this unit', 403);
         }
@@ -82,7 +86,7 @@ export async function createAppointment(req: AuthRequest, res: Response, next: N
     // Staff-managed booking (clientId explicitly supplied): employee/franchisee/cashier
     //   may only manage appointments that belong to their own unit.
     const isSelfBooking = !data.clientId;
-    const isRestrictedStaff = ['employee', 'franchisee', 'cashier'].includes(req.user!.role);
+    const isRestrictedStaff = ['employee', 'cashier'].includes(req.user!.role);
     if (!isSelfBooking && isRestrictedStaff && data.unitId !== req.user!.unitId?.toString()) {
       throw new AppError('Cannot create appointment for another unit', 403);
     }
@@ -172,7 +176,7 @@ export async function updateAppointmentStatus(req: AuthRequest, res: Response, n
     if (!appt) throw new AppError('Appointment not found', 404);
 
     // Security check
-    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor) {
       if (req.user!.role === 'client') {
         const clients = await ClientModel.find({ userId: req.user!.id });
@@ -187,8 +191,6 @@ export async function updateAppointmentStatus(req: AuthRequest, res: Response, n
       }
     }
 
-    const updated = await service.updateStatus(id, status, { price, paymentMethod, skipBilling });
-
     if (status === 'cancelled') {
       const fullAppt = await service.findById(id);
       const client = await ClientModel.findById(fullAppt.clientId);
@@ -200,8 +202,12 @@ export async function updateAppointmentStatus(req: AuthRequest, res: Response, n
         appointmentId: fullAppt._id.toString(),
         external: true
       });
+      await service.delete(id);
+      ok(res, { deleted: true });
+      return;
     }
 
+    const updated = await service.updateStatus(id, status, { price, paymentMethod, skipBilling });
     ok(res, updated);
   } catch (e) { next(e); }
 }
@@ -212,7 +218,7 @@ export async function deleteAppointment(req: AuthRequest, res: Response, next: N
     const appt = await AppointmentModel.findById(id);
     if (!appt) throw new AppError('Appointment not found', 404);
 
-    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor && appt.unitId?.toString() !== req.user!.unitId?.toString()) {
       throw new AppError('Access denied to this unit', 403);
     }
@@ -233,8 +239,8 @@ export async function getClientAppointments(req: AuthRequest, res: Response, nex
       if (!clientIds.includes(clientId)) {
         throw new AppError('Access denied', 403);
       }
-    } else if (req.user!.role !== 'owner' && req.user!.role !== 'franchisor') {
-      // For employee/franchisee, check unit
+    } else if (req.user!.role !== 'owner') {
+      // For employee/cashier, check unit
       const client = await ClientModel.findById(clientId);
       if (client?.unitId?.toString() !== req.user!.unitId?.toString()) {
         throw new AppError('Access denied to this unit', 403);
@@ -253,7 +259,7 @@ export async function updateAppointment(req: AuthRequest, res: Response, next: N
     const appt = await AppointmentModel.findById(id);
     if (!appt) throw new AppError('Appointment not found', 404);
 
-    const isOwnerOrFranchisor = req.user!.role === 'owner' || req.user!.role === 'franchisor';
+    const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor) {
       if (req.user!.role === 'client') {
         const clients = await ClientModel.find({ userId: req.user!.id });
@@ -262,7 +268,7 @@ export async function updateAppointment(req: AuthRequest, res: Response, next: N
           throw new AppError('You can only update your own appointments', 403);
         }
       } else {
-        // Employee/Franchisee: must belong to the same unit
+        // Employee/Cashier: must belong to the same unit
         if (appt.unitId?.toString() !== req.user!.unitId?.toString()) {
           throw new AppError('Access denied to this unit', 403);
         }

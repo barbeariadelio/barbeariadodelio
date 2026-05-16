@@ -7,9 +7,9 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/',    requireRoles('owner', 'employee', 'franchisee', 'franchisor', 'cashier'), requireSameUnit(), controller.listProducts);
-router.post('/',   requireRoles('owner', 'employee', 'franchisee', 'franchisor', 'cashier'), requireSameUnit(), controller.createProduct);
-router.put('/:id', requireRoles('owner', 'employee', 'franchisee', 'franchisor', 'cashier'), requireSameUnit(), controller.updateProduct);
-router.delete('/:id', requireRoles('owner', 'employee', 'franchisee', 'franchisor', 'cashier'), requireSameUnit(), controller.deleteProduct);
+router.get('/',    requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), controller.listProducts);
+router.post('/',   requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), controller.createProduct);
+router.put('/:id', requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), controller.updateProduct);
+router.delete('/:id', requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), controller.deleteProduct);
 
 export { router as productRoutes };

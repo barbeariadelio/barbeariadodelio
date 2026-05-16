@@ -29,10 +29,10 @@ export async function listUsers(req: AuthRequest, res: Response, next: NextFunct
 export async function registerUser(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const { role: requesterRole } = req.user!;
-    const isPrivileged = requesterRole === 'owner' || requesterRole === 'franchisor' || requesterRole === 'admin' || requesterRole === 'franchisee';
-    
+    const isPrivileged = requesterRole === 'owner';
+
     if (!isPrivileged) {
-      throw new AppError('Apenas administradores e franqueadores podem registrar usuários', 403);
+      throw new AppError('Apenas o proprietário pode registrar usuários', 403);
     }
     const unitId = req.body.unitId || req.user!.unitId;
     const { name, email, phone, password, role, allowedApps } = req.body;
@@ -66,6 +66,20 @@ export async function registerUser(req: AuthRequest, res: Response, next: NextFu
   } catch (e) { next(e); }
 }
 
+export async function deleteUser(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const targetUserId = req.params.id;
+    const authenticatedUserId = req.user!.id;
+
+    if (targetUserId === authenticatedUserId) {
+      throw new AppError('Você não pode excluir sua própria conta.', 403);
+    }
+
+    await service.deleteAccount(targetUserId);
+    ok(res, { success: true });
+  } catch (e) { next(e); }
+}
+
 export async function updateAccount(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const targetUserId = req.params.id;
@@ -78,7 +92,7 @@ export async function updateAccount(req: AuthRequest, res: Response, next: NextF
     const bodyKeys = Object.keys(req.body);
     const hasRestrictedFields = bodyKeys.some(k => restrictedFields.includes(k));
 
-    const isPrivileged = requesterRole === 'owner' || requesterRole === 'franchisor' || requesterRole === 'admin' || requesterRole === 'franchisee' || requesterRole === 'cashier';
+    const isPrivileged = requesterRole === 'owner';
 
     if (hasRestrictedFields && !isPrivileged) {
       throw new AppError(`Não autorizado: apenas administradores podem alterar campos de privilégio (${restrictedFields.join(', ')})`, 403);

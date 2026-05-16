@@ -8,8 +8,9 @@ const service = new FinanceService();
 
 export async function getSummary(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const isPrivileged = ['owner', 'franchisor', 'admin'].includes(req.user!.role);
-    const unitId = isPrivileged
+    const { role } = req.user!;
+    const canSelectUnit = role === 'owner' || role === 'cashier';
+    const unitId = canSelectUnit
       ? (Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string) || 'all')
       : req.user!.unitId;
     const periodRaw = Array.isArray(req.query.period) ? req.query.period[0] : req.query.period;
@@ -21,8 +22,9 @@ export async function getSummary(req: AuthRequest, res: Response, next: NextFunc
 
 export async function listTransactions(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const isPrivileged = ['owner', 'franchisor', 'admin'].includes(req.user!.role);
-    const unitId = isPrivileged
+    const { role } = req.user!;
+    const canSelectUnit = role === 'owner' || role === 'cashier';
+    const unitId = canSelectUnit
       ? (Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string) || 'all')
       : (req.user!.unitId as string);
     if (!unitId) { ok(res, { data: [], total: 0 }); return; }

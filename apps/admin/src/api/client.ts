@@ -36,7 +36,6 @@ export function resolveApiBaseUrl(unitApiUrl?: string): string {
 
 export const apiClient = axios.create({
   baseURL: apiBaseUrl,
-  withCredentials: true,
 });
 
 apiClient.interceptors.request.use(config => {
@@ -69,14 +68,20 @@ export function setupInterceptors(instance: any) {
       return res;
     },
     async (error: any) => {
-      const isAuthRoute = error.config?.url?.includes('/auth/login') || error.config?.url?.includes('/auth/refresh');
-  
-      if (error.response?.status === 401 && !isAuthRoute) {
+      const config = error.config;
+      const isAuthRoute = config?.url?.includes('/auth/login') || config?.url?.includes('/auth/refresh');
+
+      if (error.response?.status === 401 && !isAuthRoute && !config?._retry) {
+        config._retry = true;
         try {
-          const { data } = await axios.post(`${apiBaseUrl}/auth/refresh`, { refreshToken: getStoredRefreshToken() }, { withCredentials: true });
+          const { data } = await axios.post(`${apiBaseUrl}/auth/refresh`, { refreshToken: getStoredRefreshToken() });
           const accessToken = data?.data?.accessToken || data?.accessToken;
-          if (accessToken) localStorage.setItem(storageKeys.accessToken, accessToken);
-          return instance(error.config);
+          if (accessToken) {
+            localStorage.setItem(storageKeys.accessToken, accessToken);
+            config.headers = config.headers || {};
+            config.headers.Authorization = `Bearer ${accessToken}`;
+          }
+          return instance(config);
         } catch {
           clearAuthStorage();
           const loginUrl = `${import.meta.env.BASE_URL}login`.replace('//', '/');

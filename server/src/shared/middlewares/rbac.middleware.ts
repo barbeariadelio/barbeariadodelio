@@ -22,7 +22,7 @@ export function requireSameUnit() {
     const { role, unitId } = req.user;
 
     // Privileged roles can access any unit
-    if (role === 'owner' || role === 'franchisor' || role === 'admin') {
+    if (role === 'owner') {
       next();
       return;
     }

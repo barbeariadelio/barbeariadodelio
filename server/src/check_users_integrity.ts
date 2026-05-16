@@ -10,7 +10,7 @@ async function run() {
     
     // 1. Buscar todos os caixas e funcionários sem unidade
     const usersWithoutUnit = await UserModel.find({
-      role: { $in: ['cashier', 'employee', 'franchisee'] },
+      role: { $in: ['cashier', 'employee'] },
       unitId: { $exists: false }
     });
 

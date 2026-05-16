@@ -7,20 +7,21 @@ import styles from './StaffSchedule.module.scss';
 const SLOT_H = 54;
 const HEADER_H = 72;
 
-function buildGrid(startHour: number, endHour: number) {
-  const totalSlots = (endHour - startHour) * 2;
+function buildGrid(startHour: number, endHour: number, slotDuration: number = 30) {
+  const slotsPerHour = 60 / slotDuration;
+  const totalSlots = (endHour - startHour) * slotsPerHour;
   const totalH = totalSlots * SLOT_H;
   const timeSlots = Array.from({ length: totalSlots }, (_, i) => {
-    const mins = startHour * 60 + i * 30;
+    const mins = startHour * 60 + i * slotDuration;
     return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`;
   });
-  return { totalSlots, totalH, timeSlots };
+  return { totalSlots, totalH, timeSlots, slotsPerHour };
 }
 
-function makeTimeToTop(startHour: number) {
+function makeTimeToTop(startHour: number, slotDuration: number = 30) {
   return (t: string) => {
     const [h, m] = t.split(':').map(Number);
-    return Math.max(0, ((h * 60 + m) - startHour * 60) / 30 * SLOT_H);
+    return Math.max(0, ((h * 60 + m) - startHour * 60) / slotDuration * SLOT_H);
   };
 }
 
@@ -77,10 +78,10 @@ export interface ScheduleAppointment {
   usedPackageId?: string;
 }
 
-function timeToHeight(s: string, e: string) {
+function timeToHeight(s: string, e: string, slotDuration: number = 30) {
   const [sh, sm] = s.split(':').map(Number);
   const [eh, em] = e.split(':').map(Number);
-  return Math.max(SLOT_H * 0.6, ((eh * 60 + em) - (sh * 60 + sm)) / 30 * SLOT_H - 2);
+  return Math.max(SLOT_H * 0.6, ((eh * 60 + em) - (sh * 60 + sm)) / slotDuration * SLOT_H - 2);
 }
 function initials(name: string) {
   return name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
@@ -177,6 +178,7 @@ interface ModalProps {
   onEdit?: (a: ScheduleAppointment) => void;
   onProfileClick?: (clientId: string) => void;
   businessName?: string;
+  canBill?: boolean;
 }
 
 function ApptModal({
@@ -190,7 +192,8 @@ function ApptModal({
   onEdit,
   onUpdateAppt,
   onProfileClick,
-  businessName
+  businessName,
+  canBill = true,
 }: ModalProps) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -269,8 +272,8 @@ function ApptModal({
               FATURADO
             </div>
           )}
-          {!appt.isBilled && (
-            <button 
+          {canBill && !appt.isBilled && (
+            <button
               className={styles.faturarBtn}
               onClick={() => setIsBilling(true)}
             >
@@ -426,7 +429,14 @@ function ApptModal({
   );
 }
 
-function BlockModal({ prompt, duration, onDurationChange, onConfirm, onCancel, isPending }: any) {
+function BlockModal({ prompt, onConfirm, onCancel, isPending }: any) {
+  const [startH, startM] = prompt.time.split(':').map(Number);
+  const defaultEndMins = startH * 60 + startM + 60;
+  const defaultEndTime = `${Math.floor(defaultEndMins / 60).toString().padStart(2, '0')}:${(defaultEndMins % 60).toString().padStart(2, '0')}`;
+  const [endTime, setEndTime] = useState(defaultEndTime);
+
+  const inputStyle = { padding: '0.6rem', borderRadius: '6px', border: '1px solid #D1D5DB', background: '#F9FAFB', fontSize: '0.95rem', width: '100%' };
+
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onCancel()}>
       <div className={styles.panel} style={{ maxWidth: 400 }}>
@@ -436,28 +446,29 @@ function BlockModal({ prompt, duration, onDurationChange, onConfirm, onCancel, i
         </div>
         <div className={styles.panelBody} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <p style={{ margin: 0, color: '#374151', lineHeight: 1.5 }}>
-            Deseja bloquear a agenda de <strong>{prompt.employeeName}</strong> a partir das <strong>{prompt.time}</strong>?
+            Bloquear agenda de <strong>{prompt.employeeName}</strong>:
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#4B5563' }}>Duração do bloqueio:</label>
-            <select
-              value={duration}
-              onChange={e => onDurationChange(Number(e.target.value))}
-              style={{ padding: '0.6rem', borderRadius: '6px', border: '1px solid #D1D5DB', background: '#F9FAFB', fontSize: '0.95rem' }}
-            >
-              <option value={30}>30 minutos</option>
-              <option value={60}>1 hora</option>
-              <option value={90}>1 hora e 30 minutos</option>
-              <option value={120}>2 horas</option>
-              <option value={180}>3 horas</option>
-              <option value={240}>4 horas</option>
-              <option value={480}>O resto do dia (8h)</option>
-            </select>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#4B5563' }}>Hora de início</label>
+              <input type="time" value={prompt.time} disabled style={{ ...inputStyle, opacity: 0.6, cursor: 'not-allowed' }} />
+            </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <label style={{ fontSize: '0.875rem', fontWeight: 600, color: '#4B5563' }}>Hora de fim</label>
+              <input
+                type="time"
+                value={endTime}
+                min={prompt.time}
+                onChange={e => setEndTime(e.target.value)}
+                style={inputStyle}
+                autoFocus
+              />
+            </div>
           </div>
         </div>
         <div className={styles.panelFooter} style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', padding: '1rem 1.5rem', borderTop: '1px solid #E5E7EB' }}>
           <button onClick={onCancel} disabled={isPending} style={{ padding: '0.5rem 1rem', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: 600, color: '#6B7280' }}>Cancelar</button>
-          <button onClick={onConfirm} disabled={isPending} style={{ padding: '0.5rem 1rem', background: '#EF4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>
+          <button onClick={() => onConfirm(endTime)} disabled={isPending || endTime <= prompt.time} style={{ padding: '0.5rem 1rem', background: '#EF4444', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 600 }}>
             {isPending ? 'Bloqueando...' : 'Confirmar Bloqueio'}
           </button>
         </div>
@@ -487,6 +498,8 @@ interface Props {
   isDeleting?: boolean;
   onProfileClick?: (clientId: string) => void;
   businessName?: string;
+  canBill?: boolean;
+  slotDuration?: number;
 }
 
 export default function StaffSchedule({
@@ -508,29 +521,24 @@ export default function StaffSchedule({
   isDeleting = false,
   onUpdateAppt,
   onProfileClick,
-  businessName
+  businessName,
+  canBill = true,
+  slotDuration = 30,
 }: Props) {
   const startHour = workingHours?.start ? parseInt(workingHours.start.split(':')[0], 10) : 8;
   const endHour   = workingHours?.end   ? parseInt(workingHours.end.split(':')[0], 10) + (parseInt(workingHours.end.split(':')[1], 10) > 0 ? 1 : 0) : 21;
-  const { totalH: TOTAL_H, timeSlots: TIME_SLOTS } = buildGrid(startHour, Math.max(endHour, startHour + 1));
-  const timeToTop = makeTimeToTop(startHour);
+  const { totalH: TOTAL_H, timeSlots: TIME_SLOTS, slotsPerHour } = buildGrid(startHour, Math.max(endHour, startHour + 1), slotDuration);
+  const timeToTop = makeTimeToTop(startHour, slotDuration);
 
   const [selectedAppt, setSelectedAppt] = useState<ScheduleAppointment | null>(null);
   const [blockPrompt, setBlockPrompt] = useState<{ employeeId: string; employeeName: string; time: string } | null>(null);
-  const [blockDuration, setBlockDuration] = useState(30);
 
   const palette = selectedAppt
     ? PALETTES[employees.findIndex(e => e._id === selectedAppt.employeeId?._id) % PALETTES.length] ?? PALETTES[0]
     : PALETTES[0];
 
-  function confirmBlock() {
+  function confirmBlock(endTime: string) {
     if (!blockPrompt) return;
-    const [h, m] = blockPrompt.time.split(':').map(Number);
-    const totalMins = h * 60 + m + blockDuration;
-    const endH = Math.floor(totalMins / 60).toString().padStart(2, '0');
-    const endM = (totalMins % 60).toString().padStart(2, '0');
-    const endTime = `${endH}:${endM}`;
-    
     onBlock({
       employeeId: blockPrompt.employeeId,
       unitId,
@@ -634,8 +642,8 @@ export default function StaffSchedule({
 
           <div className={styles.timeCol} style={{ height: TOTAL_H }}>
             {TIME_SLOTS.map((t, i) => (
-              <div key={t} className={`${styles.timeCell} ${i % 2 === 0 ? styles.timeCellHour : ''}`} style={{ height: SLOT_H }}>
-                {i % 2 === 0 && <span className={styles.timeLabel}>{t}</span>}
+              <div key={t} className={`${styles.timeCell} ${i % slotsPerHour === 0 ? styles.timeCellHour : ''}`} style={{ height: SLOT_H }}>
+                {i % slotsPerHour === 0 && <span className={styles.timeLabel}>{t}</span>}
               </div>
             ))}
             {isT && (
@@ -786,6 +794,7 @@ export default function StaffSchedule({
           onUpdateAppt={onUpdateAppt}
           onProfileClick={onProfileClick}
           businessName={businessName}
+          canBill={canBill}
           onEdit={(a) => {
             setSelectedAppt(null);
             onEdit?.(a);

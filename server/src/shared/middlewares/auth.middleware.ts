@@ -13,7 +13,7 @@ export function optionalAuthenticate(
   _res: Response,
   next: NextFunction,
 ): void {
-  const token = (req.headers.authorization?.startsWith('Bearer ') && req.headers.authorization.split(' ')[1]) || req.cookies?.accessToken;
+  const token = req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.split(' ')[1] : undefined;
   
   if (token) {
     try {
@@ -44,10 +44,6 @@ export function authenticate(
     }
   }
   
-  if (!token && req.cookies?.accessToken) {
-    token = req.cookies.accessToken;
-  }
-
   if (!token) {
     next(new UnauthorizedError('Token de autenticação ausente ou inválido'));
     return;

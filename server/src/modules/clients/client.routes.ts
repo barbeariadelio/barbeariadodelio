@@ -5,8 +5,8 @@ import { requireRoles, requireSameUnit } from '../../shared/middlewares/rbac.mid
 
 export const clientRoutes = Router();
 
-clientRoutes.get('/', authenticate, requireRoles('owner', 'employee', 'franchisee', 'franchisor', 'cashier'), requireSameUnit(), listClients);
-clientRoutes.get('/:id', authenticate, requireRoles('owner', 'employee', 'franchisee', 'franchisor', 'cashier'), requireSameUnit(), getClient);
+clientRoutes.get('/', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), listClients);
+clientRoutes.get('/:id', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), getClient);
 clientRoutes.post('/', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), createClient);
 clientRoutes.patch('/:id', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), updateClient);
 clientRoutes.post('/:id/packages', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), assignPackage);
