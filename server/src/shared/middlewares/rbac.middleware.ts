@@ -33,11 +33,35 @@ export function requireSameUnit() {
       return;
     }
 
-    // Unit-scoped roles are permitted — controllers scope data to req.query.unitId
-    // (sent by the app's VITE_UNIT_ID) or fall back to req.user.unitId.
-    // We do not reject mismatches here because each front-end app is intentionally
-    // configured with its own VITE_UNIT_ID that may differ from the JWT's unitId
-    // (e.g. a cashier whose JWT unitId is the franchise unit logging into the admin app).
+    // Unit-scoped roles are permitted.
+    // Data scoping is enforced by resolveUnitId() inside each controller.
     next();
   };
+}
+
+/**
+ * Soul540-style tenant resolution.
+ *
+ * Non-owners are ALWAYS locked to the unitId stored in their JWT —
+ * they cannot override it via query params.
+ *
+ * Owners can scope a request to a specific unit via:
+ *   1. X-Unit-ID request header  (preferred — sent by the franchise app)
+ *   2. ?unitId= query param       (fallback — legacy / admin app)
+ *   3. Their own JWT unitId       (last resort, usually null for owners)
+ *
+ * Returns null only for owners with no unit context (meaning "all units").
+ */
+export function resolveUnitId(req: AuthRequest): string | null {
+  const { role, unitId: jwtUnitId } = req.user!;
+
+  if (role !== 'owner') {
+    // Non-owners are hard-locked to their JWT unit — no override allowed.
+    return jwtUnitId || null;
+  }
+
+  // Owners: respect the header first, then the query param, then their own JWT unitId.
+  const headerUnit = req.headers['x-unit-id'] as string | undefined;
+  const queryUnit  = req.query.unitId as string | undefined;
+  return headerUnit || queryUnit || jwtUnitId || null;
 }

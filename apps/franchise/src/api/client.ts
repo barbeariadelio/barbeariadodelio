@@ -40,15 +40,19 @@ export const apiClient = axios.create({
 });
 
 apiClient.interceptors.request.use(config => {
-  const hasUnitId = config.params?.unitId || config.url?.includes('unitId=');
+  // Resolve the active unit for this franchise instance.
+  // Priority: localStorage (set on login or SSO) → VITE_UNIT_ID env var.
+  const dynamicUnitId = getSelectedUnitId() || import.meta.env.VITE_UNIT_ID;
 
-  if (!hasUnitId) {
-    // For Franchise apps, the unit ID should be retrieved from localStorage first
-    // (set dynamically when navigating from the portal), then fallback to env.
-    const dynamicUnitId = getSelectedUnitId() || import.meta.env.VITE_UNIT_ID;
-    if (dynamicUnitId) {
+  if (dynamicUnitId) {
+    // Send as both query param (legacy support) and X-Unit-ID header
+    // (read by resolveUnitId() on the server for owner-level scoping).
+    const hasUnitId = config.params?.unitId || config.url?.includes('unitId=');
+    if (!hasUnitId) {
       config.params = { ...config.params, unitId: dynamicUnitId };
     }
+    config.headers = config.headers || {};
+    config.headers['X-Unit-ID'] = dynamicUnitId;
   }
 
   const token = getStoredAccessToken();

@@ -1,13 +1,19 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { ServiceService } from './service.service';
 import { AuthRequest } from '../../shared/middlewares/auth.middleware';
+import { resolveUnitId } from '../../shared/middlewares/rbac.middleware';
 import { ok, created } from '../../shared/utils/responseHelper';
 
 const service = new ServiceService();
 
-export async function listServices(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function listServices(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const unitId = (req.query.unitId as string) || (req as AuthRequest).user?.unitId;
+    // Soul540-style: non-owners are locked to their JWT unitId.
+    // listServices is also called unauthenticated (booking flow), so fall back
+    // to query param when there is no authenticated user.
+    const unitId = req.user
+      ? resolveUnitId(req)
+      : (req.query.unitId as string | undefined) || null;
     if (!unitId) { ok(res, []); return; }
     const services = await service.findByUnit(unitId);
     ok(res, services);

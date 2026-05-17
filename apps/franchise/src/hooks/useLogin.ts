@@ -35,7 +35,13 @@ export function useLogin() {
     setLoading(true);
     setError(null);
     try {
-      const { data: auth } = await api.post<AuthResponse>('/auth/login', form);
+      // Pass the active unit ID as appId so the server validates the user's
+      // allowedApps and rejects accounts that don't belong to this franchise unit.
+      const unitId = getSelectedUnitId() || import.meta.env.VITE_UNIT_ID;
+      const { data: auth } = await api.post<AuthResponse>('/auth/login', {
+        ...form,
+        appId: unitId || form.appId,
+      });
       localStorage.setItem(storageKeys.accessToken, auth.accessToken);
       localStorage.setItem(storageKeys.refreshToken, auth.refreshToken);
 

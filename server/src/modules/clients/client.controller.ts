@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { ClientService } from './client.service';
 import { AuthRequest } from '../../shared/middlewares/auth.middleware';
+import { resolveUnitId } from '../../shared/middlewares/rbac.middleware';
 import { ok, created } from '../../shared/utils/responseHelper';
 import { AppError } from '../../shared/errors/AppError';
 
@@ -8,7 +9,8 @@ const service = new ClientService();
 
 export async function listClients(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const unitId = (req.query.unitId as string) || req.user!.unitId;
+    // Soul540-style: non-owners are locked to their JWT unitId.
+    const unitId = resolveUnitId(req);
     if (!unitId) { ok(res, []); return; }
     
     const q = req.query.q as string | undefined;

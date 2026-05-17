@@ -40,18 +40,24 @@ export function useLogin() {
       localStorage.setItem(storageKeys.refreshToken, auth.refreshToken);
 
       const me = auth.user || (await api.get<MeResponse>('/auth/me')).data;
-      
+
       if (me.role === 'client') {
         localStorage.removeItem(storageKeys.accessToken);
         localStorage.removeItem(storageKeys.refreshToken);
         throw new Error('Acesso restrito. Use o aplicativo de agendamento.');
       }
 
+      // Persist unitId so the interceptor can scope requests to the right unit.
+      if (me.unitId && !localStorage.getItem(storageKeys.selectedUnitId)) {
+        localStorage.setItem(storageKeys.selectedUnitId, me.unitId);
+      }
+
       setUser(me as unknown as User);
       navigate('/dashboard');
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const response = (err as { response?: { data?: { message?: string } } })?.response;
       const message =
-        err?.response?.data?.message ||
+        response?.data?.message ||
         (err instanceof Error ? err.message : null) ||
         'E-mail ou senha inválidos.';
       setError(message);

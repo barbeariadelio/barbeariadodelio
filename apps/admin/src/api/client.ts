@@ -25,6 +25,7 @@ export function clearAuthStorage(): void {
   localStorage.removeItem(storageKeys.accessToken);
   localStorage.removeItem(storageKeys.refreshToken);
   localStorage.removeItem(storageKeys.user);
+  localStorage.removeItem(storageKeys.selectedUnitId);
 }
 
 export function resolveApiBaseUrl(unitApiUrl?: string): string {

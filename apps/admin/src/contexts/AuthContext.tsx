@@ -21,8 +21,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   function handleSetUser(u: User | null) {
-    if (u) localStorage.setItem(storageKeys.user, JSON.stringify(u));
-    else localStorage.removeItem(storageKeys.user);
+    if (u) {
+      localStorage.setItem(storageKeys.user, JSON.stringify(u));
+      // Persist unitId so the interceptor always scopes requests to this unit.
+      const unitId = (u as unknown as { unitId?: string }).unitId;
+      if (unitId && !localStorage.getItem(storageKeys.selectedUnitId)) {
+        localStorage.setItem(storageKeys.selectedUnitId, unitId);
+      }
+    } else {
+      localStorage.removeItem(storageKeys.user);
+      localStorage.removeItem(storageKeys.selectedUnitId);
+    }
     setUser(u);
   }
 

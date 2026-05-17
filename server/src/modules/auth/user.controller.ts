@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { UserService } from './user.service';
 import { AuthRequest } from '../../shared/middlewares/auth.middleware';
+import { resolveUnitId } from '../../shared/middlewares/rbac.middleware';
 import { ok, created } from '../../shared/utils/responseHelper';
 import { AppError } from '../../shared/errors/AppError';
 
@@ -8,14 +9,10 @@ const service = new UserService();
 
 export async function listUsers(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { role, unitId: userUnitId } = req.user!;
-    const requestedUnitId = req.query.unitId as string;
-    
-    // Determine the effective unitId to filter by
-    // We prioritize the requestedUnitId from the app (VITE_UNIT_ID)
-    // but fall back to the user's own unitId if not provided.
-    const filterUnitId = requestedUnitId || userUnitId;
-    
+    // Soul540-style: non-owners are locked to their JWT unitId;
+    // owners can scope via X-Unit-ID header or ?unitId= query param.
+    const filterUnitId = resolveUnitId(req) ?? undefined;
+
     // Clear cache to ensure immediate visibility of new users
     const { sharedCache } = await import('../../shared/utils/cache');
     sharedCache.delete(`users:list:${filterUnitId || 'all'}`);
