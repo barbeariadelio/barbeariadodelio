@@ -182,6 +182,7 @@ export default function Layout() {
   }, [user, theme, updateTheme]);
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [notifsOpen, setNotifsOpen] = useState(false);
   const notifsRef = useRef<HTMLDivElement>(null);
 
@@ -229,10 +230,14 @@ export default function Layout() {
   };
 
   return (
-    <div className={`${styles.shell} ${collapsed ? styles.collapsed : ''}`}>
+    <div className={`${styles.shell} ${collapsed ? styles.collapsed : ''} ${mobileOpen ? styles.mobileOpen : ''}`}>
+      {mobileOpen && <div className={styles.overlay} onClick={() => setMobileOpen(false)} />}
       <aside className={styles.sidebar}>
         <div className={styles.logo}>
           <img src={logo} alt="Barbearia Délio" className={styles.logoImg} />
+          <button className={styles.closeSidebarBtn} onClick={() => setMobileOpen(false)} aria-label="Fechar menu">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         </div>
 
         <nav className={styles.nav}>
@@ -250,6 +255,7 @@ export default function Layout() {
               <NavLink
                 key={item.path}
                 to={item.path}
+                onClick={() => window.innerWidth <= 768 && setMobileOpen(false)}
                 className={({ isActive }) =>
                   `${styles.navItem} ${isActive ? styles.active : ''}`
                 }
@@ -283,7 +289,7 @@ export default function Layout() {
         <header className={styles.topbar}>
           <button
             className={styles.toggleBtn}
-            onClick={() => setCollapsed(c => !c)}
+            onClick={() => window.innerWidth <= 768 ? setMobileOpen(o => !o) : setCollapsed(c => !c)}
             aria-label="Toggle sidebar"
           >
             <IconMenu />
