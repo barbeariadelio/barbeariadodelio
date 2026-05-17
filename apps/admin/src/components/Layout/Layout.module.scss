@@ -32,6 +32,30 @@ $logo-area-height: 140px;
   justify-content: center;
   padding: 0 0.5rem;
   border-bottom: 1px solid var(--border-subtle);
+  position: relative;
+}
+
+.closeSidebarBtn {
+  display: none;
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border-color: #ef4444;
+  }
 }
 
 .logoImg {
@@ -427,21 +451,57 @@ $logo-area-height: 140px;
   }
 }
 
+/* ── Overlay (mobile backdrop) ── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 99;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
 /* ── Responsive ── */
+
+/* Tablet: sidebar sempre em modo ícone */
+@media (max-width: 1024px) and (min-width: 769px) {
+  .sidebar {
+    width: $sidebar-collapsed !important;
+  }
+  .main {
+    margin-left: $sidebar-collapsed !important;
+  }
+  .navLabel { display: none !important; }
+  .userMeta { display: none !important; }
+  .navItem { padding: 0.65rem 0; justify-content: center; }
+  .navIcon { width: auto; }
+  .sidebarFooter { padding: 1rem 0; justify-content: center; flex-direction: column; }
+  .logo { padding: 0; justify-content: center; }
+}
 
 @media (max-width: 768px) {
   .sidebar {
     transform: translateX(-100%);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    width: $sidebar-width !important;
+    z-index: 100;
   }
 
   .mobileOpen .sidebar {
     transform: translateX(0);
-    width: $sidebar-width !important;
   }
 
   .main {
     margin-left: 0 !important;
+  }
+
+  .topbar {
+    padding: 0 1rem;
+  }
+
+  .closeSidebarBtn {
+    display: flex;
   }
 
   .notifsDropdown {
@@ -453,7 +513,7 @@ $logo-area-height: 140px;
     max-height: 70vh;
     z-index: 1001;
   }
-  
+
   .notifList {
     max-height: calc(70vh - 60px);
   }

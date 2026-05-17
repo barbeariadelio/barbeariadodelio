@@ -839,8 +839,44 @@ export default function Finance() {
               <HorizontalBar title="Distribuição" items={summary?.byCategory ?? []} />
             </div>
 
-            <div style={{ background: 'red', padding: '2rem', borderRadius: 12, color: 'white', fontSize: 18 }}>
-              TESTE — se aparecer, o vite está atualizando
+            <div className={styles.chartCard}>
+              <h3 className={styles.chartTitle}>Receita por Meio de Pagamento</h3>
+              {paymentPieData.length === 0 ? (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: 'var(--text-muted)', fontSize: 13 }}>
+                  Nenhuma receita faturada ainda
+                </div>
+              ) : (
+                <>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <PieChart>
+                      <Pie data={paymentPieData} dataKey="amount" nameKey="method" cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={3}>
+                        {paymentPieData.map((entry, i) => (
+                          <Cell key={i} fill={PAYMENT_COLORS[entry.method] ?? '#9CA3AF'} />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        contentStyle={{ background: '#1A1A1A', border: '1px solid #2C2C2C', borderRadius: '8px', color: '#fff' }}
+                        formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), PAYMENT_LABELS[name] || name]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem' }}>
+                    {paymentPieData.map(p => {
+                      const total = paymentPieData.reduce((s, x) => s + x.amount, 0);
+                      const pct = total > 0 ? ((p.amount / total) * 100).toFixed(1) : '0';
+                      return (
+                        <div key={p.method} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: 10, height: 10, borderRadius: '50%', background: PAYMENT_COLORS[p.method] ?? '#9CA3AF', flexShrink: 0 }} />
+                          <span style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>{PAYMENT_LABELS[p.method] || p.method}</span>
+                          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{p.count} trans.</span>
+                          <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', minWidth: 80, textAlign: 'right' }}>{formatCurrency(p.amount)}</span>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', minWidth: 36, textAlign: 'right' }}>{pct}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
