@@ -448,3 +448,26 @@ $border:            #2C2C2C;
     z-index: 1001;
   }
 }
+
+/* ── Mobile sidebar open state ── */
+.mobileOpen .sidebar {
+  transform: translateX(0);
+}
+
+.mobileOpen .closeSidebarBtn {
+  display: flex;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 99;
+  backdrop-filter: blur(2px);
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}

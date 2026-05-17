@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api/client';
+import { api, getSelectedUnitId } from '../../api/client';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend, Cell, PieChart, Pie } from 'recharts';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -143,7 +143,8 @@ export default function Finance() {
   const { user } = useAuth();
   const isStaff = user?.role === 'employee';
   const userId = (user as any)?.id || (user as any)?._id;
-  const [unitId, setUnitId] = useState('all');
+  const activeUnitId = getSelectedUnitId() || import.meta.env.VITE_UNIT_ID || 'all';
+  const [unitId, setUnitId] = useState(activeUnitId);
   const [period, setPeriod] = useState('month');
   const [activeTab, setActiveTab] = useState<TabType>('geral');
   const [showForm, setShowForm] = useState(false);
@@ -289,7 +290,6 @@ export default function Finance() {
             value={unitId}
             onChange={e => setUnitId(e.target.value)}
           >
-            <option value="all">Todas as Unidades</option>
             {units.map(u => (
               <option key={u._id} value={u._id}>{u.name}</option>
             ))}
