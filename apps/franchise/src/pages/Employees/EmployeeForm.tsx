@@ -4,6 +4,12 @@ import { useAuth } from '../../contexts/AuthContext';
 import { api, getSelectedUnitId } from '../../api/client';
 import styles from './EmployeeForm.module.scss';
 
+type DaySlot = { start: string; end: string };
+type DaySchedule = { day: number; slots: DaySlot[] };
+
+const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const DAY_NAMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+
 interface Employee {
   _id: string;
   name: string;
@@ -12,12 +18,7 @@ interface Employee {
   role: string;
   passwordPlain?: string;
   avatar?: string;
-  workSchedule?: {
-    start: string;
-    end: string;
-    lunchStart?: string;
-    lunchEnd?: string;
-  };
+  daySchedules?: DaySchedule[];
   vacations?: { start: string; end: string }[];
   blockedDays?: string[];
   isActive: boolean;
@@ -47,10 +48,10 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
   const [avatar, setAvatar] = useState(employee?.avatar ?? '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [schedStart, setSchedStart] = useState(employee?.workSchedule?.start ?? '08:00');
-  const [schedEnd, setSchedEnd] = useState(employee?.workSchedule?.end ?? '18:00');
-  const [lunchStart, setLunchStart] = useState(employee?.workSchedule?.lunchStart ?? '');
-  const [lunchEnd, setLunchEnd] = useState(employee?.workSchedule?.lunchEnd ?? '');
+  const [daySchedules, setDaySchedules] = useState<DaySchedule[]>(() => {
+    if (employee?.daySchedules?.length) return employee.daySchedules;
+    return [1, 2, 3, 4, 5].map(day => ({ day, slots: [{ start: '08:00', end: '18:00' }] }));
+  });
   
   const [vacationStart, setVacationStart] = useState(employee?.vacations?.[0]?.start ?? '');
   const [vacationEnd, setVacationEnd] = useState(employee?.vacations?.[0]?.end ?? '');
@@ -101,18 +102,13 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
       finalBlockedDays.push(newBlockedDay);
     }
 
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       name,
       email: finalEmail,
-      phone,
+      phone: phone.replace(/\D/g, ''),
       role: 'employee',
       avatar,
-      workSchedule: {
-        start: schedStart,
-        end: schedEnd,
-        lunchStart: lunchStart || undefined,
-        lunchEnd: lunchEnd || undefined,
-      },
+      daySchedules,
       vacations,
       blockedDays: finalBlockedDays.sort()
     };
@@ -189,26 +185,73 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
             />
           </div>
 
-          <div className={styles.schedGrid}>
-            <div className={styles.field}>
-              <label className={styles.label}>Início Trabalho</label>
-              <input type="time" className={styles.input} value={schedStart} onChange={e => setSchedStart(e.target.value)} />
+          <div className={styles.field}>
+            <label className={styles.label}>Horários por Dia</label>
+            <div style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+              {DAY_LABELS.map((lbl, idx) => {
+                const active = daySchedules.some(ds => ds.day === idx);
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setDaySchedules(prev => {
+                      if (active) return prev.filter(ds => ds.day !== idx);
+                      return [...prev, { day: idx, slots: [{ start: '08:00', end: '18:00' }] }].sort((a, b) => a.day - b.day);
+                    })}
+                    style={{
+                      padding: '0.35rem 0.7rem',
+                      borderRadius: '20px',
+                      border: `1px solid ${active ? 'var(--gold)' : 'var(--border-default)'}`,
+                      background: active ? 'var(--gold)' : 'transparent',
+                      color: active ? '#fff' : 'var(--text-muted)',
+                      fontSize: '0.8rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {lbl}
+                  </button>
+                );
+              })}
             </div>
-            <div className={styles.field}>
-              <label className={styles.label}>Fim Trabalho</label>
-              <input type="time" className={styles.input} value={schedEnd} onChange={e => setSchedEnd(e.target.value)} />
-            </div>
-          </div>
 
-          <div className={styles.schedGrid}>
-            <div className={styles.field}>
-              <label className={styles.label}>Início Almoço</label>
-              <input type="time" className={styles.input} value={lunchStart} onChange={e => setLunchStart(e.target.value)} />
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label}>Fim Almoço</label>
-              <input type="time" className={styles.input} value={lunchEnd} onChange={e => setLunchEnd(e.target.value)} />
-            </div>
+            {[...daySchedules].sort((a, b) => a.day - b.day).map(({ day, slots }) => (
+              <div key={day} style={{ marginBottom: '0.625rem', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '0.625rem 0.75rem' }}>
+                <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>{DAY_NAMES[day]}</p>
+                {slots.map((slot, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: idx < slots.length - 1 ? '0.4rem' : 0 }}>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', width: '20px', flexShrink: 0 }}>De</span>
+                    <input
+                      type="time"
+                      className={styles.input}
+                      value={slot.start}
+                      onChange={e => setDaySchedules(prev => prev.map(ds => ds.day === day ? { ...ds, slots: ds.slots.map((s, i) => i === idx ? { ...s, start: e.target.value } : s) } : ds))}
+                      style={{ flex: 1 }}
+                    />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', width: '24px', flexShrink: 0 }}>Até</span>
+                    <input
+                      type="time"
+                      className={styles.input}
+                      value={slot.end}
+                      onChange={e => setDaySchedules(prev => prev.map(ds => ds.day === day ? { ...ds, slots: ds.slots.map((s, i) => i === idx ? { ...s, end: e.target.value } : s) } : ds))}
+                      style={{ flex: 1 }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setDaySchedules(prev => prev.map(ds => ds.day === day ? { ...ds, slots: ds.slots.filter((_, i) => i !== idx) } : ds).filter(ds => ds.slots.length > 0))}
+                      style={{ background: 'none', border: 'none', color: '#9CA3AF', cursor: 'pointer', padding: '0 0.25rem', fontSize: '1rem', flexShrink: 0 }}
+                    >🗑</button>
+                    {idx === slots.length - 1 && (
+                      <button
+                        type="button"
+                        onClick={() => setDaySchedules(prev => prev.map(ds => ds.day === day ? { ...ds, slots: [...ds.slots, { start: '08:00', end: '18:00' }] } : ds))}
+                        style={{ width: '26px', height: '26px', borderRadius: '50%', background: '#111827', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem', fontWeight: 700, flexShrink: 0 }}
+                      >+</button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
           </div>
 
           <hr style={{ borderColor: 'var(--border-subtle)', margin: '0.5rem 0' }} />

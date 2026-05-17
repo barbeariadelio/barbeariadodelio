@@ -1,8 +1,16 @@
-import { FormEvent, useState, useRef, useEffect, useMemo } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { FormEvent, useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { api, resolveApiBaseUrl } from '../../api/client';
 import styles from './AppointmentForm.module.scss';
+
+function maskPhone(raw: string) {
+  const d = raw.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 2) return d.length ? `(${d}` : '';
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
 
 interface Unit { _id: string; name: string; apiUrl?: string; }
 interface Employee { _id: string; name: string; }
@@ -56,10 +64,15 @@ function IconX() {
 }
 
 export default function AppointmentForm({ onClose, onSuccess, initialDate, initialEmployeeId, initialTime, appointment }: Props) {
+  const qc = useQueryClient();
   const [unitId, setUnitId] = useState(import.meta.env.VITE_UNIT_ID || '');
   const [clientId, setClientId] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [showClientList, setShowClientList] = useState(false);
+  const [showQuickRegister, setShowQuickRegister] = useState(false);
+  const [quickName, setQuickName] = useState('');
+  const [quickPhone, setQuickPhone] = useState('');
+  const [quickSaving, setQuickSaving] = useState(false);
   const [employeeId, setEmployeeId] = useState(initialEmployeeId ?? '');
   const [serviceId, setServiceId] = useState('');
   const [date, setDate] = useState(initialDate ?? todayISO());
@@ -153,6 +166,24 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     setUsePackage(false);
     setSelectedPackageId('');
   }
+
+  const handleQuickRegister = useCallback(async () => {
+    if (!quickName.trim()) return;
+    setQuickSaving(true);
+    try {
+      const res = await unitApi.post('/clients', { name: quickName.trim(), phone: quickPhone.replace(/\D/g, '') || undefined, unitId: unitId || undefined });
+      const newClient: Client = res.data;
+      await qc.invalidateQueries({ queryKey: ['clients', unitId] });
+      selectClient(newClient);
+      setShowQuickRegister(false);
+      setQuickName('');
+      setQuickPhone('');
+    } catch {
+      // silent
+    } finally {
+      setQuickSaving(false);
+    }
+  }, [quickName, quickPhone, unitId, unitApi, qc]);
 
   const mutation = useMutation({
     mutationFn: (payload: object) => {
@@ -264,6 +295,17 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
 
               {showClientList && !selectedClient && (
                 <div className={styles.clientDropdown}>
+                  <button
+                    type="button"
+                    className={styles.clientOption}
+                    onMouseDown={() => { setShowQuickRegister(true); setShowClientList(false); setQuickName(clientSearch); }}
+                    style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--gold)', fontWeight: 600 }}
+                  >
+                    <span className={styles.clientOptionInitial} style={{ background: 'var(--gold)', color: '#fff' }}>+</span>
+                    <div className={styles.clientOptionInfo}>
+                      <span className={styles.clientOptionName}>Cadastrar novo cliente</span>
+                    </div>
+                  </button>
                   {filteredClients.length === 0 ? (
                     <div className={styles.clientDropdownEmpty}>Nenhum cliente encontrado</div>
                   ) : (
@@ -282,6 +324,45 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
                       </button>
                     ))
                   )}
+                </div>
+              )}
+
+              {showQuickRegister && (
+                <div style={{ border: '1px solid var(--gold)', borderRadius: '8px', padding: '0.75rem', marginTop: '0.5rem', background: 'var(--bg-surface)' }}>
+                  <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Novo cliente</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <input
+                      className={styles.input}
+                      placeholder="Nome *"
+                      value={quickName}
+                      onChange={e => setQuickName(e.target.value)}
+                      autoFocus
+                    />
+                    <input
+                      className={styles.input}
+                      placeholder="Telefone"
+                      value={quickPhone}
+                      onChange={e => setQuickPhone(maskPhone(e.target.value))}
+                      inputMode="tel"
+                    />
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => { setShowQuickRegister(false); setQuickName(''); setQuickPhone(''); }}
+                        style={{ flex: 1, padding: '0.4rem', background: 'transparent', border: '1px solid var(--border-default)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-muted)' }}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleQuickRegister}
+                        disabled={!quickName.trim() || quickSaving}
+                        style={{ flex: 2, padding: '0.4rem', background: 'var(--gold)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}
+                      >
+                        {quickSaving ? 'Salvando...' : 'Cadastrar e Selecionar'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

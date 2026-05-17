@@ -13,6 +13,8 @@ export interface Service {
   unitId: string;
   isActive: boolean;
   type?: 'single' | 'package';
+  showPrice?: boolean;
+  showPricePrefix?: boolean;
   packageValidity?: {
     type: 'none' | 'days' | 'weeks' | 'months' | 'years';
     value?: number;

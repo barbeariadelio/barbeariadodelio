@@ -1,8 +1,16 @@
-import { FormEvent, useState, useRef, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { FormEvent, useState, useRef, useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import styles from './AppointmentForm.module.scss';
+
+function maskPhone(raw: string) {
+  const d = raw.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 2) return d.length ? `(${d}` : '';
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
 
 interface Unit { _id: string; name: string; apiUrl?: string; workingDays?: number[]; }
 interface Employee { _id: string; name: string; }
@@ -27,11 +35,12 @@ interface Service {
 interface Product { _id: string; name: string; price: number; stockQuantity: number; isActive: boolean; }
 interface ApptProduct { productId: string; name: string; quantity: number; unitPrice: number; }
 
-function advanceDate(iso: string, freq: 'weekly' | 'biweekly' | 'monthly', times: number): string {
+function advanceDate(iso: string, freq: 'weekly' | 'biweekly' | 'monthly' | 'annual', times: number): string {
   const d = new Date(iso + 'T12:00:00');
-  if (freq === 'weekly')   d.setDate(d.getDate() + times * 7);
+  if (freq === 'weekly')        d.setDate(d.getDate() + times * 7);
   else if (freq === 'biweekly') d.setDate(d.getDate() + times * 14);
-  else d.setMonth(d.getMonth() + times);
+  else if (freq === 'monthly')  d.setMonth(d.getMonth() + times);
+  else                          d.setFullYear(d.getFullYear() + times);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
@@ -67,6 +76,7 @@ function IconX() {
 
 export default function AppointmentForm({ onClose, onSuccess, initialDate, initialEmployeeId, initialTime, appointment }: Props) {
   const { user } = useAuth();
+  const qc = useQueryClient();
   const isStaff = user?.role === 'employee';
   const userId = (user as any)?._id || (user as any)?.id || '';
 
@@ -74,6 +84,10 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
   const [clientId, setClientId] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [showClientList, setShowClientList] = useState(false);
+  const [showQuickRegister, setShowQuickRegister] = useState(false);
+  const [quickName, setQuickName] = useState('');
+  const [quickPhone, setQuickPhone] = useState('');
+  const [quickSaving, setQuickSaving] = useState(false);
   const [employeeId, setEmployeeId] = useState(initialEmployeeId ?? '');
   const [serviceId, setServiceId] = useState('');
   const [date, setDate] = useState(initialDate ?? todayISO());
@@ -85,7 +99,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
 
   // Repeat
   const [repeatEnabled, setRepeatEnabled] = useState(false);
-  const [repeatFrequency, setRepeatFrequency] = useState<'weekly' | 'biweekly' | 'monthly'>('weekly');
+  const [repeatFrequency, setRepeatFrequency] = useState<'weekly' | 'biweekly' | 'monthly' | 'annual'>('weekly');
   const [repeatCount, setRepeatCount] = useState(3);
   const [repeatProgress, setRepeatProgress] = useState<{ current: number; total: number } | null>(null);
 
@@ -187,6 +201,24 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     setUsePackage(false);
     setSelectedPackageId('');
   }
+
+  const handleQuickRegister = useCallback(async () => {
+    if (!quickName.trim()) return;
+    setQuickSaving(true);
+    try {
+      const res = await api.post('/clients', { name: quickName.trim(), phone: quickPhone.replace(/\D/g, '') || undefined, unitId: unitId || undefined });
+      const newClient: Client = res.data;
+      await qc.invalidateQueries({ queryKey: ['clients', unitId] });
+      selectClient(newClient);
+      setShowQuickRegister(false);
+      setQuickName('');
+      setQuickPhone('');
+    } catch {
+      // silent — user can try again
+    } finally {
+      setQuickSaving(false);
+    }
+  }, [quickName, quickPhone, unitId, qc]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -362,6 +394,17 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
 
               {showClientList && !selectedClient && (
                 <div className={styles.clientDropdown}>
+                  <button
+                    type="button"
+                    className={styles.clientOption}
+                    onMouseDown={() => { setShowQuickRegister(true); setShowClientList(false); setQuickName(clientSearch); }}
+                    style={{ borderBottom: '1px solid var(--border-subtle)', color: 'var(--gold)', fontWeight: 600 }}
+                  >
+                    <span className={styles.clientOptionInitial} style={{ background: 'var(--gold)', color: '#fff' }}>+</span>
+                    <div className={styles.clientOptionInfo}>
+                      <span className={styles.clientOptionName}>Cadastrar novo cliente</span>
+                    </div>
+                  </button>
                   {filteredClients.length === 0 ? (
                     <div className={styles.clientDropdownEmpty}>Nenhum cliente encontrado</div>
                   ) : (
@@ -380,6 +423,45 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
                       </button>
                     ))
                   )}
+                </div>
+              )}
+
+              {showQuickRegister && (
+                <div style={{ border: '1px solid var(--gold)', borderRadius: '8px', padding: '0.75rem', marginTop: '0.5rem', background: 'var(--bg-surface)' }}>
+                  <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Novo cliente</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <input
+                      className={styles.input}
+                      placeholder="Nome *"
+                      value={quickName}
+                      onChange={e => setQuickName(e.target.value)}
+                      autoFocus
+                    />
+                    <input
+                      className={styles.input}
+                      placeholder="Telefone"
+                      value={quickPhone}
+                      onChange={e => setQuickPhone(maskPhone(e.target.value))}
+                      inputMode="tel"
+                    />
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => { setShowQuickRegister(false); setQuickName(''); setQuickPhone(''); }}
+                        style={{ flex: 1, padding: '0.4rem', background: 'transparent', border: '1px solid var(--border-default)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-muted)' }}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleQuickRegister}
+                        disabled={!quickName.trim() || quickSaving}
+                        style={{ flex: 2, padding: '0.4rem', background: 'var(--gold)', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}
+                      >
+                        {quickSaving ? 'Salvando...' : 'Cadastrar e Selecionar'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -586,6 +668,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
                       <option value="weekly">Semanal</option>
                       <option value="biweekly">Quinzenal</option>
                       <option value="monthly">Mensal</option>
+                      <option value="annual">Anual</option>
                     </select>
                   </div>
                   <div className={styles.field}>

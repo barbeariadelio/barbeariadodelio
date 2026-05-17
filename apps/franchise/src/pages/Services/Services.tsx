@@ -21,6 +21,8 @@ interface Service {
   image?: string;
   isActive: boolean;
   type?: 'single' | 'package';
+  showPrice?: boolean;
+  showPricePrefix?: boolean;
   packageValidity?: {
     type: 'none' | 'days' | 'weeks' | 'months' | 'years';
     value?: number;
@@ -181,7 +183,7 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
               {svc.isActive ? 'Ativo' : 'Inativo'}
             </span>
           </div>
-          <span className={styles.dashPrice}>A partir de {formatCurrency(svc.price)}</span>
+          <span className={styles.dashPrice}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>
           <p className={styles.dashDesc}>{svc.description}</p>
         </div>
         <div className={styles.dashActions}>
@@ -482,7 +484,7 @@ function ServiceDetail({ svc, allServices, onClose, onEdit, onToggle, isToggling
 
         <div className={styles.panelBody}>
           <div className={styles.priceRow}>
-            <span className={styles.bigPrice}>A partir de {formatCurrency(svc.price)}</span>
+            <span className={styles.bigPrice}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>
             <span className={styles.durationChip}>
               {svc.type === 'package' ? 'Pacote' : `${svc.durationMinutes} min`}
             </span>
@@ -545,6 +547,12 @@ export default function Services() {
       setDetailTarget(null);
       setConfirmDeactivate(null);
     },
+  });
+
+  const updateDisplay = useMutation({
+    mutationFn: ({ id, ...patch }: { id: string; showPrice?: boolean; showPricePrefix?: boolean }) =>
+      api.patch(`/services/${id}`, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['services'] }),
   });
 
   const filteredServices = services.filter(svc => (svc.type || 'single') === activeTab);
@@ -612,10 +620,39 @@ export default function Services() {
               )}
 
               <div className={styles.meta}>
-                <span className={styles.price}>A partir de {formatCurrency(svc.price)}</span>
+                <span className={styles.price}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>
                 <span className={styles.duration}>
                   {`${svc.durationMinutes} min`}
                 </span>
+              </div>
+
+              <div onClick={e => e.stopPropagation()} style={{ display: 'flex', gap: '0.375rem', flexWrap: 'wrap', padding: '0.5rem 0', borderTop: '1px solid var(--border-subtle)', marginTop: '0.25rem' }}>
+                <button
+                  title="Exibir valor no agendamento online"
+                  onClick={() => updateDisplay.mutate({ id: svc._id, showPrice: svc.showPrice === false ? true : false, ...(svc.showPrice !== false ? {} : { showPricePrefix: true }) })}
+                  style={{
+                    fontSize: '0.7rem', fontWeight: 600, padding: '0.2rem 0.5rem', borderRadius: 20, border: 'none', cursor: 'pointer',
+                    background: svc.showPrice !== false ? 'rgba(34,197,94,0.15)' : 'rgba(120,120,120,0.12)',
+                    color: svc.showPrice !== false ? '#22C55E' : 'var(--text-muted)',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {svc.showPrice !== false ? '✓' : '✕'} Exibir preço
+                </button>
+                {svc.showPrice !== false && (
+                  <button
+                    title='Exibir "A partir de" antes do valor'
+                    onClick={() => updateDisplay.mutate({ id: svc._id, showPricePrefix: svc.showPricePrefix === false ? true : false })}
+                    style={{
+                      fontSize: '0.7rem', fontWeight: 600, padding: '0.2rem 0.5rem', borderRadius: 20, border: 'none', cursor: 'pointer',
+                      background: svc.showPricePrefix !== false ? 'rgba(59,130,246,0.15)' : 'rgba(120,120,120,0.12)',
+                      color: svc.showPricePrefix !== false ? '#3B82F6' : 'var(--text-muted)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {svc.showPricePrefix !== false ? '✓' : '✕'} "A partir de"
+                  </button>
+                )}
               </div>
 
               <div className={styles.cardActions} onClick={e => e.stopPropagation()}>

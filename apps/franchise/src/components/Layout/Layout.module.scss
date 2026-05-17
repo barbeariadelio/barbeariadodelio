@@ -120,6 +120,27 @@ $border:            #2C2C2C;
   flex: 1;
 }
 
+.whatsappContact {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  margin: 0 0.5rem 0.25rem;
+  border-radius: 8px;
+  background: rgba(37, 211, 102, 0.08);
+  color: #25D366;
+  text-decoration: none;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: background 0.2s;
+
+  &:hover {
+    background: rgba(37, 211, 102, 0.16);
+  }
+
+  svg { flex-shrink: 0; }
+}
+
 .sidebarFooter {
   padding: 1rem;
   border-top: 1px solid var(--border-subtle);

@@ -612,7 +612,14 @@ export default function Finance() {
                         className={styles.rateInput}
                         value={commissionRate}
                         min={0} max={100} step={0.1}
-                        onChange={e => setCommissionRate(Number(e.target.value))}
+                        onChange={e => {
+                          const newRate = Number(e.target.value);
+                          setCommissionRate(newRate);
+                          const allEmps = (summary?.byEmployee ?? []) as Array<{ id: string }>;
+                          if (allEmps.length > 0) {
+                            setIndividualRates(Object.fromEntries(allEmps.map(emp => [emp.id, newRate])));
+                          }
+                        }}
                         onWheel={e => (e.target as HTMLInputElement).blur()}
                         onFocus={e => e.target.select()}
                       />
@@ -625,11 +632,11 @@ export default function Finance() {
 
             {(summary?.byEmployee ?? []).length === 0 && (
               <p className={styles.empty}>
-                Nenhum agendamento confirmado ou concluído encontrado para {unitId === 'all' ? 'todas as unidades' : 'esta unidade'} no período selecionado ({period}).
+                Nenhum profissional cadastrado para {unitId === 'all' ? 'todas as unidades' : 'esta unidade'}.
               </p>
             )}
             {(summary?.byEmployee ?? []).length > 0 && (() => {
-              type Emp = { id: string; name: string; unitId: string; unitName: string; appointments: number; grossRevenue: number; totalVouchers: number };
+              type Emp = { id: string; name: string; unitId: string; unitName: string; appointments: number; grossRevenue: number; totalVouchers: number; commissionRate?: number };
               let empList: Emp[] = (summary!.byEmployee as Emp[]) || [];
 
               if (isStaff && userId) {
@@ -664,7 +671,7 @@ export default function Finance() {
                         {!isStaff && <span>Parte Loja</span>}
                       </div>
                       {employees.map(emp => {
-                        const rate = individualRates[emp.id] ?? commissionRate;
+                        const rate = individualRates[emp.id] ?? emp.commissionRate ?? commissionRate;
                         const gross = emp.grossRevenue * (rate / 100);
                         const salonShare = emp.grossRevenue - gross;
                         return (
@@ -701,10 +708,10 @@ export default function Finance() {
                             <span>{employees.reduce((s, e) => s + e.appointments, 0)}</span>
                             <span>{formatCurrency(employees.reduce((s, e) => s + e.grossRevenue, 0))}</span>
                             <span /> 
-                            <span>{formatCurrency(employees.reduce((s, e) => s + (e.grossRevenue * ((individualRates[e.id] ?? commissionRate) / 100)), 0))}</span>
+                            <span>{formatCurrency(employees.reduce((s, e) => s + (e.grossRevenue * ((individualRates[e.id] ?? e.commissionRate ?? commissionRate) / 100)), 0))}</span>
                             <span>{formatCurrency(employees.reduce((s, e) => s + (e.totalVouchers || 0), 0))}</span>
-                            <span style={{ fontWeight: 800 }}>{formatCurrency(employees.reduce((s, e) => s + ((e.grossRevenue * ((individualRates[e.id] ?? commissionRate) / 100)) - (e.totalVouchers || 0)), 0))}</span>
-                            <span>{formatCurrency(employees.reduce((s, e) => s + (e.grossRevenue - (e.grossRevenue * ((individualRates[e.id] ?? commissionRate) / 100))), 0))}</span>
+                            <span style={{ fontWeight: 800 }}>{formatCurrency(employees.reduce((s, e) => s + ((e.grossRevenue * ((individualRates[e.id] ?? e.commissionRate ?? commissionRate) / 100)) - (e.totalVouchers || 0)), 0))}</span>
+                            <span>{formatCurrency(employees.reduce((s, e) => s + (e.grossRevenue - (e.grossRevenue * ((individualRates[e.id] ?? e.commissionRate ?? commissionRate) / 100))), 0))}</span>
                           </div>
                       )}
 
@@ -744,9 +751,11 @@ export default function Finance() {
                 onClick={async () => {
                   try {
                     await Promise.all(
-                      Object.entries(individualRates).map(([id, rate]) => 
-                        api.put(`/employees/${id}`, { commissionRate: rate })
-                      )
+                      Object.entries(individualRates)
+                        .filter(([id]) => id && id !== 'unknown')
+                        .map(([id, rate]) =>
+                          api.patch(`/employees/${id}`, { commissionRate: rate })
+                        )
                     );
                     setIndividualRates({});
                     setShowSaveModal(false);

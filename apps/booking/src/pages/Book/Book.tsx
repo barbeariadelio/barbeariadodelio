@@ -7,8 +7,8 @@ import { api, resolveApiBaseUrl, setupInterceptors } from '../../api/client';
 import styles from './Book.module.scss';
 
 interface Unit { _id: string; name: string; apiUrl?: string; workingDays?: number[]; }
-interface Service { _id: string; name: string; description?: string; price: number; durationMinutes: number; isActive?: boolean; image?: string; }
-interface Employee { _id: string; name: string; avatar?: string; }
+interface Service { _id: string; name: string; description?: string; price: number; durationMinutes: number; isActive?: boolean; image?: string; showPrice?: boolean; showPricePrefix?: boolean; }
+interface Employee { _id: string; name: string; avatar?: string; daySchedules?: { day: number; slots: { start: string; end: string }[] }[]; workSchedule?: { workDays?: number[] }; }
 
 type Step = 'service' | 'barber' | 'datetime' | 'confirm';
 const STEPS: Step[] = ['service', 'barber', 'datetime', 'confirm'];
@@ -16,6 +16,7 @@ const STEP_LABELS = ['Serviço', 'Barbeiro', 'Data & Hora', 'Confirmação'];
 const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const MONTHS_SHORT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 const WEEK_SHORT = ['D','S','T','Q','Q','S','S'];
+const DAY_SHORT_BOOKING = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
 function fmt(v: number) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v); }
 function maskPhone(raw: string) {
@@ -404,8 +405,12 @@ export default function Book() {
                       {svc.description && <span className={styles.svcDesc}>{svc.description}</span>}
                     </div>
                     <div className={styles.svcRight}>
-                      <span className={styles.svcPrice}>A partir de {fmt(svc.price)}</span>
-                      <span className={styles.svcDur}>{svc.durationMinutes}min</span>
+                      {svc.showPrice !== false && (
+                        <span className={styles.svcPrice}>
+                          {svc.showPricePrefix !== false ? 'A partir de ' : ''}{fmt(svc.price)}
+                        </span>
+                      )}
+                      {svc.durationMinutes > 0 && <span className={styles.svcDur}>{svc.durationMinutes}min</span>}
                     </div>
                     <svg className={styles.svcArrow} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
                   </button>
@@ -434,6 +439,11 @@ export default function Book() {
                     </div>
                     <span className={styles.empName}>{emp.name}</span>
                     <span className={styles.empRole}>Barbeiro</span>
+                    {emp.daySchedules && emp.daySchedules.length > 0 && (
+                      <span className={styles.empDays}>
+                        {[...emp.daySchedules].sort((a, b) => a.day - b.day).map(ds => DAY_SHORT_BOOKING[ds.day]).join(' · ')}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -442,10 +452,14 @@ export default function Book() {
             {/* ── Date & Time ── */}
             {step === 'datetime' && (
               <div className={styles.dtWrap}>
-                <Calendar 
-                  value={selectedDate} 
-                  onChange={d => { setSelectedDate(d); setSelectedTime(''); }} 
-                  workingDays={unit?.workingDays}
+                <Calendar
+                  value={selectedDate}
+                  onChange={d => { setSelectedDate(d); setSelectedTime(''); }}
+                  workingDays={
+                    selectedEmployee?.daySchedules && selectedEmployee.daySchedules.length > 0
+                      ? selectedEmployee.daySchedules.map(ds => ds.day)
+                      : selectedEmployee?.workSchedule?.workDays ?? unit?.workingDays
+                  }
                 />
                 <div className={styles.slotsWrap}>
                   <p className={styles.slotsLabel}>

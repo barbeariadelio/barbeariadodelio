@@ -95,7 +95,7 @@ export class AppointmentService {
     const cached = getSlotCache(unitId, employeeId, date);
     if (cached) return cached;
 
-    const employee = await UserModel.findById(employeeId).select('workSchedule vacations blockedDays');
+    const employee = await UserModel.findById(employeeId).select('workSchedule daySchedules vacations blockedDays');
     if (!employee) throw new NotFoundError('Employee');
 
     const unit = await UnitModel.findById(unitId).select('slotInterval workingDays');
@@ -113,7 +113,19 @@ export class AppointmentService {
     if (employee.blockedDays?.includes(date)) return [];
     if (employee.vacations?.some(v => date >= v.start && date <= v.end)) return [];
 
-    const schedule = employee.workSchedule || { start: '08:00', end: '18:00' };
+    // Resolve working ranges for this day (new per-day structure takes priority)
+    let dayRanges: { start: string; end: string }[];
+    if (employee.daySchedules && employee.daySchedules.length > 0) {
+      const dayConfig = (employee.daySchedules as { day: number; slots: { start: string; end: string }[] }[]).find(ds => ds.day === dayOfWeek);
+      if (!dayConfig || dayConfig.slots.length === 0) return []; // Day not configured = not working
+      dayRanges = dayConfig.slots;
+    } else {
+      // Fallback to legacy workSchedule
+      const empWorkDays = employee.workSchedule?.workDays;
+      if (empWorkDays && empWorkDays.length > 0 && !empWorkDays.includes(dayOfWeek)) return [];
+      const schedule = employee.workSchedule || { start: '08:00', end: '18:00' };
+      dayRanges = [{ start: schedule.start || '08:00', end: schedule.end || '18:00' }];
+    }
 
     const booked = await AppointmentModel.find({
       unitId,
@@ -123,8 +135,14 @@ export class AppointmentService {
     }).select('startTime endTime');
 
     const gridStep = slotInterval > 0 ? slotInterval : 15;
-    const allSlots = this.generateSlots(schedule.start, schedule.end, gridStep);
-    
+
+    // Generate slots from all time ranges and deduplicate
+    const rawSlots: string[] = [];
+    for (const range of dayRanges) {
+      rawSlots.push(...this.generateSlots(range.start, range.end, gridStep));
+    }
+    const allSlots = [...new Set(rawSlots)].sort();
+
     const today = new Date();
     const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const nowMins = today.getHours() * 60 + today.getMinutes();
@@ -137,19 +155,13 @@ export class AppointmentService {
       if (date === todayISO && slotStart < nowMins) return false;
       if (date < todayISO) return false;
 
-      const [wsh, wsm] = schedule.start.split(':').map(Number);
-      const [weh, wem] = schedule.end.split(':').map(Number);
-      const workStart = wsh * 60 + wsm;
-      const workEnd = weh * 60 + wem;
-      if (slotEnd > workEnd) return false;
-
-      if (schedule.lunchStart && schedule.lunchEnd) {
-        const [lsh, lsm] = schedule.lunchStart.split(':').map(Number);
-        const [leh, lem] = schedule.lunchEnd.split(':').map(Number);
-        const lunchStart = lsh * 60 + lsm;
-        const lunchEnd = leh * 60 + lem;
-        if (slotStart < lunchEnd && slotEnd > lunchStart) return false;
-      }
+      // Slot must fit entirely within at least one time range
+      const fitsInRange = dayRanges.some(range => {
+        const [rsh, rsm] = range.start.split(':').map(Number);
+        const [reh, rem] = range.end.split(':').map(Number);
+        return slotStart >= rsh * 60 + rsm && slotEnd <= reh * 60 + rem;
+      });
+      if (!fitsInRange) return false;
 
       return !booked.some(b => {
         const [bsh, bsm] = b.startTime.split(':').map(Number);

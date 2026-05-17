@@ -18,6 +18,8 @@ export interface IUnit extends Document {
   };
   slotInterval?: number; // Minutes between appointments (client booking grid)
   calendarGrid?: number; // Minutes per row in admin calendar grid
+  whatsappNumber?: string; // E.164 without + e.g. "5519982771959"
+  whatsappInstance?: string; // Evolution API instance name
 }
 
 const unitSchema = new Schema<IUnit>(
@@ -40,8 +42,10 @@ const unitSchema = new Schema<IUnit>(
       }, { _id: false }),
       default: () => ({ start: '08:00', end: '20:00' }),
     },
-    slotInterval: { type: Number, default: 0 },
-    calendarGrid: { type: Number, default: 15 },
+    slotInterval:       { type: Number, default: 0 },
+    calendarGrid:       { type: Number, default: 15 },
+    whatsappNumber:     { type: String },
+    whatsappInstance:   { type: String },
   },
   { timestamps: true },
 );

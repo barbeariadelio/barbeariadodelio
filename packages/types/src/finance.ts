@@ -1,5 +1,5 @@
 export type TransactionType = 'income' | 'expense' | 'royalty' | 'commission';
-export type TransactionCategory = 'service' | 'product' | 'salary' | 'rent' | 'voucher' | 'commission' | 'package_use' | 'package_sale' | 'other';
+export type TransactionCategory = 'service' | 'product' | 'salary' | 'rent' | 'voucher' | 'commission' | 'package_use' | 'package_sale' | 'sale' | 'other';
 export type PaymentMethod = 'money' | 'debit' | 'credit' | 'pix' | 'package' | 'other';
 
 export interface Transaction {

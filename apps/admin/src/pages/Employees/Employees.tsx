@@ -7,6 +7,10 @@ import EmployeeVales from './EmployeeVales';
 import { ConfirmModal } from '@barber/ui';
 import styles from './Employees.module.scss';
 
+interface DaySchedule { day: number; slots: { start: string; end: string }[]; }
+
+const DAY_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
 interface Employee {
   _id: string;
   name: string;
@@ -14,6 +18,7 @@ interface Employee {
   phone?: string;
   role: string;
   avatar?: string;
+  daySchedules?: DaySchedule[];
   workSchedule?: {
     start: string;
     end: string;
@@ -94,9 +99,20 @@ function EmployeeDetail({ emp, onClose, onEdit, onToggle, isToggling }: DetailPr
               </div>
             )}
             <div className={styles.infoItem}>
-              <span className={styles.infoLabel}>Expediente</span>
+              <span className={styles.infoLabel}>Horários</span>
               <span className={styles.infoValue}>
-                {emp.workSchedule ? `${emp.workSchedule.start} às ${emp.workSchedule.end}` : 'Não definido'}
+                {emp.daySchedules && emp.daySchedules.length > 0 ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                    {[...emp.daySchedules].sort((a, b) => a.day - b.day).map(ds => (
+                      <div key={ds.day} style={{ display: 'flex', gap: '6px', alignItems: 'baseline' }}>
+                        <span style={{ fontWeight: 700, minWidth: '30px', fontSize: '0.8rem' }}>{DAY_SHORT[ds.day]}:</span>
+                        <span style={{ fontSize: '0.8rem' }}>{ds.slots.map(s => `${s.start}–${s.end}`).join(', ')}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : emp.workSchedule ? (
+                  `${emp.workSchedule.start} às ${emp.workSchedule.end}`
+                ) : 'Não definido'}
               </span>
             </div>
             {emp.vacations && emp.vacations.length > 0 && (

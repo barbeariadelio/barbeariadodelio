@@ -1,4 +1,4 @@
-import { FormEvent, useState, useEffect } from 'react';
+import { FormEvent, useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import styles from './ServiceForm.module.scss';
@@ -18,6 +18,8 @@ interface Service {
   image?: string;
   isActive: boolean;
   type?: 'single' | 'package';
+  showPrice?: boolean;
+  showPricePrefix?: boolean;
   packageValidity?: {
     type: 'none' | 'days' | 'weeks' | 'months' | 'years';
     value?: number;
@@ -48,6 +50,8 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
   const [price, setPrice] = useState(service?.price != null ? formatBR(service.price) : '');
   const [durationMinutes, setDurationMinutes] = useState(String(service?.durationMinutes ?? '30'));
   const [image, setImage] = useState(service?.image ?? '');
+  const [showPrice, setShowPrice] = useState(service?.showPrice !== false);
+  const [showPricePrefix, setShowPricePrefix] = useState(service?.showPricePrefix !== false);
   const [error, setError] = useState<string | null>(null);
 
   // Package fields
@@ -88,7 +92,7 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
     setPackageItems([...packageItems, { serviceId: allServices[0]._id, quantity: 1 }]);
   }
 
-  function updatePackageItem(index: number, field: keyof PackageItem, value: any) {
+  function updatePackageItem(index: number, field: keyof PackageItem, value: string | number) {
     const newItems = [...packageItems];
     newItems[index] = { ...newItems[index], [field]: value };
     setPackageItems(newItems);
@@ -106,22 +110,25 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
       return;
     }
 
-    const payload: any = {
+    const payload: Record<string, unknown> = {
       name,
       description,
       price: parseBR(price),
       durationMinutes: type === 'package' ? 0 : parseInt(durationMinutes, 10),
       image,
       type,
+      showPrice,
+      showPricePrefix,
     };
 
     if (unitId && !isEdit) payload.unitId = unitId;
 
     if (type === 'package') {
-      payload.packageValidity = { type: validityType };
+      const validity: { type: string; value?: number } = { type: validityType };
       if (validityType !== 'none') {
-        payload.packageValidity.value = parseInt(validityValue, 10) || 1;
+        validity.value = parseInt(validityValue, 10) || 1;
       }
+      payload.packageValidity = validity;
       payload.packageItems = packageItems.map(item => ({
         serviceId: item.serviceId,
         quantity: item.quantity,
@@ -202,12 +209,38 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
             )}
           </div>
 
+          <div className={styles.field}>
+            <label className={styles.label}>Exibição no agendamento online</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginTop: '0.25rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={showPrice}
+                  onChange={e => { setShowPrice(e.target.checked); if (!e.target.checked) setShowPricePrefix(false); }}
+                  style={{ width: 16, height: 16, accentColor: 'var(--gold)', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>Exibir valor do serviço</span>
+              </label>
+              {showPrice && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', cursor: 'pointer', marginLeft: '1.5rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={showPricePrefix}
+                    onChange={e => setShowPricePrefix(e.target.checked)}
+                    style={{ width: 16, height: 16, accentColor: 'var(--gold)', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>Exibir &quot;A partir de&quot; antes do valor</span>
+                </label>
+              )}
+            </div>
+          </div>
+
           {type === 'package' && (
             <>
               <div className={styles.row}>
                 <div className={styles.field}>
                   <label className={styles.label}>Validade do Pacote</label>
-                  <select className={styles.select} value={validityType} onChange={e => setValidityType(e.target.value as any)}>
+                  <select className={styles.select} value={validityType} onChange={e => setValidityType(e.target.value as typeof validityType)}>
                     <option value="none">Sem prazo de validade</option>
                     <option value="days">Definir prazo em dias</option>
                     <option value="weeks">Definir prazo em semanas</option>

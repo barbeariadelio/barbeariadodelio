@@ -51,9 +51,11 @@ apiClient.interceptors.request.use(config => {
     }
   }
 
+  config.headers = config.headers || {};
+  config.headers['X-App-Scope'] = 'admin';
+
   const token = getStoredAccessToken();
   if (token && token !== 'undefined' && token !== 'null') {
-    config.headers = config.headers || {};
     config.headers.Authorization = `Bearer ${token}`;
   }
 

@@ -20,7 +20,7 @@ const transactionSchema = new Schema<ITransaction>(
     appointmentId: { type: Schema.Types.ObjectId, ref: 'Appointment' },
     employeeId:    { type: Schema.Types.ObjectId, ref: 'User' },
     type:     { type: String, enum: ['income', 'expense', 'royalty', 'commission'], required: true },
-    category: { type: String, enum: ['service', 'product', 'salary', 'rent', 'voucher', 'commission', 'package_use', 'package_sale', 'other'], required: true },
+    category: { type: String, enum: ['service', 'product', 'salary', 'rent', 'voucher', 'commission', 'package_use', 'package_sale', 'sale', 'other'], required: true },
     amount:      { type: Number, required: true, min: 0 },
     description: { type: String, required: true },
     date:        { type: String, required: true },

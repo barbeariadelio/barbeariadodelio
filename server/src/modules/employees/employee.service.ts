@@ -37,6 +37,7 @@ export class EmployeeService {
       role: 'employee',
       avatar: data.avatar,
       workSchedule: data.workSchedule,
+      daySchedules: data.daySchedules,
       vacations: data.vacations,
       blockedDays: data.blockedDays,
       isActive: true,

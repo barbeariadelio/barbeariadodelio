@@ -32,7 +32,9 @@ import { notificationRoutes } from './modules/notifications/notification.routes'
 const app = express();
 
 // --- Security & Utility Middlewares ---
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: env.nodeEnv === 'development' ? false : undefined,
+}));
 app.use(cors({ origin: true, credentials: true }));
 app.use(compression());
 app.use(express.json({ limit: '10kb' })); // Limit body size
@@ -97,7 +99,7 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// --- SPA Mounting ---
+// --- SPA Mounting (production only) ---
 function mountSpa(basePath: string, distPath: string): void {
   const indexPath = path.join(distPath, 'index.html');
   if (!fs.existsSync(indexPath)) return;
@@ -111,18 +113,46 @@ const adminDist = path.resolve(__dirname, '../../apps/admin/dist');
 const franchiseDist = path.resolve(__dirname, '../../apps/franchise/dist');
 const bookingDist = path.resolve(__dirname, '../../apps/booking/dist');
 
-mountSpa('/admin', adminDist);
-mountSpa('/franchise-app', franchiseDist);
-mountSpa('/booking', bookingDist);
-
-app.use(errorHandler);
-
 async function start() {
   await connectDb();
-  
+
+  if (env.nodeEnv === 'development') {
+    const { createProxyMiddleware } = await import('http-proxy-middleware');
+
+    const devProxy = (pathFilter: string, port: number) =>
+      createProxyMiddleware({
+        pathFilter,
+        target: `http://localhost:${port}`,
+        changeOrigin: true,
+        on: {
+          error: (_err, _req, res) => {
+            const r = res as { headersSent?: boolean; writeHead: (s: number) => void; end: (b: string) => void };
+            if (!r.headersSent) {
+              r.writeHead(502);
+              r.end(`Vite dev server na porta ${port} não está rodando. Execute: npm run dev`);
+            }
+          },
+        },
+      });
+
+    app.use(devProxy('/admin', 5173));
+    app.use(devProxy('/franchise-app', 5174));
+    app.use(devProxy('/booking', 5175));
+  } else {
+    mountSpa('/admin', adminDist);
+    mountSpa('/franchise-app', franchiseDist);
+    mountSpa('/booking', bookingDist);
+  }
+
+  app.use(errorHandler);
+
   app.listen(env.port, () => {
     logger.info(`Server running on port ${env.port}`);
   });
+}
+
+if (process.env.NODE_ENV === 'test') {
+  app.use(errorHandler);
 }
 
 if (process.env.NODE_ENV !== 'test') {

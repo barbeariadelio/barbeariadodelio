@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { TransactionModel, ITransaction } from './transaction.model';
 import { UnitModel } from '../units/unit.model';
 import { AppointmentModel } from '../appointments/appointment.model';
-import { UserModel } from '../auth/auth.model';
+import { UserModel, IUser } from '../auth/auth.model';
 import type { FinanceSummary, TransactionCategory } from '@barber/types';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import { toDate } from 'date-fns-tz';
@@ -14,8 +14,9 @@ export class FinanceService {
     role: string,
     unitId?: string,
     period: 'day' | 'month' | 'week' | 'year' = 'month',
+    appScope?: string,
   ): Promise<FinanceSummary> {
-    const unitIds = await this.resolveUnitIds(userId, role, unitId);
+    const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope);
     const { startDate, endDate } = this.resolvePeriod(period);
 
     const transactions = await TransactionModel.find({
@@ -34,11 +35,17 @@ export class FinanceService {
 
     const unitsInfo = await UnitModel.find({ _id: { $in: unitIds } }).select('name');
 
-    return this.buildSummary(transactions, appointments as any, unitsInfo);
+    const allEmployees = await UserModel.find({
+      unitId: { $in: unitIds },
+      role: 'employee',
+      isActive: true,
+    }).select('_id name unitId commissionRate');
+
+    return this.buildSummary(transactions, appointments as any, unitsInfo, allEmployees);
   }
 
-  async getTransactions(userId: string, role: string, unitId: string, page: number, limit: number, filters?: { employeeId?: string; category?: string }): Promise<{ data: ITransaction[]; total: number }> {
-    const unitIds = await this.resolveUnitIds(userId, role, unitId);
+  async getTransactions(userId: string, role: string, unitId: string, page: number, limit: number, filters?: { employeeId?: string; category?: string }, appScope?: string): Promise<{ data: ITransaction[]; total: number }> {
+    const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope);
     
     const query: any = { unitId: { $in: unitIds } };
     if (filters?.employeeId) query.employeeId = filters.employeeId;
@@ -92,8 +99,8 @@ export class FinanceService {
    * per unit, reducing write load during high-traffic hours.
    */
 
-  private async resolveUnitIds(userId: string, role: string, unitId?: string): Promise<string[]> {
-    const allowedIds = await this.getAllowedUnitIds(userId, role);
+  private async resolveUnitIds(userId: string, role: string, unitId?: string, appScope?: string): Promise<string[]> {
+    const allowedIds = await this.getAllowedUnitIds(userId, role, appScope);
 
     if (unitId && unitId !== 'all') {
       if (allowedIds.includes(unitId)) return [unitId];
@@ -103,24 +110,25 @@ export class FinanceService {
     return allowedIds;
   }
 
-  private async getAllowedUnitIds(userId: string, role: string): Promise<string[]> {
+  private async getAllowedUnitIds(userId: string, role: string, appScope?: string): Promise<string[]> {
     if (role === 'owner') {
       const ownerObjectId = new mongoose.Types.ObjectId(userId);
-      const userDoc = await UserModel.findById(userId).select('unitId');
-      const orClause: any[] = [{ ownerId: ownerObjectId }];
-      if (userDoc?.unitId) orClause.push({ _id: userDoc.unitId });
-      const units = await UnitModel.find({ $or: orClause, isActive: true }).select('_id');
+
+      // Always fetch both sets so we can return the right subset based on scope
+      const units = await UnitModel.find({ ownerId: ownerObjectId, isActive: true }).select('_id');
       const ownIds = units.map(u => u._id.toString());
 
-      // Also include franchise units where this owner is listed as a franchisor
       const { FranchiseModel } = await import('../franchise/franchise.model');
       const franchise = await FranchiseModel.findOne({ franchisors: ownerObjectId });
-      if (franchise && franchise.units.length > 0) {
-        const franchiseIds = franchise.units.map(u => u.toString());
-        return [...new Set([...ownIds, ...franchiseIds])];
-      }
+      const franchiseIds = franchise && franchise.units.length > 0
+        ? franchise.units.map(u => u.toString())
+        : [];
 
-      return ownIds;
+      if (appScope === 'admin') return ownIds;
+      if (appScope === 'franchise') return franchiseIds;
+
+      // No scope — return all (backwards compatible)
+      return [...new Set([...ownIds, ...franchiseIds])];
     }
 
     if (role === 'employee') {
@@ -187,7 +195,7 @@ export class FinanceService {
     return { startDate: fmt(start), endDate: fmt(end) };
   }
 
-  private buildSummary(transactions: any[], appointments: any[], unitsInfo: any[] = []): FinanceSummary {
+  private buildSummary(transactions: any[], appointments: any[], unitsInfo: any[] = [], allEmployees: IUser[] = []): FinanceSummary {
     let totalIncome = 0;
     let totalExpense = 0;
     let realizedIncome = 0;   // completed only
@@ -312,7 +320,8 @@ export class FinanceService {
       svcEntry.count += 1;
 
       // Stats by employee
-      const empId = appt.employeeId?._id?.toString() || appt.employeeId?.toString() || 'unknown';
+      const empId = appt.employeeId?._id?.toString() || appt.employeeId?.toString();
+      if (!empId) continue;
       const empName = appt.employeeId?.name || 'Profissional';
       const unitKey = unitId;
 
@@ -353,7 +362,26 @@ export class FinanceService {
       }
     }
 
-    // 3. Compute commission amounts per employee
+    // 3. Ensure all active employees appear (zero-value rows for new employees with no appointments)
+    const unitNameMap = new Map(unitsInfo.map(u => [u._id.toString(), (u as any).name as string]));
+    for (const emp of allEmployees) {
+      const empId = emp._id.toString();
+      if (!byEmployeeMap.has(empId)) {
+        const empUnitId = emp.unitId?.toString() || '';
+        byEmployeeMap.set(empId, {
+          id: empId,
+          name: emp.name,
+          unitId: empUnitId,
+          unitName: unitNameMap.get(empUnitId) || '',
+          appointments: 0,
+          grossRevenue: 0,
+          commissionRate: emp.commissionRate,
+          totalVouchers: 0,
+        });
+      }
+    }
+
+    // 4. Compute commission amounts per employee
     for (const emp of byEmployeeMap.values()) {
       if (emp.commissionRate && emp.commissionRate > 0) {
         emp.commissionAmount = Math.round(emp.grossRevenue * emp.commissionRate / 100 * 100) / 100;

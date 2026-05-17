@@ -55,6 +55,9 @@ apiClient.interceptors.request.use(config => {
     config.headers['X-Unit-ID'] = dynamicUnitId;
   }
 
+  config.headers = config.headers || {};
+  config.headers['X-App-Scope'] = 'franchise';
+
   const token = getStoredAccessToken();
   if (token && token !== 'undefined' && token !== 'null') {
     config.headers = config.headers || {};

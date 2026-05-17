@@ -15,7 +15,12 @@ export const createUserSchema = z.object({
       end: z.string(),
       lunchStart: z.string().optional(),
       lunchEnd: z.string().optional(),
+      workDays: z.array(z.number()).optional(),
     }).optional(),
+    daySchedules: z.array(z.object({
+      day: z.number().min(0).max(6),
+      slots: z.array(z.object({ start: z.string(), end: z.string() })),
+    })).optional(),
   }),
 });
 
@@ -34,6 +39,11 @@ export const updateUserSchema = z.object({
       end: z.string(),
       lunchStart: z.string().optional(),
       lunchEnd: z.string().optional(),
+      workDays: z.array(z.number()).optional(),
     }).optional(),
+    daySchedules: z.array(z.object({
+      day: z.number().min(0).max(6),
+      slots: z.array(z.object({ start: z.string(), end: z.string() })),
+    })).optional(),
   }),
 });

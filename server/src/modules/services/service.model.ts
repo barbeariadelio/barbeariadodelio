@@ -15,6 +15,8 @@ export interface IService extends Document {
   image?: string;
   isActive: boolean;
   type: 'single' | 'package';
+  showPrice: boolean;
+  showPricePrefix: boolean;
   packageValidity?: {
     type: 'none' | 'days' | 'weeks' | 'months' | 'years';
     value?: number;
@@ -29,9 +31,11 @@ const serviceSchema = new Schema<IService>(
     price:           { type: Number, required: true, min: 0 },
     durationMinutes: { type: Number, required: true, min: 0 }, // Changed min to 0 to support packages that don't have a specific duration upfront
     unitId:          { type: Schema.Types.ObjectId, ref: 'Unit', required: true },
-    image:           String,
-    isActive:        { type: Boolean, default: true },
-    type:            { type: String, enum: ['single', 'package'], default: 'single' },
+    image:            String,
+    isActive:         { type: Boolean, default: true },
+    type:             { type: String, enum: ['single', 'package'], default: 'single' },
+    showPrice:        { type: Boolean, default: true },
+    showPricePrefix:  { type: Boolean, default: true },
     packageValidity: {
       type: { type: String, enum: ['none', 'days', 'weeks', 'months', 'years'] },
       value: Number,

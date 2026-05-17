@@ -26,12 +26,19 @@ export async function listUnits(req: AuthRequest, res: Response, next: NextFunct
     const { role, id, unitId } = req.user!;
 
     if (role === 'owner') {
+      const appScope = req.headers['x-app-scope'] as string | undefined;
       const ownUnits = await service.findByOwner(id);
       const { FranchiseModel } = await import('../franchise/franchise.model');
       const { default: mongoose } = await import('mongoose');
       const franchise = await FranchiseModel.findOne({ franchisors: new mongoose.Types.ObjectId(id) });
 
-      if (franchise && franchise.units.length > 0) {
+      if (appScope === 'admin') {
+        units = ownUnits;
+      } else if (appScope === 'franchise') {
+        units = franchise && franchise.units.length > 0
+          ? await service.findByIds(franchise.units.map(u => u.toString()))
+          : [];
+      } else if (franchise && franchise.units.length > 0) {
         const franchiseUnits = await service.findByIds(franchise.units.map(u => u.toString()));
         const ownIds = new Set(ownUnits.map(u => u._id.toString()));
         units = [...ownUnits, ...franchiseUnits.filter(u => !ownIds.has(u._id.toString()))];

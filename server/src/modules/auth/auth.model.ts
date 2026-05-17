@@ -15,7 +15,12 @@ export interface IUser extends Document {
     end: string;
     lunchStart?: string;
     lunchEnd?: string;
+    workDays?: number[];
   };
+  daySchedules?: {
+    day: number;
+    slots: { start: string; end: string }[];
+  }[];
   vacations?: {
     start: string;
     end: string;
@@ -47,10 +52,15 @@ const userSchema = new Schema<IUser>(
       end: { type: String, default: '18:00' },
       lunchStart: String,
       lunchEnd: String,
+      workDays: [Number],
     },
     vacations: [{
       start: String,
       end: String,
+    }],
+    daySchedules: [{
+      day: { type: Number, min: 0, max: 6 },
+      slots: [{ start: String, end: String }],
     }],
     blockedDays: [String],
     isActive: { type: Boolean, default: true },

@@ -16,8 +16,8 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    hmr: { host: 'localhost', port: 5173 },
     watch: {
-      // Força o Vite a monitorar mudanças nos pacotes workspace (necessário no Windows/OneDrive)
       ignored: (filePath: string) => {
         if (filePath.includes('packages\\ui\\src') || filePath.includes('packages/ui/src')) return false;
         return filePath.includes('node_modules');

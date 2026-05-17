@@ -31,18 +31,22 @@
   align-items: flex-start;
   padding: 1.5rem;
   border-bottom: 1px dashed var(--border-subtle);
+  gap: 1rem;
+  @media (max-width: 640px) { flex-direction: column; }
 }
 
 .dashHeaderMain {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  min-width: 0;
 }
 
 .dashTitleRow {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .dashTitle {
@@ -68,6 +72,8 @@
 .dashActions {
   display: flex;
   gap: 0.75rem;
+  flex-shrink: 0;
+  @media (max-width: 640px) { width: 100%; button { flex: 1; } }
 }
 
 .dashContent {
@@ -97,6 +103,7 @@
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
+  @media (max-width: 640px) { font-size: 1.75rem; }
 }
 
 .newBtn {
@@ -146,8 +153,12 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1.5rem;
+  @media (max-width: 500px) {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
 }
 
 .card {
@@ -159,8 +170,10 @@
   display: flex;
   flex-direction: column;
   transition: all 0.2s;
+  min-width: 0;
   &:hover { border-color: var(--gold); transform: translateY(-2px); }
   &.inactive { opacity: 0.6; }
+  @media (max-width: 500px) { padding: 1rem; }
 }
 
 .cardHeader {
@@ -189,13 +202,14 @@
 }
 
 .cardThumb {
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   border-radius: 4px;
   overflow: hidden;
   border: 1px solid var(--border-default);
   flex-shrink: 0;
   img { width: 100%; height: 100%; object-fit: cover; }
+  @media (max-width: 500px) { width: 44px; height: 44px; }
 }
 
 .description {
@@ -217,6 +231,8 @@
   margin-top: auto;
   padding-bottom: 1.25rem;
   border-bottom: 1px solid var(--border-subtle);
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .price { font-size: 1.25rem; font-weight: 700; color: #22c55e; }
@@ -551,9 +567,10 @@
 
 .subscriberGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 1rem;
   margin-top: 1rem;
+  @media (max-width: 500px) { grid-template-columns: 1fr; }
 }
 
 .subscriberCard {
