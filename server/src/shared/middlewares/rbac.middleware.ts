@@ -21,20 +21,16 @@ export function requireSameUnit() {
     }
     const { role, unitId } = req.user;
 
-    // Privileged roles can access any unit
     if (role === 'owner') {
       next();
       return;
     }
 
-    // For unit-level roles, we MUST have a unitId
     if (!unitId) {
       next(new ForbiddenError('Usuário sem unidade vinculada.'));
       return;
     }
 
-    // Unit-scoped roles are permitted.
-    // Data scoping is enforced by resolveUnitId() inside each controller.
     next();
   };
 }
@@ -42,26 +38,34 @@ export function requireSameUnit() {
 /**
  * Soul540-style tenant resolution.
  *
- * Non-owners are ALWAYS locked to the unitId stored in their JWT —
- * they cannot override it via query params.
+ * Rule 1: If the JWT carries a unitId (any role, including owner),
+ *         the user is ALWAYS locked to that unit — no override possible.
+ *         → Franchise owner accounts have unitId set, so they can never
+ *           see data from other units, regardless of which app they use.
  *
- * Owners can scope a request to a specific unit via:
- *   1. X-Unit-ID request header  (preferred — sent by the franchise app)
- *   2. ?unitId= query param       (fallback — legacy / admin app)
- *   3. Their own JWT unitId       (last resort, usually null for owners)
+ * Rule 2: Owners whose JWT has NO unitId (the global admin owner) can
+ *         scope a request via:
+ *           - X-Unit-ID header  (sent by franchise app on every request)
+ *           - ?unitId= query param  (sent by admin app interceptor)
+ *         Returns null = "see all units" if neither is present.
  *
- * Returns null only for owners with no unit context (meaning "all units").
+ * Rule 3: Non-owners without unitId cannot see any data (returns null).
  */
 export function resolveUnitId(req: AuthRequest): string | null {
   const { role, unitId: jwtUnitId } = req.user!;
 
-  if (role !== 'owner') {
-    // Non-owners are hard-locked to their JWT unit — no override allowed.
-    return jwtUnitId || null;
+  // Rule 1 — JWT unitId always wins, regardless of role.
+  if (jwtUnitId) {
+    return jwtUnitId;
   }
 
-  // Owners: respect the header first, then the query param, then their own JWT unitId.
-  const headerUnit = req.headers['x-unit-id'] as string | undefined;
-  const queryUnit  = req.query.unitId as string | undefined;
-  return headerUnit || queryUnit || jwtUnitId || null;
+  // Rule 2 — global admin owner can scope via header or query param.
+  if (role === 'owner') {
+    const headerUnit = req.headers['x-unit-id'] as string | undefined;
+    const queryUnit  = req.query.unitId as string | undefined;
+    return headerUnit || queryUnit || null;
+  }
+
+  // Rule 3 — non-owners without unitId see nothing.
+  return null;
 }
