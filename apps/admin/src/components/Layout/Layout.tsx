@@ -35,7 +35,6 @@ const NAV_ITEMS = [
   { path: '/services',    label: 'Serviços',        icon: <IconStar />, roles: ['owner'] },
   { path: '/finance',     label: 'Financeiro',      icon: <IconDollarSign />, roles: ['owner', 'cashier', 'employee'] },
   { path: '/permissions', label: 'Permissões',      icon: <IconShield />, roles: ['owner'] },
-  { path: '/units',       label: 'Unidades',         icon: <IconGrid />, roles: ['owner'] },
   { path: '/settings',    label: 'Configurações',   icon: <IconSettings />, roles: ['owner'] },
 ];
 
@@ -192,15 +191,24 @@ export default function Layout() {
                           </div>
                         );
                       })
-                    ) : <div className={styles.notifEmpty}><p>Nenhuma notificação nova.</p></div>}
+                    ) : (
+                      <div className={styles.notifEmpty}>
+                        <p>Nenhuma notificação nova.</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
             </div>
-            <button className={styles.themeToggle} onClick={handleToggleTheme}>{theme === 'dark' ? <IconSun /> : <IconMoon />}</button>
+
+            <button className={styles.themeToggle} onClick={handleToggleTheme} title={`Alternar para modo ${theme === 'dark' ? 'claro' : 'escuro'}`}>
+              {theme === 'dark' ? <IconSun /> : <IconMoon />}
+            </button>
           </div>
         </header>
-        <main className={styles.content}><Outlet /></main>
+        <main className={styles.content}>
+          <Outlet />
+        </main>
       </div>
     </div>
   );

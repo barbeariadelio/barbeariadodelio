@@ -8,12 +8,12 @@ const Login = lazy(() => import('./pages/Login/Login'));
 const Profile = lazy(() => import('./pages/Profile/Profile'));
 
 function Loader() {
-  return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#F8F7F4', color: '#5C5448', fontFamily: 'Inter, sans-serif' }}>Carregando...</div>;
+  return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: '#0D0B09', color: '#A89880', fontFamily: 'Inter, sans-serif' }}>Carregando...</div>;
 }
 
 export default function App() {
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', 'light');
+    document.documentElement.setAttribute('data-theme', 'dark');
   }, []);
 
   return (
