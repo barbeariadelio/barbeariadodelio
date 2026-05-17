@@ -926,7 +926,7 @@ export default function StaffSchedule({
                       <div className={styles.apptIcons}>
                         {/* Plane Icon — só aparece quando lembrete foi enviado */}
                         {appt.reminderSent && (
-                          <svg className={styles.iconSm} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" title="Lembrete enviado"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                          <svg className={styles.iconSm} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><title>Lembrete enviado</title><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg>
                         )}
                         
                         {/* Globe Icon (Booked Online - only for guest bookings) */}
