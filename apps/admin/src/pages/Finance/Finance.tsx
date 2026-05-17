@@ -374,8 +374,8 @@ export default function Finance() {
                           cx="50%" cy="50%"
                           innerRadius={55} outerRadius={85}
                           paddingAngle={3}
-                          label={({ method, percent }: { method: string; percent?: number }) =>
-                            `${PAYMENT_LABELS[method] || method} ${((percent ?? 0) * 100).toFixed(0)}%`
+                          label={({ method, percent }: { method?: string; percent?: number }) =>
+                            `${PAYMENT_LABELS[method ?? ''] || method || ''} ${((percent ?? 0) * 100).toFixed(0)}%`
                           }
                           labelLine={false}
                         >
