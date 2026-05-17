@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend, Cell, PieChart, Pie } from 'recharts';
@@ -77,11 +77,15 @@ interface FinanceSummary {
   totalIncome: number;
   totalExpense: number;
   netProfit: number;
+  realizedIncome: number;
+  projectedIncome: number;
   royaltiesPaid?: number;
   byUnit?: Array<{ unitId: string; name: string; income: number; expense: number; profit: number }>;
   byCategory?: Array<{ category: string; amount: number }>;
   byService?: Array<{ name: string; revenue: number; count: number }>;
   byEmployee?: Array<{ id: string; name: string; unitId: string; unitName: string; appointments: number; grossRevenue: number; totalVouchers: number }>;
+  byPaymentMethod?: Array<{ method: string; amount: number; count: number }>;
+  byProduct?: Array<{ name: string; amount: number; quantity: number; count: number }>;
   chart?: Array<{ date: string; income: number; expense: number }>;
 }
 
@@ -112,13 +116,25 @@ const TYPE_LABELS: Record<string, string> = {
   income: 'Receita',
   expense: 'Despesa',
   royalty: 'Royalty',
+  commission: 'Comissão',
 };
 
 const PAYMENT_LABELS: Record<string, string> = {
   money: 'Dinheiro',
+  debit: 'Débito',
+  credit: 'Crédito',
   card: 'Cartão',
   pix: 'Pix',
   other: 'Outro',
+};
+
+const PAYMENT_COLORS: Record<string, string> = {
+  money: '#22C55E',
+  debit: '#3B82F6',
+  credit: '#6366F1',
+  card: '#8B5CF6',
+  pix: '#06B6D4',
+  other: '#9CA3AF',
 };
 
 type TabType = 'geral' | 'mensal' | 'despesas' | 'lancamentos';
@@ -150,7 +166,7 @@ export default function Finance() {
   const { data: summary, isLoading: summaryLoading } = useQuery<FinanceSummary>({
     queryKey: ['finance-summary', unitId, period],
     queryFn: async () => {
-      const { data } = await api.get(`/finance/summary?unitId=${unitId}&period=${period}`);
+      const { data } = await api.get('/finance/summary', { params: { unitId, period } });
       return data;
     },
   });
@@ -158,11 +174,35 @@ export default function Finance() {
   const { data: transactions = [], isLoading: txLoading } = useQuery<Transaction[]>({
     queryKey: ['finance-transactions', unitId],
     queryFn: async () => {
-      const params = unitId !== 'all' ? `?unitId=${unitId}` : '';
-      const { data } = await api.get(`/finance/transactions${params}`);
+      const { data } = await api.get('/finance/transactions', { params: { unitId, limit: 1000 } });
       return Array.isArray(data) ? data : data.data ?? [];
     },
   });
+
+  const paymentPieData = useMemo(() => {
+    const map = new Map<string, { method: string; amount: number; count: number }>();
+    for (const tx of transactions) {
+      if (tx.type !== 'income') continue;
+      const pm = (tx.paymentMethod as string) || 'other';
+      if (pm === 'package') continue;
+      const prev = map.get(pm) ?? { method: pm, amount: 0, count: 0 };
+      map.set(pm, { method: pm, amount: prev.amount + tx.amount, count: prev.count + 1 });
+    }
+    return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
+  }, [transactions]);
+
+  const productTableData = useMemo(() => {
+    const map = new Map<string, { name: string; amount: number; quantity: number; count: number }>();
+    for (const tx of transactions) {
+      if (tx.type !== 'income' || tx.category !== 'product') continue;
+      const match = tx.description?.match(/^Produto:\s*(.+?)\s*\(x(\d+)\)/);
+      const name = match ? match[1] : (tx.description || 'Produto');
+      const qty  = match ? parseInt(match[2], 10) : 1;
+      const prev = map.get(name) ?? { name, amount: 0, quantity: 0, count: 0 };
+      map.set(name, { name, amount: prev.amount + tx.amount, quantity: prev.quantity + qty, count: prev.count + 1 });
+    }
+    return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
+  }, [transactions]);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/finance/transactions/${id}`),
@@ -293,13 +333,13 @@ export default function Finance() {
           {!isStaff && (
             <div className={styles.summaryBar}>
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Receita Total</span>
-                <span className={`${styles.summaryValue} ${styles.green}`}>{formatCurrency(summary?.totalIncome ?? 0)}</span>
+                <span className={styles.summaryLabel}>Receita Realizada</span>
+                <span className={`${styles.summaryValue} ${styles.green}`}>{formatCurrency(summary?.realizedIncome ?? 0)}</span>
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Despesa Total</span>
-                <span className={`${styles.summaryValue} ${styles.red}`}>{formatCurrency(summary?.totalExpense ?? 0)}</span>
+                <span className={styles.summaryLabel}>Receita Prevista</span>
+                <span className={`${styles.summaryValue} ${styles.amber}`}>{formatCurrency(summary?.projectedIncome ?? 0)}</span>
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
@@ -353,7 +393,63 @@ export default function Finance() {
           )}
 
           {!isStaff && (
-            <div className={styles.quickStatsGrid}>
+            <div className={styles.quickStatsGrid} style={{ marginBottom: '0' }}>
+              <div className={styles.chartCard}>
+                <h3 className={styles.chartTitle}>Receita por Meio de Pagamento</h3>
+                {paymentPieData.length === 0 ? (
+                  <p className={styles.empty} style={{ paddingTop: '3rem' }}>Nenhuma receita faturada ainda.</p>
+                ) : (
+                  <>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <PieChart>
+                        <Pie
+                          data={paymentPieData}
+                          dataKey="amount"
+                          nameKey="method"
+                          cx="50%" cy="50%"
+                          innerRadius={55} outerRadius={85}
+                          paddingAngle={3}
+                          label={({ method, percent }: { method?: string; percent?: number }) =>
+                            `${PAYMENT_LABELS[method ?? ''] || method || ''} ${((percent ?? 0) * 100).toFixed(0)}%`
+                          }
+                          labelLine={false}
+                        >
+                          {paymentPieData.map((entry, i) => (
+                            <Cell key={i} fill={PAYMENT_COLORS[entry.method] ?? '#9CA3AF'} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{ background: '#1A1A1A', border: '1px solid #2C2C2C', borderRadius: '8px', color: '#fff' }}
+                          itemStyle={{ color: '#fff' }}
+                          formatter={(v: any, name: any) => [formatCurrency(Number(v) || 0), PAYMENT_LABELS[name] || name]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem' }}>
+                      {paymentPieData.map(p => {
+                        const total = paymentPieData.reduce((s, x) => s + x.amount, 0);
+                        const pct = total > 0 ? ((p.amount / total) * 100).toFixed(1) : '0';
+                        return (
+                          <div key={p.method} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{ width: 10, height: 10, borderRadius: '50%', background: PAYMENT_COLORS[p.method] ?? '#9CA3AF', flexShrink: 0 }} />
+                            <span style={{ flex: 1, fontSize: '13px', color: 'var(--text-primary)', fontWeight: 600 }}>
+                              {PAYMENT_LABELS[p.method] || p.method}
+                            </span>
+                            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{p.count} trans.</span>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', minWidth: 80, textAlign: 'right' }}>
+                              {formatCurrency(p.amount)}
+                            </span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', minWidth: 36, textAlign: 'right' }}>
+                              {pct}%
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+
               <div className={styles.chartCard}>
                 <h3 className={styles.chartTitle}>Distribuição de Despesas</h3>
                 <ResponsiveContainer width="100%" height={260}>
@@ -447,6 +543,59 @@ export default function Finance() {
             </div>
           )}
 
+          {!isStaff && (
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>Venda de Produtos</h3>
+              {productTableData.length === 0 ? (
+                <p className={styles.empty}>Nenhuma venda de produto registrada.</p>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+                    <div className={styles.summaryItem} style={{ flex: 1, minWidth: 140 }}>
+                      <span className={styles.summaryLabel}>Total Produtos</span>
+                      <span className={`${styles.summaryValue} ${styles.green}`}>
+                        {formatCurrency(productTableData.reduce((s, p) => s + p.amount, 0))}
+                      </span>
+                    </div>
+                    <div className={styles.summaryItem} style={{ flex: 1, minWidth: 140 }}>
+                      <span className={styles.summaryLabel}>Itens Vendidos</span>
+                      <span className={`${styles.summaryValue} ${styles.blue}`}>
+                        {productTableData.reduce((s, p) => s + p.quantity, 0)}
+                      </span>
+                    </div>
+                    <div className={styles.summaryItem} style={{ flex: 1, minWidth: 140 }}>
+                      <span className={styles.summaryLabel}>Produtos Distintos</span>
+                      <span className={`${styles.summaryValue} ${styles.amber}`}>
+                        {productTableData.length}
+                      </span>
+                    </div>
+                  </div>
+                  <div className={styles.serviceGrid}>
+                    {productTableData.map(p => {
+                      const total = productTableData.reduce((s, x) => s + x.amount, 0);
+                      const pct = total > 0 ? (p.amount / total) * 100 : 0;
+                      return (
+                        <div key={p.name} className={styles.serviceCard}>
+                          <div className={styles.svcHead}>
+                            <span className={styles.svcName}>{p.name}</span>
+                            <span className={styles.svcCount}>{p.quantity} unid. · {p.count} venda{p.count !== 1 ? 's' : ''}</span>
+                          </div>
+                          <div className={styles.svcBody}>
+                            <span className={styles.svcLabel}>Total Gerado</span>
+                            <span className={styles.svcValue}>{formatCurrency(p.amount)}</span>
+                          </div>
+                          <div className={styles.svcTrack}>
+                            <div className={styles.svcFill} style={{ width: `${Math.min(pct * 2, 100)}%`, background: '#3B82F6' }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           <div className={styles.section}>
             <div className={styles.commissionSectionHead}>
               <div>
@@ -508,11 +657,11 @@ export default function Finance() {
                         <span>Profissional</span>
                         <span>Atend.</span>
                         <span>Receita Gerada</span>
-                        <span style={{ textAlign: 'center' }}>%</span>
+                        {!isStaff && <span style={{ textAlign: 'center' }}>%</span>}
                         <span>Comissão</span>
                         <span>Vales</span>
                         <span>A Pagar</span>
-                        <span>Parte Loja</span>
+                        {!isStaff && <span>Parte Loja</span>}
                       </div>
                       {employees.map(emp => {
                         const rate = individualRates[emp.id] ?? commissionRate;
@@ -526,22 +675,23 @@ export default function Finance() {
                             </div>
                             <span className={styles.commissionCell}>{emp.appointments}</span>
                             <span className={`${styles.commissionCell} ${styles.amber}`}>{formatCurrency(emp.grossRevenue)}</span>
-                            <div className={styles.miniRateInputWrap}>
-                              <input
-                                type="number"
-                                className={styles.miniRateInput}
-                                value={rate}
-                                min={0} max={100} step={1}
-                                onChange={e => setIndividualRates(prev => ({ ...prev, [emp.id]: Number(e.target.value) }))}
-                                onWheel={e => (e.target as HTMLInputElement).blur()}
-                                disabled={isStaff}
-                              />
-                              <span className={styles.miniRateSuffix}>%</span>
-                            </div>
+                            {!isStaff && (
+                              <div className={styles.miniRateInputWrap}>
+                                <input
+                                  type="number"
+                                  className={styles.miniRateInput}
+                                  value={rate}
+                                  min={0} max={100} step={1}
+                                  onChange={e => setIndividualRates(prev => ({ ...prev, [emp.id]: Number(e.target.value) }))}
+                                  onWheel={e => (e.target as HTMLInputElement).blur()}
+                                />
+                                <span className={styles.miniRateSuffix}>%</span>
+                              </div>
+                            )}
                             <span className={`${styles.commissionCell} ${styles.blue}`}>{formatCurrency(emp.grossRevenue * (rate / 100))}</span>
                             <span className={`${styles.commissionCell} ${styles.red}`}>{formatCurrency(emp.totalVouchers || 0)}</span>
                             <span className={`${styles.commissionCell} ${styles.green}`} style={{ fontWeight: 800 }}>{formatCurrency((emp.grossRevenue * (rate / 100)) - (emp.totalVouchers || 0))}</span>
-                            <span className={styles.commissionCell}>{formatCurrency(emp.grossRevenue - (emp.grossRevenue * (rate / 100)))}</span>
+                            {!isStaff && <span className={styles.commissionCell}>{formatCurrency(emp.grossRevenue - (emp.grossRevenue * (rate / 100)))}</span>}
                           </div>
                         );
                       })}

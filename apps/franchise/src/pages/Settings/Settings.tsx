@@ -13,6 +13,7 @@ interface Unit {
   workingDays?: number[];
   workingHours?: { start: string; end: string; lunchStart?: string; lunchEnd?: string };
   slotInterval?: number;
+  calendarGrid?: number;
 }
 
 type Tab = 'profile' | 'unit';
@@ -47,6 +48,7 @@ export default function Settings() {
   const [whLunchStart, setWhLunchStart] = useState('');
   const [whLunchEnd, setWhLunchEnd] = useState('');
   const [slotInterval, setSlotInterval] = useState<number>(0);
+  const [calendarGrid, setCalendarGrid] = useState<number>(15);
   const [unitSuccess, setUnitSuccess] = useState(false);
   const [unitError, setUnitError] = useState<string | null>(null);
 
@@ -73,6 +75,7 @@ export default function Settings() {
       setWhLunchStart(unit.workingHours?.lunchStart ?? '');
       setWhLunchEnd(unit.workingHours?.lunchEnd ?? '');
       setSlotInterval(unit.slotInterval ?? 0);
+      setCalendarGrid(unit.calendarGrid ?? 15);
     }
   }, [unit]);
 
@@ -121,6 +124,7 @@ export default function Settings() {
         lunchEnd: whLunchEnd || undefined,
       },
       slotInterval,
+      calendarGrid,
     });
   }
 
@@ -244,7 +248,7 @@ export default function Settings() {
 
             {/* ── Slot Interval ── */}
             <div className={styles.field}>
-              <label className={styles.label}>Intervalo entre agendamentos</label>
+              <label className={styles.label}>Intervalo entre agendamentos <span className={styles.optional}>(visível ao cliente)</span></label>
               <select 
                 className={styles.input} 
                 value={slotInterval} 
@@ -255,6 +259,21 @@ export default function Settings() {
                 <option value={30}>30 minutos</option>
                 <option value={45}>45 minutos</option>
                 <option value={60}>1 hora</option>
+              </select>
+            </div>
+
+            {/* ── Calendar Grid ── */}
+            <div className={styles.field}>
+              <label className={styles.label}>Grade do calendário interno <span className={styles.optional}>(só afeta o painel franchise)</span></label>
+              <select
+                className={styles.input}
+                value={calendarGrid}
+                onChange={e => setCalendarGrid(Number(e.target.value))}
+              >
+                <option value={5}>5 minutos</option>
+                <option value={10}>10 minutos</option>
+                <option value={15}>15 minutos</option>
+                <option value={30}>30 minutos</option>
               </select>
             </div>
 

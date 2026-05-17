@@ -29,6 +29,8 @@ interface Props {
   onClose: () => void;
   onSuccess: () => void;
   initialDate?: string;
+  initialEmployeeId?: string;
+  initialTime?: string;
   appointment?: any;
 }
 
@@ -53,15 +55,15 @@ function IconX() {
   );
 }
 
-export default function AppointmentForm({ onClose, onSuccess, initialDate, appointment }: Props) {
+export default function AppointmentForm({ onClose, onSuccess, initialDate, initialEmployeeId, initialTime, appointment }: Props) {
   const [unitId, setUnitId] = useState(import.meta.env.VITE_UNIT_ID || '');
   const [clientId, setClientId] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [showClientList, setShowClientList] = useState(false);
-  const [employeeId, setEmployeeId] = useState('');
+  const [employeeId, setEmployeeId] = useState(initialEmployeeId ?? '');
   const [serviceId, setServiceId] = useState('');
   const [date, setDate] = useState(initialDate ?? todayISO());
-  const [startTime, setStartTime] = useState('09:00');
+  const [startTime, setStartTime] = useState(initialTime ?? '09:00');
   const [notes, setNotes] = useState('');
   const [usePackage, setUsePackage] = useState(false);
   const [selectedPackageId, setSelectedPackageId] = useState('');

@@ -557,6 +557,36 @@
   border-radius: 6px;
 }
 
+.clientTabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border-subtle);
+  margin-bottom: 1.5rem;
+}
+
+.clientTab {
+  padding: 0.6rem 1.25rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+
+  &:hover { color: var(--text-primary); }
+}
+
+.clientTabActive {
+  color: var(--text-primary);
+  border-bottom-color: var(--text-primary);
+}
+
 .packageSelectionList {
   display: flex;
   flex-direction: column;

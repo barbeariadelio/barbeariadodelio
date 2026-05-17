@@ -31,6 +31,8 @@ function getGreeting(name?: string | null) {
 interface UnitConfig {
   workingDays?: number[];
   workingHours?: { start: string; end: string; lunchStart?: string; lunchEnd?: string };
+  slotInterval?: number;
+  calendarGrid?: number;
 }
 
 type EditableAppointment = CalendarAppointment | ScheduleAppointment;
@@ -73,6 +75,8 @@ export default function Dashboard() {
   const [selectedDay, setSelectedDay] = useState(new Date());
   const [showForm, setShowForm] = useState(false);
   const [editAppt, setEditAppt] = useState<EditableAppointment | null>(null);
+  const [slotEmployeeId, setSlotEmployeeId] = useState<string | undefined>();
+  const [slotTime, setSlotTime] = useState<string | undefined>();
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   /* ── Month appointments (calendar view) ── */
@@ -177,13 +181,18 @@ export default function Dashboard() {
   });
 
   const deleteMut = useMutation({
-    mutationFn: (id: string) => api.delete(`/appointments/${id}`),
+    mutationFn: ({ id, mode }: { id: string; mode?: string }) =>
+      api.delete(`/appointments/${id}`, { params: mode ? { mode } : undefined }),
     onSuccess: () => { handleScheduleUpdate(); handleMonthUpdate(); },
   });
 
   const blockMut = useMutation({
     mutationFn: (payload: AppointmentPayload) => api.post('/appointments', payload),
     onSuccess: () => { handleScheduleUpdate(); handleMonthUpdate(); },
+    onError: (err: unknown) => {
+      setErrorMsg(getErrorMessage(err));
+      setTimeout(() => setErrorMsg(null), 5000);
+    },
   });
 
   const updateApptMut = useMutation({
@@ -192,6 +201,11 @@ export default function Dashboard() {
   });
 
   const currentMonthLabel = format(calendarMonth, 'MMMM', { locale: ptBR });
+
+  type DeleteMode = 'single' | 'this-and-future';
+  const handleDelete = async (id: string, mode?: DeleteMode) => {
+    await deleteMut.mutateAsync({ id, mode });
+  };
 
   return (
     <div className={styles.page}>
@@ -241,10 +255,12 @@ export default function Dashboard() {
             onUpdate={handleMonthUpdate}
             onDayClick={handleDayClick}
             onStatusChange={async (id, s, opts) => { await statusMut.mutateAsync({ id, status: s, options: opts }); }}
-            onDelete={async (id) => { await deleteMut.mutateAsync(id); }}
+            onDelete={handleDelete}
+            isDeleting={deleteMut.isPending}
             isProcessing={statusMut.isPending || deleteMut.isPending}
             onEdit={(appt) => { setEditAppt(appt); setShowForm(true); }}
             onViewProfile={(clientId) => navigate(`/clients?id=${clientId}`)}
+            canBill={!isStaff}
           />
         </div>
       )}
@@ -264,30 +280,46 @@ export default function Dashboard() {
             setEditAppt(appt);
             setShowForm(true);
           }}
+          onNewApptAtSlot={(empId, time) => {
+            setEditAppt(null);
+            setSlotEmployeeId(empId);
+            setSlotTime(time);
+            setShowForm(true);
+          }}
           onBack={() => setView('calendar')}
           unitId={unitId}
           workingDays={unitConfig?.workingDays}
           workingHours={unitConfig?.workingHours}
+          slotDuration={unitConfig?.calendarGrid || 15}
           onStatusChange={async (id, s, opts) => { await statusMut.mutateAsync({ id, status: s, options: opts }); }}
-          onDelete={async (id) => { await deleteMut.mutateAsync(id); }}
+          onDelete={handleDelete}
           onBlock={async (payload) => { await blockMut.mutateAsync(payload); }}
           onUpdateAppt={async (id, data) => { await updateApptMut.mutateAsync({ id, data }); }}
           isProcessing={statusMut.isPending || blockMut.isPending || updateApptMut.isPending}
           isDeleting={deleteMut.isPending}
           businessName="Barber Franchise"
+          onProfileClick={(clientId) => navigate(`/clients?id=${clientId}`)}
+          canBill={!isStaff}
         />
       )}
 
       {showForm && (
         <AppointmentForm
           appointment={editAppt}
+          initialDate={!editAppt && view === 'schedule' ? dateISO(selectedDay) : undefined}
+          initialEmployeeId={!editAppt ? slotEmployeeId : undefined}
+          initialTime={!editAppt ? slotTime : undefined}
           onClose={() => {
             setShowForm(false);
             setEditAppt(null);
+            setSlotEmployeeId(undefined);
+            setSlotTime(undefined);
           }}
           onSuccess={() => {
             setShowForm(false);
             setEditAppt(null);
+            setSlotEmployeeId(undefined);
+            setSlotTime(undefined);
             if (view === 'calendar') handleMonthUpdate();
             else handleScheduleUpdate();
           }}

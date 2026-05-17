@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { api, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import ClientForm from './ClientForm';
@@ -21,6 +21,8 @@ interface PackageSubscription {
   };
   startDate: string;
   active: boolean;
+  expiresAt?: string;
+  itemLimits?: Array<{ serviceId: string; quantity: number; used: number }>;
 }
 
 interface AvailablePackage {
@@ -47,6 +49,10 @@ interface AppointmentItem {
   employeeId: { name: string } | null;
   status: string;
   price: number;
+  usedPackageId?: string;
+  isBilled?: boolean;
+  productsBilled?: boolean;
+  products?: Array<{ productId: string; name: string; quantity: number; unitPrice: number }>;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -96,6 +102,16 @@ export default function Clients() {
   const [showForm, setShowForm] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [editingItem, setEditingItem] = useState<{ pkgId: string; serviceId: string } | null>(null);
+  const [editValue, setEditValue] = useState('');
+  const [editUsedValue, setEditUsedValue] = useState('');
+  const [clientTab, setClientTab] = useState<'history' | 'products'>('history');
+  const [billingAppt, setBillingAppt] = useState<AppointmentItem | null>(null);
+  const [billingPrice, setBillingPrice] = useState('');
+  const [billingPaymentMethod, setBillingPaymentMethod] = useState<'money' | 'debit' | 'credit' | 'pix' | 'other'>('pix');
+  const [billingRegisterPayment, setBillingRegisterPayment] = useState(true);
+  const [billingBillService, setBillingBillService] = useState(true);
+  const [billingBillProducts, setBillingBillProducts] = useState(false);
   const [whatsappClient, setWhatsappClient] = useState<{ phone: string; name: string } | null>(null);
   const [whatsappMessage, setWhatsappMessage] = useState('');
   const [showPackageModal, setShowPackageModal] = useState(false);
@@ -156,18 +172,63 @@ export default function Clients() {
 
   const selectedClient = clients.find(c => c._id === selectedId) ?? null;
 
+  const updateLimitMutation = useMutation({
+    mutationFn: ({ clientId, pkgServiceId, serviceId, quantity, used }: { clientId: string; pkgServiceId: string; serviceId: string; quantity: number; used: number }) =>
+      api.patch(`/clients/${clientId}/packages/${pkgServiceId}/items/${serviceId}`, { quantity, used }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['clients'] });
+      qc.invalidateQueries({ queryKey: ['client-appointments', selectedId] });
+      setEditingItem(null);
+      setToast({ message: 'Sessões atualizadas!', type: 'success' });
+    },
+    onError: () => setToast({ message: 'Erro ao atualizar sessões.', type: 'error' }),
+  });
+
+  const billMutation = useMutation({
+    mutationFn: ({ apptId, price, paymentMethod, skipBilling, billService, billProducts }: { apptId: string; price: number; paymentMethod: string; skipBilling: boolean; billService: boolean; billProducts: boolean }) =>
+      api.patch(`/appointments/${apptId}/status`, { status: 'completed', price, paymentMethod, skipBilling, billService, billProducts }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['client-appointments', selectedId] });
+      qc.invalidateQueries({ queryKey: ['clients'] });
+      setBillingAppt(null);
+      setToast({ message: 'Atendimento faturado com sucesso!', type: 'success' });
+    },
+    onError: () => setToast({ message: 'Erro ao faturar atendimento.', type: 'error' }),
+  });
+
+  function openBilling(appt: AppointmentItem) {
+    setBillingAppt(appt);
+    setBillingPrice(appt.price.toFixed(2).replace('.', ','));
+    setBillingPaymentMethod('pix');
+    setBillingRegisterPayment(true);
+    setBillingBillService(!appt.isBilled);
+    setBillingBillProducts((appt.products?.length ?? 0) > 0 && !appt.productsBilled);
+  }
+
+  function confirmBilling() {
+    if (!billingAppt) return;
+    const price = parseFloat(billingPrice.replace(',', '.'));
+    const isPackageAppt = !!billingAppt.usedPackageId;
+    billMutation.mutate({
+      apptId: billingAppt._id,
+      price: isNaN(price) ? billingAppt.price : price,
+      paymentMethod: billingPaymentMethod,
+      skipBilling: isPackageAppt ? !billingRegisterPayment : false,
+      billService: isPackageAppt ? billingRegisterPayment : billingBillService,
+      billProducts: billingBillProducts,
+    });
+  }
+
   const handleSelect = useCallback((id: string) => {
     setSelectedId(prev => (prev === id ? null : id));
+    setClientTab('history');
   }, []);
 
-  const now = new Date();
-  const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-  function calculateMonthlyUsage(serviceId: string) {
+  function calculatePackageUsage(packageServiceId: string, itemServiceId: string) {
     return appointments.filter(a =>
-      a.status === 'completed' &&
-      a.date.startsWith(currentMonthPrefix) &&
-      a.serviceId?._id === serviceId
+      a.status !== 'cancelled' &&
+      a.usedPackageId === packageServiceId &&
+      a.serviceId?._id === itemServiceId
     ).length;
   }
 
@@ -274,88 +335,391 @@ export default function Clients() {
               </div>
             </div>
 
-            <div className={styles.clientPackages}>
-              <div className={styles.sectionHeader}>
-                <h3 className={styles.historyTitle}>Pacotes e Assinaturas (Uso no mês atual)</h3>
-                <button className={styles.addPackageBtn} onClick={() => setShowPackageModal(true)}>
-                  + Adicionar Pacote
-                </button>
-              </div>
-              
-              {(!selectedClient.packages || selectedClient.packages.filter(p => p.active && p.packageId).length === 0) ? (
-                <p className={styles.emptySmall}>Este cliente não possui pacotes ativos.</p>
-              ) : (
+            {selectedClient.packages && selectedClient.packages.filter(p => p.packageId).length > 0 && (
+              <div className={styles.clientPackages}>
+                <div className={styles.sectionHeader}>
+                  <h3 className={styles.historyTitle}>Pacotes e Assinaturas</h3>
+                  <button className={styles.addPackageBtn} onClick={() => setShowPackageModal(true)}>
+                    + Adicionar Pacote
+                  </button>
+                </div>
                 <div className={styles.packageList}>
-                  {selectedClient.packages.filter(p => p.active && p.packageId).map(pkg => (
-                    <div key={pkg._id} className={styles.packageCard}>
-                      <div className={styles.packageCardHead}>
-                        <h4 className={styles.packageName}>{pkg.packageId.name}</h4>
-                        <span className={styles.packageBadge}>Ativo</span>
+                  {selectedClient.packages.filter(p => p.packageId).map(pkg => {
+                    const now = new Date();
+                    const isExpired = pkg.expiresAt ? new Date(pkg.expiresAt) < now : false;
+                    const statusLabel = isExpired ? 'EXPIRADO' : pkg.active ? 'ATIVO' : 'INATIVO';
+                    const statusColor = isExpired ? '#EF4444' : pkg.active ? '#22C55E' : '#9CA3AF';
+                    return (
+                      <div key={pkg._id} className={styles.packageCard}>
+                        <div className={styles.packageCardHead}>
+                          <h4 className={styles.packageName}>{pkg.packageId.name}</h4>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                            <span className={styles.packageBadge} style={{ background: `${statusColor}22`, color: statusColor, border: `1px solid ${statusColor}55` }}>{statusLabel}</span>
+                            {pkg.expiresAt && (
+                              <span style={{ fontSize: '11px', color: isExpired ? '#EF4444' : 'var(--text-secondary)' }}>
+                                {isExpired ? 'Expirou' : 'Expira'} em {formatDate(pkg.expiresAt.split('T')[0])}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className={styles.packageUsage}>
+                          {pkg.packageId.packageItems.map(item => {
+                            const backendLimit = pkg.itemLimits?.find(l => l.serviceId === item.serviceId._id);
+                            const used = backendLimit?.used ?? calculatePackageUsage(pkg.packageId._id, item.serviceId._id);
+                            const total = backendLimit?.quantity ?? item.quantity;
+                            const remaining = Math.max(0, total - used);
+                            const perc = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
+                            const isExhausted = used >= total;
+                            const isEditing = editingItem?.pkgId === pkg.packageId._id && editingItem?.serviceId === item.serviceId._id;
+                            return (
+                              <div key={item.serviceId._id} className={styles.usageItem}>
+                                <div className={styles.usageRow}>
+                                  <span className={styles.usageServiceName}>{item.serviceId.name}</span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    {isEditing ? (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Usadas:</span>
+                                          <input type="number" min={0} max={parseInt(editValue, 10) || 9999}
+                                            style={{ width: '50px', padding: '2px 6px', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '13px', textAlign: 'center' }}
+                                            value={editUsedValue} onChange={e => setEditUsedValue(e.target.value)}
+                                            onKeyDown={e => { if (e.key === 'Escape') setEditingItem(null); }} autoFocus />
+                                        </div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Total:</span>
+                                          <input type="number" min={0}
+                                            style={{ width: '50px', padding: '2px 6px', borderRadius: '6px', border: '1px solid var(--border)', fontSize: '13px', textAlign: 'center' }}
+                                            value={editValue} onChange={e => setEditValue(e.target.value)}
+                                            onKeyDown={e => {
+                                              if (e.key === 'Enter') {
+                                                const q = parseInt(editValue, 10); const u = parseInt(editUsedValue, 10);
+                                                if (!isNaN(q) && !isNaN(u) && q >= 0 && u >= 0) updateLimitMutation.mutate({ clientId: selectedClient._id, pkgServiceId: pkg.packageId._id, serviceId: item.serviceId._id, quantity: q, used: u });
+                                              }
+                                              if (e.key === 'Escape') setEditingItem(null);
+                                            }} />
+                                        </div>
+                                        <button style={{ padding: '2px 8px', borderRadius: '6px', background: 'var(--blue-600)', color: '#fff', border: 'none', fontSize: '12px', cursor: 'pointer' }}
+                                          disabled={updateLimitMutation.isPending}
+                                          onClick={() => { const q = parseInt(editValue, 10); const u = parseInt(editUsedValue, 10); if (!isNaN(q) && !isNaN(u) && q >= 0 && u >= 0) updateLimitMutation.mutate({ clientId: selectedClient._id, pkgServiceId: pkg.packageId._id, serviceId: item.serviceId._id, quantity: q, used: u }); }}>✓</button>
+                                        <button style={{ padding: '2px 6px', borderRadius: '6px', background: 'transparent', border: '1px solid var(--border)', fontSize: '12px', cursor: 'pointer' }} onClick={() => setEditingItem(null)}>✕</button>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <span className={styles.usageCount} style={{ color: isExhausted ? '#EF4444' : 'var(--blue-600)' }}>
+                                          {used} de {total} {isExhausted ? '(Esgotado)' : `(${remaining} restante${remaining !== 1 ? 's' : ''})`}
+                                        </span>
+                                        <button title="Editar sessões"
+                                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', lineHeight: 1 }}
+                                          onClick={() => { setEditingItem({ pkgId: pkg.packageId._id, serviceId: item.serviceId._id }); setEditValue(String(total)); setEditUsedValue(String(used)); }}>
+                                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className={styles.usageBar}>
+                                  <div className={styles.usageFill} style={{ width: `${perc}%`, background: isExhausted ? '#EF4444' : isExpired ? '#F59E0B' : 'var(--blue-600)', transition: 'width 0.3s ease' }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                      <div className={styles.packageUsage}>
-                        {pkg.packageId.packageItems.map(item => {
-                          const used = calculateMonthlyUsage(item.serviceId._id);
-                          const total = item.quantity;
-                          const perc = Math.min(100, Math.round((used / total) * 100));
-                          const isExhausted = used >= total;
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {(!selectedClient.packages || selectedClient.packages.filter(p => p.packageId).length === 0) && (
+              <div className={styles.clientPackages}>
+                <div className={styles.sectionHeader}>
+                  <h3 className={styles.historyTitle}>Pacotes e Assinaturas</h3>
+                  <button className={styles.addPackageBtn} onClick={() => setShowPackageModal(true)}>
+                    + Adicionar Pacote
+                  </button>
+                </div>
+                <p className={styles.emptySmall}>Este cliente não possui pacotes.</p>
+              </div>
+            )}
+
+            {/* ── Tabs ── */}
+            <div className={styles.clientTabs}>
+              <button
+                className={`${styles.clientTab} ${clientTab === 'history' ? styles.clientTabActive : ''}`}
+                onClick={() => setClientTab('history')}
+              >
+                Histórico de Atendimentos
+              </button>
+              <button
+                className={`${styles.clientTab} ${clientTab === 'products' ? styles.clientTabActive : ''}`}
+                onClick={() => setClientTab('products')}
+              >
+                Venda de Produto
+                {appointments.some(a => a.products && a.products.length > 0) && (
+                  <span style={{ marginLeft: '6px', background: '#111827', color: '#fff', borderRadius: '9px', fontSize: '10px', fontWeight: 700, padding: '1px 6px' }}>
+                    {appointments.filter(a => a.products && a.products.length > 0).length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* ── History tab ── */}
+            {clientTab === 'history' && (
+              <>
+                {appointments.length === 0 && (
+                  <p className={styles.empty}>Nenhum atendimento registrado.</p>
+                )}
+                <div className={styles.historyList}>
+                  {appointments.map(appt => (
+                    <div key={appt._id} className={styles.historyRow}>
+                      <div className={styles.historyInfo}>
+                        <span className={styles.historyDate}>{formatDate(appt.date)} — {appt.startTime}</span>
+                        <span className={styles.historySub}>
+                          {appt.serviceId?.name ?? 'Serviço'} · {appt.employeeId?.name ?? 'Barbeiro'}
+                        </span>
+                        {appt.products && appt.products.length > 0 && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginTop: '0.25rem' }}>
+                            {appt.products.map((p, i) => (
+                              <span key={i} style={{ fontSize: '11px', fontWeight: 600, color: '#6B7280', background: '#F3F4F6', border: '1px solid #E5E7EB', borderRadius: '4px', padding: '1px 6px', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+                                {p.name} x{p.quantity}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className={styles.historyRight}>
+                        <span className={styles.badge} style={{ background: `${STATUS_COLORS[appt.status]}22`, color: STATUS_COLORS[appt.status], border: `1px solid ${STATUS_COLORS[appt.status]}55` }}>
+                          {STATUS_LABELS[appt.status]}
+                        </span>
+                        {(() => {
+                          const hasProds = (appt.products?.length ?? 0) > 0;
+                          const fullyBilled = appt.isBilled && (!hasProds || appt.productsBilled);
+                          const partiallyBilled = appt.isBilled || (hasProds && appt.productsBilled);
+                          const canBillMore = !fullyBilled && appt.status !== 'cancelled';
                           return (
-                            <div key={item.serviceId._id} className={styles.usageItem}>
-                              <div className={styles.usageRow}>
-                                <span className={styles.usageServiceName}>{item.serviceId.name}</span>
-                                <span className={styles.usageCount} style={{ color: isExhausted ? '#EF4444' : 'var(--blue-600)' }}>
-                                  {used} de {total} {isExhausted && '(Esgotado)'}
+                            <>
+                              {fullyBilled && (
+                                <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', color: '#1565C0', background: 'rgba(21,101,192,0.1)', border: '1px solid rgba(21,101,192,0.3)', borderRadius: '4px', padding: '1px 6px' }}>
+                                  FATURADO
                                 </span>
-                              </div>
-                              <div className={styles.usageBar}>
-                                <div 
-                                  className={styles.usageFill} 
-                                  style={{ width: `${perc}%`, background: isExhausted ? '#EF4444' : 'var(--blue-600)' }}
-                                ></div>
-                              </div>
-                            </div>
+                              )}
+                              {!fullyBilled && appt.isBilled && (
+                                <span style={{ fontSize: '10px', fontWeight: 700, color: '#22C55E', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '4px', padding: '1px 6px' }}>
+                                  SERVIÇO FAT.
+                                </span>
+                              )}
+                              {!fullyBilled && appt.productsBilled && (
+                                <span style={{ fontSize: '10px', fontWeight: 700, color: '#22C55E', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '4px', padding: '1px 6px' }}>
+                                  PROD. FAT.
+                                </span>
+                              )}
+                              {canBillMore && (
+                                <button onClick={() => openBilling(appt)} style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.05em', color: '#fff', background: '#1565C0', border: 'none', borderRadius: '5px', padding: '3px 9px', cursor: 'pointer' }}>
+                                  {partiallyBilled ? 'FAT. REST.' : 'FATURAR'}
+                                </button>
+                              )}
+                            </>
                           );
-                        })}
+                        })()}
+                        <div style={{ textAlign: 'right' }}>
+                          <span className={styles.historyPrice}>{formatCurrency(appt.price)}</span>
+                          {appt.products && appt.products.length > 0 && (
+                            <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '1px' }}>
+                              +{formatCurrency(appt.products.reduce((s, p) => s + p.quantity * p.unitPrice, 0))} produtos
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
                 </div>
-              )}
-            </div>
-
-            <h3 className={styles.historyTitle}>Histórico de Atendimentos</h3>
-
-            {appointments.length === 0 && (
-              <p className={styles.empty}>Nenhum atendimento registrado.</p>
+              </>
             )}
 
-            <div className={styles.historyList}>
-              {appointments.map(appt => (
-                <div key={appt._id} className={styles.historyRow}>
-                  <div className={styles.historyInfo}>
-                    <span className={styles.historyDate}>{formatDate(appt.date)} — {appt.startTime}</span>
-                    <span className={styles.historySub}>
-                      {appt.serviceId?.name ?? 'Serviço'} · {appt.employeeId?.name ?? 'Barbeiro'}
-                    </span>
-                  </div>
-                  <div className={styles.historyRight}>
-                    <span
-                      className={styles.badge}
-                      style={{
-                        background: `${STATUS_COLORS[appt.status]}22`,
-                        color: STATUS_COLORS[appt.status],
-                        border: `1px solid ${STATUS_COLORS[appt.status]}55`,
-                      }}
-                    >
-                      {STATUS_LABELS[appt.status]}
-                    </span>
-                    <span className={styles.historyPrice}>{formatCurrency(appt.price)}</span>
-                  </div>
+            {/* ── Product sales tab ── */}
+            {clientTab === 'products' && (() => {
+              const salesAppts = appointments.filter(a => a.products && a.products.length > 0);
+              if (salesAppts.length === 0) {
+                return <p className={styles.empty}>Nenhuma venda de produto registrada.</p>;
+              }
+              return (
+                <div className={styles.historyList}>
+                  {salesAppts.map(appt => {
+                    const total = appt.products!.reduce((s, p) => s + p.quantity * p.unitPrice, 0);
+                    return (
+                      <div key={appt._id} className={styles.historyRow} style={{ alignItems: 'flex-start' }}>
+                        <div className={styles.historyInfo}>
+                          <span className={styles.historyDate}>{formatDate(appt.date)} — {appt.startTime}</span>
+                          <span className={styles.historySub}>{appt.employeeId?.name ?? 'Barbeiro'}</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', marginTop: '0.4rem' }}>
+                            {appt.products!.map((p, i) => (
+                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8125rem' }}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: '#6B7280', flexShrink: 0 }}><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+                                <span style={{ fontWeight: 600, color: '#111827' }}>{p.name}</span>
+                                <span style={{ color: '#6B7280' }}>×{p.quantity}</span>
+                                <span style={{ color: '#6B7280' }}>·</span>
+                                <span style={{ color: '#374151' }}>{formatCurrency(p.unitPrice)} un.</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className={styles.historyRight} style={{ flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
+                          {appt.productsBilled ? (
+                            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', color: '#1565C0', background: 'rgba(21,101,192,0.1)', border: '1px solid rgba(21,101,192,0.3)', borderRadius: '4px', padding: '1px 6px' }}>
+                              FATURADO
+                            </span>
+                          ) : (
+                            <>
+                              <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', color: '#6B7280', background: '#F3F4F6', border: '1px solid #E5E7EB', borderRadius: '4px', padding: '1px 6px' }}>
+                                PENDENTE
+                              </span>
+                              {appt.status !== 'cancelled' && (
+                                <button onClick={() => openBilling(appt)} style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.05em', color: '#fff', background: '#1565C0', border: 'none', borderRadius: '5px', padding: '3px 9px', cursor: 'pointer' }}>
+                                  FATURAR
+                                </button>
+                              )}
+                            </>
+                          )}
+                          <span className={styles.historyPrice}>{formatCurrency(total)}</span>
+                          <span style={{ fontSize: '11px', color: '#6B7280' }}>sem comissão</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+              );
+            })()}
           </div>
         )}
       </div>
+
+      {billingAppt && createPortal(
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={e => { if (e.target === e.currentTarget) setBillingAppt(null); }}
+        >
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: '14px', padding: '2rem', width: '100%', maxWidth: '400px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)' }}>Finalizar Atendimento</span>
+              <button onClick={() => setBillingAppt(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--text-muted)' }}>✕</button>
+            </div>
+
+            <div style={{ marginBottom: '1.25rem', padding: '0.75rem 1rem', background: 'var(--bg-elevated)', borderRadius: '8px', fontSize: '13px' }}>
+              <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{billingAppt.serviceId?.name ?? 'Serviço'}</div>
+              <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>
+                {formatDate(billingAppt.date)} — {billingAppt.startTime} · {billingAppt.employeeId?.name ?? 'Barbeiro'}
+              </div>
+            </div>
+
+            {(billingAppt.products?.length ?? 0) > 0 && (
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                  O que faturar
+                </label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: billingAppt.isBilled ? 'default' : 'pointer', opacity: billingAppt.isBilled ? 0.55 : 1 }}>
+                    <input type="checkbox" checked={billingAppt.isBilled || billingBillService} disabled={!!billingAppt.isBilled}
+                      onChange={e => setBillingBillService(e.target.checked)} style={{ width: 16, height: 16 }} />
+                    <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                      <span style={{ color: 'var(--text-primary)' }}>Serviço: {billingAppt.serviceId?.name ?? 'Serviço'}</span>
+                      {billingAppt.isBilled
+                        ? <span style={{ color: '#22C55E', fontWeight: 700 }}>✓ Faturado</span>
+                        : <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formatCurrency(billingAppt.price)}</span>
+                      }
+                    </div>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: billingAppt.productsBilled ? 'default' : 'pointer', opacity: billingAppt.productsBilled ? 0.55 : 1 }}>
+                    <input type="checkbox" checked={!!billingAppt.productsBilled || billingBillProducts} disabled={!!billingAppt.productsBilled}
+                      onChange={e => setBillingBillProducts(e.target.checked)} style={{ width: 16, height: 16 }} />
+                    <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
+                      <span style={{ color: 'var(--text-primary)' }}>Produtos ({billingAppt.products!.length} {billingAppt.products!.length === 1 ? 'item' : 'itens'})</span>
+                      {billingAppt.productsBilled
+                        ? <span style={{ color: '#22C55E', fontWeight: 700 }}>✓ Faturado</span>
+                        : <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formatCurrency(billingAppt.products!.reduce((s, p) => s + p.quantity * p.unitPrice, 0))}</span>
+                      }
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {billingBillService && !billingAppt.isBilled && (
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  {(billingAppt.products?.length ?? 0) > 0 ? 'Valor do Serviço' : 'Valor Final'}
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid var(--border-default)', borderRadius: '8px', padding: '8px 12px', background: 'var(--bg-base)' }}>
+                  <span style={{ fontWeight: 600, color: 'var(--text-secondary)' }}>R$</span>
+                  <input type="text" value={billingPrice} onChange={e => setBillingPrice(e.target.value.replace(/[^0-9,]/g, ''))}
+                    style={{ flex: 1, border: 'none', outline: 'none', fontSize: '16px', fontWeight: 700, background: 'transparent', color: 'var(--text-primary)' }} autoFocus />
+                </div>
+              </div>
+            )}
+
+            {billingAppt.usedPackageId ? (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FF6D00" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: '#FF6D00' }}>Sessão de Pacote</span>
+                </div>
+                <div style={{ padding: '1rem', borderRadius: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', marginBottom: '1.25rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', userSelect: 'none' }}>
+                    <div onClick={() => setBillingRegisterPayment(v => !v)}
+                      style={{ width: '42px', height: '24px', borderRadius: '12px', flexShrink: 0, background: billingRegisterPayment ? 'var(--gold)' : 'var(--border-default)', transition: 'background 0.2s', position: 'relative', cursor: 'pointer' }}>
+                      <div style={{ position: 'absolute', top: '3px', left: billingRegisterPayment ? '21px' : '3px', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                    </div>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>{billingRegisterPayment ? 'Registrar pagamento' : 'Sem cobrança'}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        {billingRegisterPayment ? 'Gera transação e comissão para o barbeiro' : 'Apenas desconta a sessão do pacote, sem transação'}
+                      </div>
+                    </div>
+                  </label>
+                </div>
+                {billingRegisterPayment && (
+                  <div style={{ marginBottom: '1.25rem' }}>
+                    <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Forma de Pagamento</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      {(['money', 'debit', 'credit', 'pix', 'other'] as const).map(pm => (
+                        <button key={pm} onClick={() => setBillingPaymentMethod(pm)}
+                          style={{ padding: '8px', borderRadius: '8px', border: `2px solid ${billingPaymentMethod === pm ? 'var(--gold)' : 'var(--border-default)'}`, background: billingPaymentMethod === pm ? 'var(--gold-dim)' : 'var(--bg-base)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', color: billingPaymentMethod === pm ? 'var(--gold)' : 'var(--text-primary)' }}>
+                          {pm === 'money' ? 'Dinheiro' : pm === 'debit' ? 'Débito' : pm === 'credit' ? 'Crédito' : pm === 'pix' ? 'Pix' : 'Outro'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ marginBottom: '1.25rem' }}>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Forma de Pagamento</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {(['money', 'debit', 'credit', 'pix', 'other'] as const).map(pm => (
+                    <button key={pm} onClick={() => setBillingPaymentMethod(pm)}
+                      style={{ padding: '8px', borderRadius: '8px', border: `2px solid ${billingPaymentMethod === pm ? 'var(--gold)' : 'var(--border-default)'}`, background: billingPaymentMethod === pm ? 'var(--gold-dim)' : 'var(--bg-base)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', color: billingPaymentMethod === pm ? 'var(--gold)' : 'var(--text-primary)' }}>
+                      {pm === 'money' ? 'Dinheiro' : pm === 'debit' ? 'Débito' : pm === 'credit' ? 'Crédito' : pm === 'pix' ? 'Pix' : 'Outro'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '10px', marginTop: '0.5rem' }}>
+              <button onClick={() => setBillingAppt(null)}
+                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-elevated)', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>
+                Voltar
+              </button>
+              <button onClick={confirmBilling} disabled={billMutation.isPending}
+                style={{ flex: 2, padding: '10px', borderRadius: '8px', border: 'none', background: 'var(--gold)', color: '#080808', fontWeight: 700, cursor: 'pointer', opacity: billMutation.isPending ? 0.7 : 1 }}>
+                {billMutation.isPending ? 'Processando...' : 'Confirmar e Concluir'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {whatsappClient && createPortal(
         <div

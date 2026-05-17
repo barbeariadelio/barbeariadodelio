@@ -56,10 +56,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user]);
 
   function handleSetUser(u: User | null) {
-    if (u) localStorage.setItem(storageKeys.user, JSON.stringify(u));
-    else {
+    if (u) {
+      localStorage.setItem(storageKeys.user, JSON.stringify(u));
+      // Persist the user's unitId so the API interceptor always filters by unit.
+      // Only override if not already set (e.g. via SSO URL param from portal).
+      const unitId = (u as unknown as { unitId?: string }).unitId;
+      if (unitId && !localStorage.getItem(storageKeys.selectedUnitId)) {
+        localStorage.setItem(storageKeys.selectedUnitId, unitId);
+      }
+    } else {
       localStorage.removeItem(storageKeys.user);
       localStorage.removeItem(storageKeys.accessToken);
+      localStorage.removeItem(storageKeys.selectedUnitId);
     }
     setUser(u);
   }

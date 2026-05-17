@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { api, storageKeys } from '../api/client';
+import { api, storageKeys, getSelectedUnitId } from '../api/client';
 import type { User } from '@barber/types';
 
 interface LoginForm {
@@ -40,12 +40,17 @@ export function useLogin() {
       localStorage.setItem(storageKeys.refreshToken, auth.refreshToken);
 
       const me = auth.user || (await api.get<MeResponse>('/auth/me')).data;
+      // Persist unitId immediately so the interceptor filters all subsequent requests.
+      if (me.unitId && !getSelectedUnitId()) {
+        localStorage.setItem(storageKeys.selectedUnitId, me.unitId);
+      }
       setUser(me as unknown as User);
 
       navigate('/dashboard');
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const response = (err as { response?: { data?: { message?: string } } })?.response;
       const message =
-        err?.response?.data?.message ||
+        response?.data?.message ||
         (err instanceof Error ? err.message : null) ||
         'E-mail ou senha inválidos.';
       setError(message);
