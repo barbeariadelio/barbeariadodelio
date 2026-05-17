@@ -39,7 +39,7 @@ function todayISO() {
 export default function Sales() {
   const { user } = useAuth();
   const qc = useQueryClient();
-  const unitId = getSelectedUnitId() || (user as Record<string, unknown>)?.unitId as string || '';
+  const unitId = getSelectedUnitId() || (user as any)?.unitId as string || '';
 
   const [tab, setTab] = useState<'pdv' | 'history'>('pdv');
   const [search, setSearch] = useState('');
