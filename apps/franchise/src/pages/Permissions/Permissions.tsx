@@ -528,7 +528,9 @@ export default function Permissions() {
         <div className={styles.modalOverlay}>
           <div className={styles.modal} style={{ maxWidth: '380px' }}>
             <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>{confirmModal.isActive ? 'Desativar Usuário' : 'Reativar Usuário'}</h2>
+              <h2 className={styles.modalTitle}>
+                {confirmModal.action === 'delete' ? 'Excluir Usuário' : confirmModal.isActive ? 'Desativar Usuário' : 'Reativar Usuário'}
+              </h2>
               <button className={styles.btnClose} onClick={() => setConfirmModal(null)}>
                 <span style={{ display: 'flex', transform: 'rotate(45deg)' }}><IconPlus /></span>
               </button>
@@ -536,22 +538,32 @@ export default function Permissions() {
             <div className={styles.modalBody} style={{ textAlign: 'center', padding: '2rem 1.5rem' }}>
               <div style={{ marginBottom: '1rem' }}><IconAlert /></div>
               <p style={{ color: 'var(--text-primary)', fontWeight: 600, fontSize: '1rem', margin: 0 }}>
-                Tem certeza que deseja {confirmModal.isActive ? 'desativar' : 'reativar'} o acesso de <strong>{confirmModal.userName}</strong>?
+                {confirmModal.action === 'delete'
+                  ? <>Tem certeza que deseja excluir <strong>{confirmModal.userName}</strong>?</>
+                  : <>Tem certeza que deseja {confirmModal.isActive ? 'desativar' : 'reativar'} o acesso de <strong>{confirmModal.userName}</strong>?</>
+                }
               </p>
               <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', marginTop: '0.5rem' }}>
-                {confirmModal.isActive ? 'O usuário não conseguirá mais realizar login no sistema.' : 'O usuário voltará a ter acesso normal ao sistema.'}
+                {confirmModal.action === 'delete'
+                  ? 'Esta ação não pode ser desfeita.'
+                  : confirmModal.isActive ? 'O usuário não conseguirá mais realizar login no sistema.' : 'O usuário voltará a ter acesso normal ao sistema.'
+                }
               </p>
             </div>
             <div className={styles.modalFooter}>
               <button className={styles.btnSecondary} onClick={() => setConfirmModal(null)}>Cancelar</button>
-              <button 
-                className={confirmModal.isActive ? styles.btnDanger : styles.btnPrimary} 
+              <button
+                className={styles.btnDanger}
                 onClick={() => {
-                  updateMutation.mutate({ id: confirmModal.userId, isActive: !confirmModal.isActive });
+                  if (confirmModal.action === 'delete') {
+                    deleteMutation.mutate(confirmModal.userId);
+                  } else {
+                    updateMutation.mutate({ id: confirmModal.userId, isActive: !confirmModal.isActive });
+                  }
                   setConfirmModal(null);
                 }}
               >
-                Sim, {confirmModal.isActive ? 'Desativar' : 'Reativar'}
+                {confirmModal.action === 'delete' ? 'Sim, Excluir' : confirmModal.isActive ? 'Sim, Desativar' : 'Sim, Reativar'}
               </button>
             </div>
           </div>
