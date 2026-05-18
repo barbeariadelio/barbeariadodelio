@@ -114,7 +114,7 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
       name,
       description,
       price: parseBR(price),
-      durationMinutes: type === 'package' ? 0 : parseInt(durationMinutes, 10),
+      durationMinutes: parseInt(durationMinutes, 10) || 30,
       image,
       type,
       showPrice,
@@ -201,12 +201,10 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
               </div>
             </div>
             
-            {type === 'single' && (
-              <div className={styles.field}>
-                <label className={styles.label}>Duração (min) *</label>
-                <input type="number" min="5" step="5" className={styles.input} value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} required />
-              </div>
-            )}
+            <div className={styles.field}>
+              <label className={styles.label}>Duração (min) *</label>
+              <input type="number" min="5" step="5" className={styles.input} value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} required />
+            </div>
           </div>
 
           <div className={styles.field}>

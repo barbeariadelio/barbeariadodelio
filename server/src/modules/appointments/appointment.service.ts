@@ -602,16 +602,17 @@ export class AppointmentService {
           await appt.save();
         }
 
-        // ── When a package SALE is billed, activate the subscription on the client ──
+        // ── When a package SALE is billed, activate the subscription and decrement one session ──
         if (isPackageSale && appt.clientId && svcDoc) {
           const client = await ClientModel.findById(appt.clientId);
           if (client) {
-            const alreadyHas = client.packages?.some(
+            if (!client.packages) client.packages = [];
+
+            let sub = client.packages.find(
               p => p.packageId.toString() === svcDoc._id.toString() && p.active
             );
-            if (!alreadyHas) {
-              if (!client.packages) client.packages = [];
 
+            if (!sub) {
               let expiresAt: Date | undefined;
               const validity = (svcDoc as any).packageValidity;
               if (validity && validity.type && validity.type !== 'none' && validity.value) {
@@ -634,8 +635,21 @@ export class AppointmentService {
                   used: 0,
                 })),
               });
-              await client.save();
+              sub = client.packages[client.packages.length - 1];
             }
+
+            // Each billed package-sale appointment consumes one session of every included service
+            if (sub?.itemLimits && sub.itemLimits.length > 0) {
+              for (const limit of sub.itemLimits) {
+                if ((limit.used || 0) < (limit.quantity || 0)) {
+                  limit.used = (limit.used || 0) + 1;
+                }
+              }
+              const allExhausted = sub.itemLimits.every(l => (l.used || 0) >= (l.quantity || 0));
+              if (allExhausted) sub.active = false;
+            }
+
+            await client.save();
           }
         }
 

@@ -382,7 +382,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
               <option value="">Selecione um serviço</option>
               {services.map(s => (
                 <option key={s._id} value={s._id}>
-                  {s.name} — {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(s.price)} ({s.durationMinutes}min)
+                  {s.name} — {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(s.price)} ({s.durationMinutes > 0 ? `${s.durationMinutes}min` : 'Pacote'})
                 </option>
               ))}
             </select>

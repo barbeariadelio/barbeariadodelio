@@ -110,6 +110,7 @@ export default function Clients() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['clients'] });
       qc.invalidateQueries({ queryKey: ['client-appointments', selectedId] });
+      qc.invalidateQueries({ queryKey: ['client-detail', selectedId] });
       setEditingItem(null);
       setToast({ message: 'Sessões atualizadas!', type: 'success' });
     },
@@ -122,6 +123,7 @@ export default function Clients() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['client-appointments', selectedId] });
       qc.invalidateQueries({ queryKey: ['clients'] });
+      qc.invalidateQueries({ queryKey: ['client-detail', selectedId] });
       setBillingAppt(null);
       setToast({ message: 'Atendimento faturado com sucesso!', type: 'success' });
     },
@@ -194,7 +196,16 @@ export default function Clients() {
     enabled: !!selectedId,
   });
 
-  const selectedClient = clients.find(c => c._id === selectedId) ?? null;
+  const { data: clientDetail } = useQuery<Client>({
+    queryKey: ['client-detail', selectedId],
+    queryFn: async () => {
+      const { data } = await api.get(`/clients/${selectedId}`);
+      return data;
+    },
+    enabled: !!selectedId,
+  });
+
+  const selectedClient = clientDetail ?? clients.find(c => c._id === selectedId) ?? null;
 
   const handleSelect = useCallback((id: string) => {
     setSelectedId(prev => (prev === id ? null : id));

@@ -92,6 +92,7 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState("");
   const [editingClient, setEditingClient] = useState<{ client: any; limits: { [key: string]: string } } | null>(null);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
   
   const { data: clients = [], isLoading } = useQuery<any[]>({
@@ -322,8 +323,8 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
                               </button>
                             )}
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); removeMutation.mutate(c._id); }} 
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setConfirmRemoveId(c._id); }}
                               className={styles.subscriberRemoveBtn}
                               disabled={removeMutation.isPending}
                               title="Cancelar assinatura"
@@ -410,6 +411,33 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
           )}
         </div>
       </div>
+
+      {confirmRemoveId && (
+        <div className={styles.modalOverlay} onClick={() => setConfirmRemoveId(null)}>
+          <div className={styles.modal} style={{ maxWidth: '360px' }} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Remover do Pacote</h2>
+              <button className={styles.closeBtn} onClick={() => setConfirmRemoveId(null)}>✕</button>
+            </div>
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                Tem certeza que deseja remover este cliente do pacote? O histórico de sessões será mantido.
+              </p>
+              <div className={styles.actions}>
+                <button className={styles.cancelBtn} onClick={() => setConfirmRemoveId(null)}>Cancelar</button>
+                <button
+                  className={styles.submitBtn}
+                  style={{ background: '#EF4444' }}
+                  disabled={removeMutation.isPending}
+                  onClick={() => { removeMutation.mutate(confirmRemoveId); setConfirmRemoveId(null); }}
+                >
+                  {removeMutation.isPending ? 'Removendo...' : 'Remover'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editingClient && (
         <div className={styles.modalOverlay} onClick={e => e.target === e.currentTarget && setEditingClient(null)}>

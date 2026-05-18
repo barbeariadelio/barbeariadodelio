@@ -341,6 +341,7 @@ function ApptModal({
             <div className={styles.footerBtns}>
               {(['confirmed', 'cancelled'] as const)
                 .filter(s => s !== appt.status)
+                .filter(s => !(s === 'cancelled' && appt.isBilled))
                 .map(s => (
                   <button
                     key={s}

@@ -121,7 +121,7 @@ function Summary({ service, employee, date, time, notes }: { service: Service|nu
               <div className={styles.sidebarBlock}>
                 <span className={styles.sidebarKey}>Serviço</span>
                 <span className={styles.sidebarVal}>{service.name}</span>
-                <span className={styles.sidebarMeta}>{service.durationMinutes} min</span>
+                {service.durationMinutes > 0 && <span className={styles.sidebarMeta}>{service.durationMinutes} min</span>}
               </div>
             )}
             {employee && (
@@ -507,7 +507,7 @@ export default function Book() {
                   </div>
                   {([
                     ['Serviço', selectedService?.name],
-                    ['Duração', selectedService ? `${selectedService.durationMinutes} min` : null],
+                    ['Duração', selectedService?.durationMinutes ? `${selectedService.durationMinutes} min` : null],
                     ['Barbeiro', selectedEmployee?.name],
                     ['Data', fmtDateLong(selectedDate)],
                     ['Horário', selectedTime],

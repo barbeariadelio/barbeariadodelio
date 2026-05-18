@@ -196,6 +196,9 @@ export async function updateAppointmentStatus(req: AuthRequest, res: Response, n
 
     if (status === 'cancelled') {
       const fullAppt = await service.findById(id);
+      if (fullAppt.isBilled) {
+        throw new AppError('Não é possível cancelar um agendamento já faturado.', 400);
+      }
       const client = await ClientModel.findById(fullAppt.clientId);
       await notificationService.notify({
         unitId: fullAppt.unitId.toString(),
