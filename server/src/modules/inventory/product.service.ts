@@ -17,6 +17,10 @@ export class ProductService {
   }
 
   async create(data: Partial<IProduct>): Promise<IProduct> {
+    const deleted = await ProductModel.findOne({ unitId: data.unitId, name: data.name, isActive: false });
+    if (deleted) {
+      return (await ProductModel.findByIdAndUpdate(deleted._id, { ...data, isActive: true }, { new: true, runValidators: true }))!;
+    }
     return ProductModel.create(data);
   }
 
