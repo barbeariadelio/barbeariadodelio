@@ -59,7 +59,7 @@ export default function Permissions() {
   const [copiedField, setCopiedField] = useState<string | null>(null);
   
   const [newUser, setNewUser] = useState({ name: '', email: '', phone: '19', password: '', role: 'employee', allowedApps: ['franchise'] });
-  const [loginType, setLoginType] = useState<'email' | 'phone'>('email');
+  const [loginType, setLoginType] = useState<'email' | 'phone'>('phone');
 
   const copyToClipboard = (text: string, fieldId: string) => {
     navigator.clipboard.writeText(text);
