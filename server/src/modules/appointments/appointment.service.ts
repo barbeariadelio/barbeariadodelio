@@ -251,7 +251,43 @@ export class AppointmentService {
     let isPackage = data.isPackage || svc?.type === 'package';
 
     // For package-type services, always store the per-session prorated price
-    if (svc?.type === 'package') {
+    // and auto-enroll the client in the package if they don't have it yet
+    if (svc?.type === 'package' && data.clientId) {
+      const totalSessions = svc.packageItems?.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1;
+      finalPrice = Math.round((svc.price / totalSessions) * 100) / 100;
+
+      const client = await ClientModel.findById(data.clientId);
+      if (client) {
+        const alreadyHas = client.packages?.some(
+          p => p.packageId.toString() === svc._id!.toString() && p.active
+        );
+        if (!alreadyHas) {
+          let expiresAt: Date | undefined;
+          const validity = (svc as any).packageValidity;
+          if (validity?.type && validity.type !== 'none' && validity.value) {
+            const exp = new Date();
+            if (validity.type === 'days')   exp.setDate(exp.getDate() + validity.value);
+            else if (validity.type === 'weeks')  exp.setDate(exp.getDate() + validity.value * 7);
+            else if (validity.type === 'months') exp.setMonth(exp.getMonth() + validity.value);
+            else if (validity.type === 'years')  exp.setFullYear(exp.getFullYear() + validity.value);
+            expiresAt = exp;
+          }
+          client.packages = client.packages || [];
+          client.packages.push({
+            packageId: svc._id as any,
+            startDate: new Date(),
+            active: true,
+            expiresAt,
+            itemLimits: svc.packageItems?.map(pi => ({
+              serviceId: pi.serviceId,
+              quantity: pi.quantity,
+              used: 0,
+            })) || [],
+          });
+          await client.save();
+        }
+      }
+    } else if (svc?.type === 'package') {
       const totalSessions = svc.packageItems?.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1;
       finalPrice = Math.round((svc.price / totalSessions) * 100) / 100;
     }
