@@ -511,8 +511,24 @@ export class AppointmentService {
       if (!populated) throw new NotFoundError('Appointment');
       
       const svcDoc = populated.serviceId;
-      const isPackageUse = !!appt.usedPackageId;
+      let isPackageUse = !!appt.usedPackageId;
       const isPackageSale = !isPackageUse && svcDoc?.type === 'package';
+
+      // ── Auto-link to active package on billing ──
+      // If this is a regular service and the client has an active package covering it,
+      // link the appointment now so the session is consumed and the counter updates.
+      if (!isPackageUse && !isPackageSale && appt.clientId && appt.serviceId) {
+        const clientForPkg = await ClientModel.findById(appt.clientId);
+        if (clientForPkg) {
+          const { packageId } = await this.calculateProratedPrice(clientForPkg, appt.serviceId.toString());
+          if (packageId) {
+            appt.usedPackageId = packageId;
+            await appt.save();
+            isPackageUse = true;
+          }
+        }
+      }
+
       // skipBilling: caller explicitly requested no financial transaction (package use only)
       const skipBilling = isPackageUse && options?.skipBilling === true;
 
