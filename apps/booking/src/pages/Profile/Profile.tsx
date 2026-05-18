@@ -256,6 +256,7 @@ export default function Profile() {
       {apptToEdit && (
         <div className={styles.modalOverlay} onClick={() => { setApptToEdit(null); setEditStep('choice'); }}>
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <button className={styles.modalCloseBtn} onClick={() => { setApptToEdit(null); setEditStep('choice'); }}>✕</button>
             <h3 className={styles.modalTitle}>Editar Agendamento</h3>
             
             {editStep === 'choice' && (
