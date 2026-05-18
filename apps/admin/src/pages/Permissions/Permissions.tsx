@@ -58,6 +58,7 @@ export default function Permissions() {
   const [pendingPhone, setPendingPhone] = useState<string>('');
   const [pendingLoginType, setPendingLoginType] = useState<'email' | 'phone'>('email');
   const [pendingPassword, setPendingPassword] = useState<string>('');
+  const [pendingUnitId, setPendingUnitId] = useState<string>('');
   const [showModal, setShowModal] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ show: boolean; userId: string; userName: string; isActive: boolean; action: 'toggle' | 'delete' } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -125,6 +126,8 @@ export default function Permissions() {
         const isAutoEmail = !u.email || u.email.includes('@barbeariadodelio') || u.email.includes('@delio.staff') || u.email.includes('@delio.internal') || u.email.includes('@delio.guest');
         setPendingLoginType(u.phone && isAutoEmail ? 'phone' : u.email ? 'email' : 'phone');
         setPendingPassword('');
+        const uid = typeof u.unitId === 'object' ? u.unitId?._id : u.unitId;
+        setPendingUnitId(uid || '');
       }
     }
   }, [expandedRow, users]);
@@ -296,11 +299,13 @@ export default function Permissions() {
                 const role = normalizeRole(u.role);
                 const isPassVisible = visiblePasswords.has(u._id);
                 const isExpanded = expandedRow === u._id;
+                const currentUnitId = typeof u.unitId === 'object' ? u.unitId?._id : u.unitId;
                 const hasChanges = pendingRole !== role ||
                                  JSON.stringify(u.allowedApps || []) !== JSON.stringify(pendingAllowedApps) ||
                                  (pendingLoginType === 'email' ? pendingEmail !== (u.email || '') : pendingPhone !== (u.phone || '')) ||
                                  (u.email && pendingLoginType === 'phone') || (u.phone && pendingLoginType === 'email') ||
-                                 pendingPassword.length > 0;
+                                 pendingPassword.length > 0 ||
+                                 pendingUnitId !== (currentUnitId || '');
 
                 return (
                   <Fragment key={u._id}>
@@ -464,7 +469,7 @@ export default function Permissions() {
                                         className={styles.btnSave}
                                         onClick={(e) => { 
                                           e.stopPropagation(); 
-                                          const payload: any = { id: u._id, role: pendingRole as any, allowedApps: pendingAllowedApps };
+                                          const payload: any = { id: u._id, role: pendingRole as any, allowedApps: pendingAllowedApps, unitId: pendingUnitId || undefined };
                                           if (pendingLoginType === 'email') {
                                             payload.email = pendingEmail.toLowerCase();
                                             payload.phone = null;
@@ -485,10 +490,11 @@ export default function Permissions() {
                                         onClick={(e) => {
                                           e.stopPropagation();
                                           setPendingRole(role);
-                                          const initialApps = u.allowedApps && u.allowedApps.length > 0 
-                                            ? u.allowedApps 
+                                          const initialApps = u.allowedApps && u.allowedApps.length > 0
+                                            ? u.allowedApps
                                             : ['admin'];
                                           setPendingAllowedApps(initialApps);
+                                          setPendingUnitId(currentUnitId || '');
                                         }}
                                       >
                                         Não salvar
@@ -510,6 +516,20 @@ export default function Permissions() {
                                   </label>
                                 </div>
                               </div>
+                              {units.length > 1 && (
+                                <div className={styles.accordionCol}>
+                                  <label className={styles.label}>Unidade de Trabalho</label>
+                                  <select
+                                    className={styles.select}
+                                    value={pendingUnitId}
+                                    onChange={e => setPendingUnitId(e.target.value)}
+                                    onClick={e => e.stopPropagation()}
+                                  >
+                                    <option value="">— Selecionar —</option>
+                                    {units.map(ut => <option key={ut._id} value={ut._id}>{ut.name}</option>)}
+                                  </select>
+                                </div>
+                              )}
                               <div className={styles.accordionCol}>
                                 <label className={styles.label}>Status da Conta</label>
                                 <button 
