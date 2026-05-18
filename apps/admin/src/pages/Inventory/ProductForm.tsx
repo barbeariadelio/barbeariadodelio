@@ -129,6 +129,12 @@ export default function ProductForm({ product, onClose, onSuccess }: Props) {
             </div>
           </div>
 
+          {mutation.isError && (
+            <p className={styles.errorMsg}>
+              {((mutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message) ?? 'Erro ao salvar produto.'}
+            </p>
+          )}
+
           <div className={styles.actions}>
             <button type="button" className={styles.cancelBtn} onClick={onClose}>Cancelar</button>
             <button type="submit" className={styles.submitBtn} disabled={mutation.isPending}>

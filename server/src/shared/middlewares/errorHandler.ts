@@ -13,11 +13,15 @@ export function errorHandler(
     return;
   }
 
-  // Handle MongoDB Duplicate Key Error (e.g., email or phone already exists)
+  // Handle MongoDB Duplicate Key Error
   if ((err as any).code === 11000) {
     const field = Object.keys((err as any).keyPattern || {})[0] || 'campo';
-    const fieldMap: Record<string, string> = { email: 'e-mail', phone: 'telefone' };
-    res.status(409).json({ message: `Já existe um usuário cadastrado com este ${fieldMap[field] || field}.` });
+    const messageMap: Record<string, string> = {
+      email: 'Já existe um cadastro com este e-mail.',
+      phone: 'Já existe um cadastro com este telefone.',
+      name:  'Já existe um cadastro com este nome.',
+    };
+    res.status(409).json({ message: messageMap[field] ?? `Já existe um cadastro com este ${field}.` });
     return;
   }
 

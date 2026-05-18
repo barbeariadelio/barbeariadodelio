@@ -132,3 +132,14 @@
   &:hover { filter: brightness(1.1); transform: translateY(-1px); }
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
+
+.errorMsg {
+  font-size: 0.8125rem;
+  color: var(--color-error, #dc2626);
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.2);
+  border-radius: 8px;
+  padding: 0.625rem 0.875rem;
+  margin: 0;
+  text-align: center;
+}
