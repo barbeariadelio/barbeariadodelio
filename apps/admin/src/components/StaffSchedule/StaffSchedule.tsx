@@ -188,7 +188,7 @@ function ApptModal({ appt, palette, onClose, onStatusChange, onDelete, isPending
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isBilling, setIsBilling] = useState(false);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'money' | 'card' | 'pix' | 'other'>('pix');
+  const [paymentMethod, setPaymentMethod] = useState<'money' | 'credit' | 'pix' | 'other'>('pix');
   const navigate = useNavigate();
 
   const dateFmt = format(new Date(appt.date + 'T12:00:00'), "EEEE, dd 'de' MMMM", { locale: ptBR });
@@ -325,9 +325,9 @@ function ApptModal({ appt, palette, onClose, onStatusChange, onDelete, isPending
                         label: 'Dinheiro', 
                         icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
                       },
-                      { 
-                        id: 'card', 
-                        label: 'Cartão', 
+                      {
+                        id: 'credit',
+                        label: 'Cartão',
                         icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
                       },
                       { 

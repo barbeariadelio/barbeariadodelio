@@ -169,7 +169,7 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
   const [isBilling, setIsBilling] = useState(false);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [localPrice, setLocalPrice] = useState(appt.price?.toString().replace('.', ',') || '0,00');
-  const [paymentMethod, setPaymentMethod] = useState<'money' | 'card' | 'debit' | 'credit' | 'pix' | 'other'>('pix');
+  const [paymentMethod, setPaymentMethod] = useState<'money' | 'debit' | 'credit' | 'pix' | 'other'>('pix');
   const [registerPayment, setRegisterPayment] = useState(true);
 
   const dateFmt = format(parseISO(appt.date), "EEEE, dd 'de' MMMM", { locale: ptBR });
@@ -255,13 +255,13 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
               <div className={styles.billingField} style={{ marginTop: '1.5rem' }}>
                 <label className={styles.detailLabel}>Forma de Pagamento</label>
                 <div className={styles.paymentGrid}>
-                  {['money', 'card', 'pix', 'other'].map(pm => (
+                  {['money', 'credit', 'pix', 'other'].map(pm => (
                     <button
                       key={pm}
                       className={`${styles.paymentBtn} ${paymentMethod === pm ? styles.pmActive : ''}`}
                       onClick={() => setPaymentMethod(pm as any)}
                     >
-                      {pm === 'money' ? 'Dinheiro' : pm === 'card' ? 'Cartão' : pm === 'pix' ? 'Pix' : 'Outro'}
+                      {pm === 'money' ? 'Dinheiro' : pm === 'credit' ? 'Cartão' : pm === 'pix' ? 'Pix' : 'Outro'}
                     </button>
                   ))}
                 </div>
