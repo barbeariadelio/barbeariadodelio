@@ -10,13 +10,15 @@ export async function getSummary(req: AuthRequest, res: Response, next: NextFunc
   try {
     const { role } = req.user!;
     const canSelectUnit = role === 'owner' || role === 'cashier';
+    const rawQueryUnitId = Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string);
     const unitId = canSelectUnit
-      ? (Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string) || 'all')
-      : req.user!.unitId;
+      ? (rawQueryUnitId || 'all')
+      : (req.user!.unitId || rawQueryUnitId);
     const periodRaw = Array.isArray(req.query.period) ? req.query.period[0] : req.query.period;
     const period = (periodRaw as 'day' | 'month' | 'week' | 'year') || 'month';
     const appScope = req.headers['x-app-scope'] as string | undefined;
-    const summary = await service.getSummary(req.user!.id, req.user!.role, unitId, period, appScope);
+    const jwtUnitId = req.user!.unitId;
+    const summary = await service.getSummary(req.user!.id, req.user!.role, unitId, period, appScope, jwtUnitId);
     ok(res, summary);
   } catch (e) { next(e); }
 }
@@ -25,15 +27,17 @@ export async function listTransactions(req: AuthRequest, res: Response, next: Ne
   try {
     const { role } = req.user!;
     const canSelectUnit = role === 'owner' || role === 'cashier';
+    const rawQueryUnitId = Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string);
     const unitId = canSelectUnit
-      ? (Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string) || 'all')
-      : (req.user!.unitId as string);
+      ? (rawQueryUnitId || 'all')
+      : ((req.user!.unitId as string) || rawQueryUnitId);
     if (!unitId) { ok(res, { data: [], total: 0 }); return; }
     const { page, limit } = parsePagination(req.query);
     const employeeId = req.query.employeeId as string;
     const category = req.query.category as string;
     const appScope = req.headers['x-app-scope'] as string | undefined;
-    const result = await service.getTransactions(req.user!.id, req.user!.role, unitId, page, limit, { employeeId, category }, appScope);
+    const jwtUnitId = req.user!.unitId;
+    const result = await service.getTransactions(req.user!.id, req.user!.role, unitId, page, limit, { employeeId, category }, appScope, jwtUnitId);
     ok(res, result);
   } catch (e) { next(e); }
 }

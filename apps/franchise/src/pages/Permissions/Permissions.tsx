@@ -1,6 +1,6 @@
 import { useState, useMemo, FormEvent, useEffect, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../../api/client';
+import { api, getSelectedUnitId } from '../../api/client';
 import styles from './Permissions.module.scss';
 
 type AppUser = {
@@ -105,6 +105,10 @@ export default function Permissions() {
         delete payload.email;
         payload.phone = payload.phone.replace(/\D/g, '');
       }
+      // Explicitly set unitId from the active franchise unit so the employee is
+      // scoped to this unit even when the owner's JWT has no unitId.
+      const activeUnitId = getSelectedUnitId();
+      if (activeUnitId) payload.unitId = activeUnitId;
       return api.post('/users/register', payload);
     },
     onSuccess: () => {
@@ -120,7 +124,11 @@ export default function Permissions() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...payload }: Partial<AppUser> & { id: string }) => api.put(`/users/${id}`, payload),
+    mutationFn: ({ id, ...payload }: Partial<AppUser> & { id: string; password?: string }) => {
+      const activeUnitId = getSelectedUnitId();
+      if (activeUnitId && !(payload as any).unitId) (payload as any).unitId = activeUnitId;
+      return api.put(`/users/${id}`, payload);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       setToast({ message: 'Usuário atualizado com sucesso!', type: 'success' });

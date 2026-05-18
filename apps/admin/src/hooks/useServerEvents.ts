@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiBaseUrl, getStoredAccessToken } from '../api/client';
 
@@ -13,20 +13,44 @@ const EVENT_INVALIDATIONS: Record<string, string[][]> = {
 
 export function useServerEvents() {
   const qc = useQueryClient();
+  const esRef = useRef<EventSource | null>(null);
+  const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const token = getStoredAccessToken();
-    if (!token) return;
+    let destroyed = false;
 
-    const url = `${apiBaseUrl}/events?token=${encodeURIComponent(token)}`;
-    const es = new EventSource(url);
+    function connect() {
+      if (destroyed) return;
 
-    for (const [eventName, queryKeys] of Object.entries(EVENT_INVALIDATIONS)) {
-      es.addEventListener(eventName, () => {
-        queryKeys.forEach(key => qc.invalidateQueries({ queryKey: key }));
-      });
+      const token = getStoredAccessToken();
+      if (!token) return;
+
+      const es = new EventSource(`${apiBaseUrl}/events?token=${encodeURIComponent(token)}`);
+      esRef.current = es;
+
+      for (const [eventName, queryKeys] of Object.entries(EVENT_INVALIDATIONS)) {
+        es.addEventListener(eventName, () => {
+          queryKeys.forEach(key => qc.invalidateQueries({ queryKey: key }));
+        });
+      }
+
+      es.onerror = () => {
+        es.close();
+        esRef.current = null;
+        if (!destroyed) {
+          // Reconnect after 5 s using whatever token is current (may have been refreshed)
+          reconnectTimer.current = setTimeout(connect, 5_000);
+        }
+      };
     }
 
-    return () => es.close();
+    connect();
+
+    return () => {
+      destroyed = true;
+      if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      esRef.current?.close();
+      esRef.current = null;
+    };
   }, [qc]);
 }

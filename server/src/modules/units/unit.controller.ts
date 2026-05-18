@@ -36,9 +36,12 @@ export async function listUnits(req: AuthRequest, res: Response, next: NextFunct
         const franchiseUnitIds = new Set((franchise?.units ?? []).map(u => u.toString()));
         units = ownUnits.filter(u => !franchiseUnitIds.has(u._id.toString()));
       } else if (appScope === 'franchise') {
-        units = franchise && franchise.units.length > 0
-          ? await service.findByIds(franchise.units.map(u => u.toString()))
-          : [];
+        if (franchise && franchise.units.length > 0) {
+          units = await service.findByIds(franchise.units.map(u => u.toString()));
+        } else {
+          // Franchise owner that owns units directly (no FranchiseModel entry) — show their owned units.
+          units = ownUnits;
+        }
       } else if (franchise && franchise.units.length > 0) {
         const franchiseUnits = await service.findByIds(franchise.units.map(u => u.toString()));
         const ownIds = new Set(ownUnits.map(u => u._id.toString()));

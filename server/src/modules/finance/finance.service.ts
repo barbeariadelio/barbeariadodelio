@@ -15,8 +15,9 @@ export class FinanceService {
     unitId?: string,
     period: 'day' | 'month' | 'week' | 'year' = 'month',
     appScope?: string,
+    jwtUnitId?: string,
   ): Promise<FinanceSummary> {
-    const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope);
+    const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
     const { startDate, endDate } = this.resolvePeriod(period);
 
     const transactions = await TransactionModel.find({
@@ -44,8 +45,8 @@ export class FinanceService {
     return this.buildSummary(transactions, appointments as any, unitsInfo, allEmployees);
   }
 
-  async getTransactions(userId: string, role: string, unitId: string, page: number, limit: number, filters?: { employeeId?: string; category?: string }, appScope?: string): Promise<{ data: ITransaction[]; total: number }> {
-    const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope);
+  async getTransactions(userId: string, role: string, unitId: string, page: number, limit: number, filters?: { employeeId?: string; category?: string }, appScope?: string, jwtUnitId?: string): Promise<{ data: ITransaction[]; total: number }> {
+    const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
     
     const query: any = { unitId: { $in: unitIds } };
     if (filters?.employeeId) query.employeeId = filters.employeeId;
@@ -99,11 +100,52 @@ export class FinanceService {
    * per unit, reducing write load during high-traffic hours.
    */
 
-  private async resolveUnitIds(userId: string, role: string, unitId?: string, appScope?: string): Promise<string[]> {
+  private async resolveUnitIds(userId: string, role: string, unitId?: string, appScope?: string, jwtUnitId?: string): Promise<string[]> {
+    // Soul540 Rule 1: JWT unitId locks the user to exactly that unit.
+    // Franchise owners always have jwtUnitId set; global admin never does.
+    // Exception: owner role must never be locked by jwtUnitId — they can see all units.
+    if (jwtUnitId && role !== 'owner') {
+      return [jwtUnitId];
+    }
+
+    // Global admin (owner with no JWT unitId): can see ALL active units.
+    // This bypasses ownerId dependency which may not survive database migrations.
+    if (role === 'owner') {
+      if (appScope === 'franchise') {
+        // Admin switching into franchise view: look up franchise units via FranchiseModel,
+        // or return all units as fallback.
+        const ownerObjectId = new mongoose.Types.ObjectId(userId);
+        const { FranchiseModel } = await import('../franchise/franchise.model');
+        const franchise = await FranchiseModel.findOne({ franchisors: ownerObjectId });
+        if (franchise && franchise.units.length > 0) {
+          const ids = franchise.units.map(u => u.toString());
+          if (unitId && unitId !== 'all') return ids.includes(unitId) ? [unitId] : [unitId];
+          return ids;
+        }
+      }
+
+      // Admin scope or no scope: return ALL active units.
+      const allUnits = await UnitModel.find({ isActive: true }).select('_id');
+      const allIds = allUnits.map(u => u._id.toString());
+
+      if (unitId && unitId !== 'all') {
+        // Trust a specific unit selection from the admin — they can see any unit.
+        return [unitId];
+      }
+      return allIds;
+    }
+
     const allowedIds = await this.getAllowedUnitIds(userId, role, appScope);
 
     if (unitId && unitId !== 'all') {
       if (allowedIds.includes(unitId)) return [unitId];
+      // Employees created before the unitId fix may have no unitId in DB/JWT.
+      // The client always sends the franchise-selected unit in the query param — trust it
+      // and backfill the DB so this only happens once.
+      if (role === 'employee' && allowedIds.length === 0) {
+        await UserModel.findByIdAndUpdate(userId, { $set: { unitId } });
+        return [unitId];
+      }
       return [];
     }
 
@@ -112,26 +154,8 @@ export class FinanceService {
 
   private async getAllowedUnitIds(userId: string, role: string, appScope?: string): Promise<string[]> {
     if (role === 'owner') {
-      const ownerObjectId = new mongoose.Types.ObjectId(userId);
-
-      // Always fetch both sets so we can return the right subset based on scope
-      const units = await UnitModel.find({ ownerId: ownerObjectId, isActive: true }).select('_id');
-      const ownIds = units.map(u => u._id.toString());
-
-      const { FranchiseModel } = await import('../franchise/franchise.model');
-      const franchise = await FranchiseModel.findOne({ franchisors: ownerObjectId });
-      const franchiseIds = franchise && franchise.units.length > 0
-        ? franchise.units.map(u => u.toString())
-        : [];
-
-      if (appScope === 'admin') {
-        const franchiseSet = new Set(franchiseIds);
-        return ownIds.filter(id => !franchiseSet.has(id));
-      }
-      if (appScope === 'franchise') return franchiseIds;
-
-      // No scope — return all (backwards compatible)
-      return [...new Set([...ownIds, ...franchiseIds])];
+      // Note: owner case is fully handled in resolveUnitIds above.
+      return [];
     }
 
     if (role === 'employee') {
@@ -404,9 +428,6 @@ export class FinanceService {
       byService: Array.from(byServiceMap.values()),
       byEmployee: Array.from(byEmployeeMap.values()),
       byPaymentMethod: Array.from(byPaymentMap.entries()).map(([method, { amount, count }]) => ({ method, amount, count })),
-      byProduct: Array.from(byProductMap.entries())
-        .map(([name, { amount, quantity, count }]) => ({ name, amount, quantity, count }))
-        .sort((a, b) => b.amount - a.amount),
       chart,
     };
   }

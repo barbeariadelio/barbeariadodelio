@@ -67,6 +67,22 @@ apiClient.interceptors.request.use(config => {
   return config;
 });
 
+let refreshPromise: Promise<string | null> | null = null;
+
+function refreshAccessToken(): Promise<string | null> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = axios
+    .post(`${apiBaseUrl}/auth/refresh`, { refreshToken: getStoredRefreshToken() })
+    .then(({ data }) => {
+      const token = data?.data?.accessToken || data?.accessToken;
+      if (token) localStorage.setItem(storageKeys.accessToken, token);
+      return token ?? null;
+    })
+    .catch(() => null)
+    .finally(() => { refreshPromise = null; });
+  return refreshPromise;
+}
+
 export function setupInterceptors(instance: any) {
   instance.interceptors.response.use(
     (res: any) => {
@@ -81,20 +97,15 @@ export function setupInterceptors(instance: any) {
 
       if (error.response?.status === 401 && !isAuthRoute && !config?._retry) {
         config._retry = true;
-        try {
-          const { data } = await axios.post(`${apiBaseUrl}/auth/refresh`, { refreshToken: getStoredRefreshToken() });
-          const accessToken = data?.data?.accessToken || data?.accessToken;
-          if (accessToken) {
-            localStorage.setItem(storageKeys.accessToken, accessToken);
-            config.headers = config.headers || {};
-            config.headers.Authorization = `Bearer ${accessToken}`;
-          }
+        const newToken = await refreshAccessToken();
+        if (newToken) {
+          config.headers = config.headers || {};
+          config.headers.Authorization = `Bearer ${newToken}`;
           return instance(config);
-        } catch {
-          clearAuthStorage();
-          const loginUrl = `${import.meta.env.BASE_URL}login`.replace('//', '/');
-          window.location.href = loginUrl;
         }
+        clearAuthStorage();
+        const loginUrl = `${import.meta.env.BASE_URL}login`.replace('//', '/');
+        window.location.href = loginUrl;
       }
       return Promise.reject(error);
     },

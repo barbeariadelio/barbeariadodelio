@@ -325,6 +325,17 @@ export default function Finance() {
         <div style={{ marginBottom: '2rem' }}>
           <h3 className={styles.sectionTitle}>Meu Salário e Comissões</h3>
           <p className={styles.subtitle}>Acompanhe seus rendimentos no período selecionado</p>
+          <div className={styles.periodTabs} style={{ marginTop: '1rem' }}>
+            {PERIOD_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                className={`${styles.periodBtn} ${period === opt.value ? styles.periodBtnActive : ''}`}
+                onClick={() => setPeriod(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
