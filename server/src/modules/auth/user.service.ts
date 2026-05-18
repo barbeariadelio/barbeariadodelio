@@ -32,7 +32,16 @@ export class UserService {
   }
 
   async updateAccount(id: string, data: Partial<IUser>): Promise<IUser> {
-    const user = await UserModel.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: true }).select('-passwordHash');
+    const setData: any = {};
+    const unsetData: any = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (v === null) unsetData[k] = '';
+      else setData[k] = v;
+    }
+    const update: any = {};
+    if (Object.keys(setData).length) update.$set = setData;
+    if (Object.keys(unsetData).length) update.$unset = unsetData;
+    const user = await UserModel.findByIdAndUpdate(id, update, { new: true, runValidators: true }).select('-passwordHash');
     if (!user) throw new NotFoundError('User');
 
     sharedCache.delete(`users:list:${user.unitId || 'all'}`);

@@ -13,11 +13,6 @@ export async function listUsers(req: AuthRequest, res: Response, next: NextFunct
     // owners can scope via X-Unit-ID header or ?unitId= query param.
     const filterUnitId = resolveUnitId(req) ?? undefined;
 
-    // Clear cache to ensure immediate visibility of new users
-    const { sharedCache } = await import('../../shared/utils/cache');
-    sharedCache.delete(`users:list:${filterUnitId || 'all'}`);
-    sharedCache.delete('users:list:all');
-
     const users = await service.listAll(filterUnitId);
     ok(res, users);
   } catch (e) { next(e); }
@@ -43,7 +38,7 @@ export async function registerUser(req: AuthRequest, res: Response, next: NextFu
       password, 
       role, 
       allowedApps, 
-      unitId: unitId || (allowedApps && allowedApps.length > 0 ? allowedApps[0] : req.user!.unitId)
+      unitId: unitId || req.user!.unitId
     };
     
     if (email && email.trim() !== '') {

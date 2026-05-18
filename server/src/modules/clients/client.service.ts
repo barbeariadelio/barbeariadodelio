@@ -52,14 +52,34 @@ export class ClientService {
   async assignPackage(id: string, packageId: string): Promise<IClient> {
     const client = await ClientModel.findById(id);
     if (!client) throw new NotFoundError('Client');
-    
+
+    const { ServiceModel } = await import('../services/service.model');
+    const pkg = await ServiceModel.findById(packageId);
+
     if (!client.packages) client.packages = [];
     const alreadyHas = client.packages.some(p => p.packageId.toString() === packageId && p.active);
     if (!alreadyHas) {
+      let expiresAt: Date | undefined;
+      const validity = pkg?.packageValidity;
+      if (validity && validity.type && validity.type !== 'none' && validity.value) {
+        const exp = new Date();
+        if (validity.type === 'days')   exp.setDate(exp.getDate() + validity.value);
+        if (validity.type === 'weeks')  exp.setDate(exp.getDate() + validity.value * 7);
+        if (validity.type === 'months') exp.setMonth(exp.getMonth() + validity.value);
+        if (validity.type === 'years')  exp.setFullYear(exp.getFullYear() + validity.value);
+        expiresAt = exp;
+      }
+
       client.packages.push({
         packageId: packageId as any,
         startDate: new Date(),
-        active: true
+        active: true,
+        expiresAt,
+        itemLimits: pkg?.packageItems?.map(pi => ({
+          serviceId: pi.serviceId,
+          quantity: pi.quantity,
+          used: 0,
+        })) || [],
       });
       await client.save();
     }

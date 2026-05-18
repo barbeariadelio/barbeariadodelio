@@ -28,6 +28,7 @@ import { franchiseRoutes } from './modules/franchise/franchise.routes';
 import { productRoutes } from './modules/inventory/product.routes';
 import { userRoutes } from './modules/auth/user.routes';
 import { notificationRoutes } from './modules/notifications/notification.routes';
+import { sseRoutes } from './modules/events/sse.routes';
 
 const app = express();
 
@@ -86,6 +87,7 @@ app.use('/franchise', franchiseRoutes);
 app.use('/products', productRoutes);
 app.use('/users', userRoutes);
 app.use('/notifications', notificationRoutes);
+app.use('/events', sseRoutes);
 
 app.get('/health', (_req, res) => {
   const mongoStatus = mongoose.connection.readyState === 1 ? 'up' : 'down';

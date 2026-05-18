@@ -245,10 +245,16 @@ export class AppointmentService {
     }
     
     const svc = await ServiceModel.findById(data.serviceId);
-    
+
     let finalPrice = data.price ?? svc?.price ?? 0;
     let usedPackageId = undefined;
     let isPackage = data.isPackage || svc?.type === 'package';
+
+    // For package-type services, always store the per-session prorated price
+    if (svc?.type === 'package') {
+      const totalSessions = svc.packageItems?.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1;
+      finalPrice = Math.round((svc.price / totalSessions) * 100) / 100;
+    }
 
     // If it's a single service, check if client is using an active package for it
     if (svc?.type === 'single' && data.clientId) {
@@ -609,9 +615,7 @@ export class AppointmentService {
           if (isPackageUse) {
             commissionBase = appt.price;
           } else if (isPackageSale) {
-            const packageItems = svcDoc?.packageItems ?? [];
-            const totalSessions = packageItems.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1;
-            commissionBase = billedAmount / totalSessions;
+            commissionBase = billedAmount; // price already prorated per session at appointment creation
           }
           const commissionAmount = Math.round(commissionBase * employee.commissionRate / 100 * 100) / 100;
           const commExists = await TransactionModel.findOne({ appointmentId: appt._id, type: 'commission' });
@@ -672,6 +676,25 @@ export class AppointmentService {
       (appt as any).productsBilled = false;
       (appt as any).billingSkipped = false;
       await appt.save();
+
+      // ── If it was a package SALE, remove the subscription that was created on billing ──
+      if (!appt.usedPackageId && appt.isPackage && appt.clientId && appt.serviceId) {
+        const svcForUnbill = await ServiceModel.findById(appt.serviceId).select('type');
+        if (svcForUnbill?.type === 'package') {
+          const client = await ClientModel.findById(appt.clientId);
+          if (client?.packages) {
+            const svcIdStr = appt.serviceId.toString();
+            // Remove the most recently added active subscription for this package
+            const idx = client.packages.map((p, i) => ({ p, i }))
+              .reverse()
+              .find(({ p }) => p.packageId.toString() === svcIdStr)?.i;
+            if (idx !== undefined) {
+              client.packages.splice(idx, 1);
+              await client.save();
+            }
+          }
+        }
+      }
 
       // ── Decrement used session counter when a package use is un-billed ──
       if (appt.usedPackageId && appt.clientId && appt.serviceId) {

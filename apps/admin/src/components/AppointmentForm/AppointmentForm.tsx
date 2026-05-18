@@ -244,19 +244,25 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       }
     }
 
-    const buildPayload = (apptDate: string, finalIsPackage: boolean, seriesId?: string) => ({
-      unitId,
-      clientId,
-      employeeId,
-      serviceId,
-      date: apptDate,
-      startTime,
-      notes,
-      price: finalIsPackage ? 0 : (service?.price ?? 0),
-      isPackage: finalIsPackage,
-      products: apptProducts.length > 0 ? apptProducts : undefined,
-      seriesId,
-    });
+    const buildPayload = (apptDate: string, finalIsPackage: boolean, seriesId?: string) => {
+      const payload: Record<string, unknown> = {
+        unitId,
+        clientId,
+        employeeId,
+        serviceId,
+        date: apptDate,
+        startTime,
+        notes,
+        isPackage: finalIsPackage,
+        products: apptProducts.length > 0 ? apptProducts : undefined,
+        seriesId,
+      };
+      // Only include price on creation — edits must not reset the stored prorated price
+      if (!appointment?._id) {
+        payload.price = finalIsPackage ? 0 : (service?.price ?? 0);
+      }
+      return payload;
+    };
 
     const createOne = async (apptDate: string, finalIsPackage: boolean, seriesId?: string) => {
       if (appointment?._id) {

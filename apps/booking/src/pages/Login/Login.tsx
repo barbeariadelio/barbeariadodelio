@@ -41,12 +41,15 @@ export default function Login() {
     
     try {
       // Use the new booking-login endpoint which only requires name and phone
-      const { data: userAccount } = await api.post('/auth/booking-login', { 
-        name: name.trim(), 
-        phone: phone.replace(/\D/g, '') 
+      const { data } = await api.post('/auth/booking-login', {
+        name: name.trim(),
+        phone: phone.replace(/\D/g, '')
       });
-      
-      setUser(userAccount);
+
+      const { accessToken, refreshToken, user } = data;
+      if (accessToken) localStorage.setItem('accessToken', accessToken);
+      if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+      setUser(user ?? data);
       navigate(-1);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ocorreu um erro ao entrar. Tente novamente.');

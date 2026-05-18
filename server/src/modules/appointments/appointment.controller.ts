@@ -7,6 +7,7 @@ import { ClientModel } from '../clients/client.model';
 import { AppointmentModel } from './appointment.model';
 import { UserModel } from '../auth/auth.model';
 import { AppError } from '../../shared/errors/AppError';
+import { sseService } from '../events/sse.service';
 
 const service = new AppointmentService();
 
@@ -19,11 +20,11 @@ export async function listAppointments(req: AuthRequest, res: Response, next: Ne
       : req.user!.unitId;
     if (!unitId) { ok(res, []); return; }
 
-    const { date, start, end } = req.query as Record<string, string | undefined>;
+    const { date, start, end, employeeId: queryEmployeeId } = req.query as Record<string, string | undefined>;
     const { page, limit, skip } = (await import('../../shared/utils/pagination')).parsePagination(req.query as any);
 
-    // Employees only see their own appointments
-    const employeeFilter = role === 'employee' ? userId : undefined;
+    // Employees only see their own appointments; owners/cashiers can filter by a specific employee via ?employeeId=
+    const employeeFilter = role === 'employee' ? userId : queryEmployeeId;
 
     const appointments = await service.findByUnitAndDate(unitId, date, start, end, { skip, limit }, employeeFilter);
     ok(res, appointments);
@@ -131,6 +132,7 @@ export async function createAppointment(req: AuthRequest, res: Response, next: N
       external: true
     });
 
+    sseService.emit(appt.unitId.toString(), 'appointments:change');
     created(res, appt);
   } catch (e) { next(e); }
 }
@@ -209,6 +211,12 @@ export async function updateAppointmentStatus(req: AuthRequest, res: Response, n
     }
 
     const updated = await service.updateStatus(id, status, { price, paymentMethod, skipBilling, billService, billProducts });
+    const uid = updated.unitId?.toString();
+    if (uid) {
+      sseService.emit(uid, 'appointments:change');
+      sseService.emit(uid, 'finance:change');
+      sseService.emit(uid, 'clients:change');
+    }
     ok(res, updated);
   } catch (e) { next(e); }
 }
@@ -224,8 +232,10 @@ export async function deleteAppointment(req: AuthRequest, res: Response, next: N
       throw new AppError('Access denied to this unit', 403);
     }
 
+    const uid = appt.unitId?.toString();
     const mode = (req.query.mode as string) as 'single' | 'this-and-future' | undefined;
     await service.delete(id, { mode });
+    if (uid) sseService.emit(uid, 'appointments:change');
     ok(res, { deleted: true });
   } catch (e) { next(e); }
 }
@@ -291,6 +301,7 @@ export async function updateAppointment(req: AuthRequest, res: Response, next: N
       external: true
     });
 
+    sseService.emit(updated.unitId.toString(), 'appointments:change');
     ok(res, updated);
   } catch (e) { next(e); }
 }

@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { api } from '../../api/client';
 import styles from './Layout.module.scss';
 import logo from '../../assets/logo.png';
+import { useServerEvents } from '../../hooks/useServerEvents';
 
 function IconSun() {
   return (
@@ -178,6 +179,7 @@ const NAV_ITEMS = [
 export default function Layout() {
   const { user, setUser, logout } = useAuth();
   const { theme, toggleTheme, updateTheme } = useTheme();
+  useServerEvents();
 
   const lastUserId = useRef<string | null>(null);
 

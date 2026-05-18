@@ -49,7 +49,7 @@ export default function Permissions() {
   const [confirmModal, setConfirmModal] = useState<{ show: boolean; userId: string; userName: string; isActive: boolean } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   
-  const [newUser, setNewUser] = useState({ name: '', email: '', phone: '19', password: '', role: 'employee', allowedApps: ['admin'] });
+  const [newUser, setNewUser] = useState({ name: '', email: '', phone: '19', password: '', role: 'employee', allowedApps: ['franchise'] });
   const [loginType, setLoginType] = useState<'email' | 'phone'>('email');
 
   const copyToClipboard = (text: string, fieldId: string) => {
@@ -81,9 +81,9 @@ export default function Permissions() {
       if (u) {
         const role = normalizeRole(u.role);
         setPendingRole(role);
-        const initialApps = u.allowedApps && u.allowedApps.length > 0 
-          ? u.allowedApps 
-          : ['admin'];
+        const initialApps = u.allowedApps && u.allowedApps.length > 0
+          ? u.allowedApps
+          : ['franchise'];
         setPendingAllowedApps(initialApps);
         setPendingEmail(u.email || '');
         setPendingPhone(u.phone || '');
@@ -108,7 +108,7 @@ export default function Permissions() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       setShowModal(false);
-      setNewUser({ name: '', email: '', phone: '19', password: '', role: 'employee', allowedApps: ['admin'] });
+      setNewUser({ name: '', email: '', phone: '19', password: '', role: 'employee', allowedApps: ['franchise'] });
       setToast({ message: 'Usuário criado com sucesso!', type: 'success' });
     },
     onError: (err: any) => {
@@ -150,17 +150,12 @@ export default function Permissions() {
   };
 
   const toggleNewUserApp = (app: string) => {
-    setNewUser(prev => {
-      const apps = prev.allowedApps.includes(app)
+    setNewUser(prev => ({
+      ...prev,
+      allowedApps: prev.allowedApps.includes(app)
         ? prev.allowedApps.filter(a => a !== app)
-        : [...prev.allowedApps, app];
-      return {
-        ...prev,
-        allowedApps: apps,
-        // Also update unitId to the first selected app if it looks like an ID
-        unitId: apps[0]
-      };
-    });
+        : [...prev.allowedApps, app],
+    }));
   };
 
   const generatePassword = () => {
@@ -394,10 +389,10 @@ export default function Permissions() {
                                           const payload: any = { role: pendingRole as any, allowedApps: pendingAllowedApps };
                                           if (pendingLoginType === 'email') {
                                             payload.email = pendingEmail.toLowerCase();
-                                            payload.phone = undefined;
+                                            payload.phone = null;
                                           } else {
                                             payload.phone = pendingPhone.replace(/\D/g, '');
-                                            payload.email = undefined;
+                                            payload.email = null;
                                           }
                                           updateMutation.mutate({ id: u._id, ...payload }); 
                                         }}
@@ -427,21 +422,21 @@ export default function Permissions() {
                                 <label className={styles.label}>Acesso ao Sistema</label>
                                 <div className={styles.systemsGrid}>
                                   <label className={styles.checkboxLabel}>
-                                    <input 
-                                      type="checkbox" 
-                                      className={styles.checkbox} 
-                                      checked={pendingAllowedApps.includes('69fa463aa078044937f7024e')} 
-                                      onChange={() => toggleApp('69fa463aa078044937f7024e')} 
-                                    /> 
+                                    <input
+                                      type="checkbox"
+                                      className={styles.checkbox}
+                                      checked={pendingAllowedApps.includes('admin')}
+                                      onChange={() => toggleApp('admin')}
+                                    />
                                     <span>Morada do Sol</span>
                                   </label>
                                   <label className={styles.checkboxLabel}>
-                                    <input 
-                                      type="checkbox" 
-                                      className={styles.checkbox} 
-                                      checked={pendingAllowedApps.includes('69fa463aa078044937f70250')} 
-                                      onChange={() => toggleApp('69fa463aa078044937f70250')} 
-                                    /> 
+                                    <input
+                                      type="checkbox"
+                                      className={styles.checkbox}
+                                      checked={pendingAllowedApps.includes('franchise')}
+                                      onChange={() => toggleApp('franchise')}
+                                    />
                                     <span>Nova Veneza</span>
                                   </label>
                                 </div>
@@ -575,21 +570,21 @@ export default function Permissions() {
                   <label className={styles.label}>Sistemas Autorizados</label>
                   <div className={styles.systemsGrid}>
                     <label className={styles.checkboxLabel}>
-                      <input 
-                        type="checkbox" 
-                        className={styles.checkbox} 
-                        checked={newUser.allowedApps.includes('69fa463aa078044937f7024e')} 
-                        onChange={() => toggleNewUserApp('69fa463aa078044937f7024e')} 
-                      /> 
+                      <input
+                        type="checkbox"
+                        className={styles.checkbox}
+                        checked={newUser.allowedApps.includes('admin')}
+                        onChange={() => toggleNewUserApp('admin')}
+                      />
                       <span>Morada do Sol</span>
                     </label>
                     <label className={styles.checkboxLabel}>
-                      <input 
-                        type="checkbox" 
-                        className={styles.checkbox} 
-                        checked={newUser.allowedApps.includes('69fa463aa078044937f70250')} 
-                        onChange={() => toggleNewUserApp('69fa463aa078044937f70250')} 
-                      /> 
+                      <input
+                        type="checkbox"
+                        className={styles.checkbox}
+                        checked={newUser.allowedApps.includes('franchise')}
+                        onChange={() => toggleNewUserApp('franchise')}
+                      />
                       <span>Nova Veneza</span>
                     </label>
                   </div>

@@ -4,6 +4,7 @@ import { AuthRequest } from '../../shared/middlewares/auth.middleware';
 import { resolveUnitId } from '../../shared/middlewares/rbac.middleware';
 import { ok, created } from '../../shared/utils/responseHelper';
 import { AppError } from '../../shared/errors/AppError';
+import { sseService } from '../events/sse.service';
 
 const service = new ClientService();
 
@@ -48,6 +49,7 @@ export async function createClient(req: AuthRequest, res: Response, next: NextFu
     }
 
     const client = await service.create({ ...req.body, unitId });
+    sseService.emit(unitId.toString(), 'clients:change');
     created(res, client);
   } catch (e) { next(e); }
 }
@@ -55,7 +57,7 @@ export async function createClient(req: AuthRequest, res: Response, next: NextFu
 export async function updateClient(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const client = await service.findById(req.params.id);
-    
+
     // Security check
     const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor && client.unitId?.toString() !== req.user!.unitId?.toString()) {
@@ -63,6 +65,8 @@ export async function updateClient(req: AuthRequest, res: Response, next: NextFu
     }
 
     const updated = await service.update(req.params.id, req.body);
+    const uid = updated.unitId?.toString();
+    if (uid) sseService.emit(uid, 'clients:change');
     ok(res, updated);
   } catch (e) { next(e); }
 }
@@ -70,7 +74,7 @@ export async function updateClient(req: AuthRequest, res: Response, next: NextFu
 export async function assignPackage(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const client = await service.findById(req.params.id);
-    
+
     // Security check
     const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor && client.unitId?.toString() !== req.user!.unitId?.toString()) {
@@ -78,6 +82,8 @@ export async function assignPackage(req: AuthRequest, res: Response, next: NextF
     }
 
     const result = await service.assignPackage(req.params.id, req.body.packageId);
+    const uid = (result as any).unitId?.toString();
+    if (uid) sseService.emit(uid, 'clients:change');
     ok(res, result);
   } catch (e) { next(e); }
 }
@@ -85,7 +91,7 @@ export async function assignPackage(req: AuthRequest, res: Response, next: NextF
 export async function removePackage(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const client = await service.findById(req.params.id);
-    
+
     // Security check
     const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor && client.unitId?.toString() !== req.user!.unitId?.toString()) {
@@ -93,6 +99,8 @@ export async function removePackage(req: AuthRequest, res: Response, next: NextF
     }
 
     const result = await service.removePackage(req.params.id, req.params.packageId);
+    const uid = client.unitId?.toString();
+    if (uid) sseService.emit(uid, 'clients:change');
     ok(res, result);
   } catch (e) { next(e); }
 }
