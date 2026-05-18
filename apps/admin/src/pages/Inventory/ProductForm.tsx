@@ -25,17 +25,19 @@ export default function ProductForm({ product, onClose, onSuccess }: Props) {
     name: product?.name ?? '',
     description: product?.description ?? '',
     category: product?.category ?? '',
-    price: product?.price ?? 0,
-    costPrice: product?.costPrice ?? 0,
-    stockQuantity: product?.stockQuantity ?? 0,
+    price: product ? String(product.price) : '',
+    costPrice: product ? String(product.costPrice) : '',
+    stockQuantity: product ? String(product.stockQuantity) : '',
     minStock: product?.minStock ?? 5,
   });
 
   const mutation = useMutation({
-    mutationFn: (data: typeof formData) => 
-      product 
-        ? api.put(`/products/${product._id}`, data) 
-        : api.post('/products', data),
+    mutationFn: (data: typeof formData) => {
+      const payload = { ...data, price: Number(data.price) || 0, costPrice: Number(data.costPrice) || 0, stockQuantity: Number(data.stockQuantity) || 0 };
+      return product
+        ? api.put(`/products/${product._id}`, payload)
+        : api.post('/products', payload);
+    },
     onSuccess,
   });
 
@@ -84,22 +86,24 @@ export default function ProductForm({ product, onClose, onSuccess }: Props) {
           <div className={styles.row}>
             <div className={styles.field}>
               <label>Preço de Custo (R$)</label>
-              <input 
-                type="number" 
+              <input
+                type="number"
                 step="0.01"
-                value={formData.costPrice} 
-                onChange={e => setFormData({ ...formData, costPrice: Number(e.target.value) })} 
-                required 
+                value={formData.costPrice}
+                placeholder="0,00"
+                onChange={e => setFormData({ ...formData, costPrice: e.target.value })}
+                required
               />
             </div>
             <div className={styles.field}>
               <label>Preço de Venda (R$)</label>
-              <input 
-                type="number" 
+              <input
+                type="number"
                 step="0.01"
-                value={formData.price} 
-                onChange={e => setFormData({ ...formData, price: Number(e.target.value) })} 
-                required 
+                value={formData.price}
+                placeholder="0,00"
+                onChange={e => setFormData({ ...formData, price: e.target.value })}
+                required
               />
             </div>
           </div>
@@ -110,7 +114,7 @@ export default function ProductForm({ product, onClose, onSuccess }: Props) {
               <input 
                 type="number" 
                 value={formData.stockQuantity} 
-                onChange={e => setFormData({ ...formData, stockQuantity: Number(e.target.value) })} 
+                onChange={e => setFormData({ ...formData, stockQuantity: e.target.value })}
                 required 
               />
             </div>
