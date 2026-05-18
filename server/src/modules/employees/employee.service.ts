@@ -28,14 +28,18 @@ export class EmployeeService {
     const password = data.password || autoPassword;
     const passwordHash = await bcrypt.hash(password, 10);
 
+    // Free unique indexes held by deactivated users so the new employee can use the same email/phone
     const orConditions: any[] = [];
     if (data.email) orConditions.push({ email: data.email.toLowerCase() });
     if (data.phone) orConditions.push({ phone: data.phone });
-    const existing = orConditions.length > 0
-      ? await UserModel.findOne({ $or: orConditions, isActive: false })
-      : null;
+    if (orConditions.length > 0) {
+      await UserModel.updateMany(
+        { $or: orConditions, isActive: false },
+        { $unset: { email: '', phone: '' } },
+      );
+    }
 
-    const payload = {
+    const emp = await UserModel.create({
       name: data.name,
       email: data.email || undefined,
       passwordHash,
@@ -50,20 +54,11 @@ export class EmployeeService {
       blockedDays: data.blockedDays,
       isActive: true,
       allowedApps: ['admin'],
-    };
-
-    let empId: string;
-    if (existing) {
-      await UserModel.findByIdAndUpdate(existing._id, payload, { runValidators: true });
-      empId = String(existing._id);
-    } else {
-      const created = await UserModel.create(payload);
-      empId = String(created._id);
-    }
+    });
 
     sharedCache.delete(`users:list:${data.unitId || 'all'}`);
     sharedCache.delete('users:list:all');
-    return UserModel.findById(empId).select('-passwordHash') as Promise<IUser>;
+    return UserModel.findById(emp._id).select('-passwordHash') as Promise<IUser>;
   }
 
   async update(id: string, data: any): Promise<IUser> {
