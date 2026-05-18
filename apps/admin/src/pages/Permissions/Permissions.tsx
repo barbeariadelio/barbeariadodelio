@@ -1,4 +1,4 @@
-import { useState, useMemo, FormEvent, useEffect, Fragment } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import styles from './Permissions.module.scss';
@@ -15,6 +15,12 @@ type AppUser = {
   unitId?: string | { name: string; _id: string };
   allowedApps?: string[];
 };
+
+interface Unit {
+  _id: string;
+  name: string;
+  franchiseId?: string;
+}
 
 const ROLE_LABELS: Record<string, string> = {
   owner: 'Admin',
@@ -33,6 +39,14 @@ function normalizeRole(role: string): string {
   return role;
 }
 
+function maskPhone(value: string): string {
+  const d = value.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 2) return d;
+  if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
 export default function Permissions() {
   const qc = useQueryClient();
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -48,7 +62,7 @@ export default function Permissions() {
   const [confirmModal, setConfirmModal] = useState<{ show: boolean; userId: string; userName: string; isActive: boolean; action: 'toggle' | 'delete' } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   
-  const [newUser, setNewUser] = useState({ name: '', email: '', phone: '19', password: '', role: 'employee', allowedApps: ['admin'] });
+  const [newUser, setNewUser] = useState({ name: '', email: '', phone: '19', password: '', role: 'employee', allowedApps: ['admin'], unitId: '' });
   const [loginType, setLoginType] = useState<'email' | 'phone'>('email');
 
   const copyToClipboard = (text: string, fieldId: string) => {
@@ -66,6 +80,28 @@ export default function Permissions() {
       return allUsers.filter((u: AppUser) => u.role !== 'client');
     }),
   });
+
+  const { data: units = [] } = useQuery<Unit[]>({
+    queryKey: ['units'],
+    queryFn: () => api.get('/units').then(r => Array.isArray(r.data) ? r.data : r.data.units ?? []),
+  });
+
+  // Auto-derive unitId when units load or allowedApps change
+  useEffect(() => {
+    if (units.length === 0) return;
+    const hasFranchise = newUser.allowedApps.includes('franchise');
+    const hasAdmin = newUser.allowedApps.includes('admin');
+    let target: Unit | undefined;
+    if (hasFranchise && !hasAdmin) {
+      target = units.find(u => !!u.franchiseId);
+    } else {
+      target = units.find(u => !u.franchiseId);
+    }
+    if (target && newUser.unitId !== target._id) {
+      setNewUser(prev => ({ ...prev, unitId: target!._id }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [units, newUser.allowedApps]);
 
   useEffect(() => {
     if (toast) {
@@ -109,7 +145,7 @@ export default function Permissions() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['users'] });
       setShowModal(false);
-      setNewUser({ name: '', email: '', phone: '19', password: '', role: 'employee', allowedApps: ['admin'] });
+      setNewUser({ name: '', email: '', phone: '19', password: '', role: 'employee', allowedApps: ['admin'], unitId: '' });
       setToast({ message: 'Usuário criado com sucesso!', type: 'success' });
     },
     onError: (err: any) => {
@@ -248,6 +284,7 @@ export default function Permissions() {
               <tr>
                 <th className={styles.th}>Usuário</th>
                 <th className={styles.th}>Papel</th>
+                <th className={styles.th}>Sistema</th>
                 <th className={styles.th}>Identificador</th>
                 <th className={styles.th}>Senha</th>
                 <th className={styles.th}>Status</th>
@@ -282,6 +319,24 @@ export default function Permissions() {
                         }`}>
                           {ROLE_LABELS[role] || role}
                         </span>
+                      </td>
+                      <td className={styles.td}>
+                        <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap' }}>
+                          {(u.allowedApps ?? []).map(app => (
+                            <span key={app} style={{
+                              fontSize: '0.7rem', fontWeight: 700, padding: '0.15rem 0.5rem',
+                              borderRadius: 20, border: '1px solid',
+                              background: app === 'admin' ? 'rgba(21,101,192,0.1)' : 'rgba(139,90,43,0.1)',
+                              color: app === 'admin' ? '#1565C0' : '#8B5A2B',
+                              borderColor: app === 'admin' ? 'rgba(21,101,192,0.3)' : 'rgba(139,90,43,0.3)',
+                            }}>
+                              {app === 'admin' ? 'Morada do Sol' : app === 'franchise' ? 'Nova Veneza' : app}
+                            </span>
+                          ))}
+                          {(!u.allowedApps || u.allowedApps.length === 0) && (
+                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </div>
                       </td>
                       <td className={styles.td}>
                         <div className={styles.passCell}>
@@ -324,7 +379,7 @@ export default function Permissions() {
                     </tr>
                     {isExpanded && (
                       <tr className={styles.accordionRow}>
-                        <td colSpan={6} className={styles.accordionTd}>
+                        <td colSpan={7} className={styles.accordionTd}>
                           <div className={styles.accordionContent}>
                             <div className={styles.accordionGrid}>
                               <div className={styles.accordionCol}>
@@ -567,7 +622,7 @@ export default function Permissions() {
                   {loginType === 'email' ? (
                     <input className={styles.input} type="email" required value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} placeholder="exemplo@email.com" />
                   ) : (
-                    <input className={styles.input} type="tel" required value={newUser.phone} onChange={e => setNewUser({...newUser, phone: e.target.value})} placeholder="(00) 00000-0000" />
+                    <input className={styles.input} type="tel" required value={newUser.phone} onChange={e => setNewUser({...newUser, phone: maskPhone(e.target.value)})} placeholder="(00) 00000-0000" />
                   )}
                 </div>
 
@@ -595,18 +650,26 @@ export default function Permissions() {
                   </select>
                 </div>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Sistemas Autorizados</label>
+                  <label className={styles.label}>Pode fazer login em</label>
                   <div className={styles.systemsGrid}>
                     <label className={styles.checkboxLabel}>
-                      <input type="checkbox" checked={newUser.allowedApps.includes('admin')} onChange={() => toggleNewUserApp('admin')} /> 
+                      <input type="checkbox" checked={newUser.allowedApps.includes('admin')} onChange={() => toggleNewUserApp('admin')} />
                       <span>Morada do Sol</span>
                     </label>
                     <label className={styles.checkboxLabel}>
-                      <input type="checkbox" checked={newUser.allowedApps.includes('franchise')} onChange={() => toggleNewUserApp('franchise')} /> 
+                      <input type="checkbox" checked={newUser.allowedApps.includes('franchise')} onChange={() => toggleNewUserApp('franchise')} />
                       <span>Nova Veneza</span>
                     </label>
                   </div>
                 </div>
+                {units.length > 1 && (
+                  <div className={styles.formGroup}>
+                    <label className={styles.label}>Unidade de Trabalho</label>
+                    <select className={styles.select} value={newUser.unitId} onChange={e => setNewUser({ ...newUser, unitId: e.target.value })}>
+                      {units.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
+                    </select>
+                  </div>
+                )}
               </div>
               <div className={styles.modalFooter}>
                 <button type="button" className={styles.btnSecondary} onClick={() => setShowModal(false)}>Cancelar</button>

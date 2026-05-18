@@ -9,10 +9,27 @@ const service = new UserService();
 
 export async function listUsers(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    // Soul540-style: non-owners are locked to their JWT unitId;
-    // owners can scope via X-Unit-ID header or ?unitId= query param.
-    const filterUnitId = resolveUnitId(req) ?? undefined;
+    const { role, id: ownerId } = req.user!;
 
+    if (role === 'owner') {
+      const { UnitService } = await import('../units/unit.service');
+      const { FranchiseModel } = await import('../franchise/franchise.model');
+      const mongoose = await import('mongoose');
+
+      const unitSvc = new UnitService();
+      const ownUnits = await unitSvc.findByOwner(ownerId);
+      const franchise = await FranchiseModel.findOne({ franchisors: new mongoose.Types.ObjectId(ownerId) });
+
+      const allUnitIds = new Set(ownUnits.map(u => u._id.toString()));
+      (franchise?.units ?? []).forEach(u => allUnitIds.add(u.toString()));
+
+      const users = await service.listByUnitIds([...allUnitIds]);
+      ok(res, users);
+      return;
+    }
+
+    // Non-owners: locked to their own unitId
+    const filterUnitId = resolveUnitId(req) ?? undefined;
     const users = await service.listAll(filterUnitId);
     ok(res, users);
   } catch (e) { next(e); }

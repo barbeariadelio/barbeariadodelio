@@ -28,6 +28,14 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   employee: ['Própria Agenda', 'Salário', 'Comissões'],
 };
 
+function maskPhone(value: string): string {
+  const d = value.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 2) return d;
+  if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
 function normalizeRole(role: string): string {
   const r = role?.toLowerCase();
   if (r === 'staff' || r === 'employee' || r === 'funcionario' || r === 'funcionário') return 'employee';
@@ -574,7 +582,7 @@ export default function Permissions() {
                   {loginType === 'email' ? (
                     <input className={styles.input} type="email" required value={newUser.email} onChange={e => setNewUser({...newUser, email: e.target.value})} placeholder="exemplo@email.com" />
                   ) : (
-                    <input className={styles.input} type="tel" required value={newUser.phone} onChange={e => setNewUser({...newUser, phone: e.target.value})} placeholder="(00) 00000-0000" />
+                    <input className={styles.input} type="tel" required value={newUser.phone} onChange={e => setNewUser({...newUser, phone: maskPhone(e.target.value)})} placeholder="(00) 00000-0000" />
                   )}
                 </div>
 
@@ -602,7 +610,7 @@ export default function Permissions() {
                   </select>
                 </div>
                 <div className={styles.formGroup}>
-                  <label className={styles.label}>Sistemas Autorizados</label>
+                  <label className={styles.label}>Pode fazer login em</label>
                   <div className={styles.systemsGrid}>
                     <label className={styles.checkboxLabel}>
                       <input

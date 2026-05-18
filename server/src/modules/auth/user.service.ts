@@ -11,7 +11,19 @@ export class UserService {
 
     const filter = unitId ? { unitId } : {};
     const users = await UserModel.find(filter).select('-passwordHash').sort({ name: 1 });
-    
+
+    sharedCache.set(cacheKey, users, 60);
+    return users;
+  }
+
+  async listByUnitIds(unitIds: string[]): Promise<IUser[]> {
+    const cacheKey = `users:list:owner:${unitIds.sort().join(',')}`;
+    const cached = sharedCache.get<IUser[]>(cacheKey);
+    if (cached) return cached;
+
+    const filter = unitIds.length > 0 ? { unitId: { $in: unitIds } } : {};
+    const users = await UserModel.find(filter).select('-passwordHash').sort({ name: 1 });
+
     sharedCache.set(cacheKey, users, 60);
     return users;
   }
@@ -27,6 +39,7 @@ export class UserService {
     
     sharedCache.delete(`users:list:${data.unitId || 'all'}`);
     sharedCache.delete('users:list:all');
+    sharedCache.keys().filter(k => k.startsWith('users:list:owner:')).forEach(k => sharedCache.delete(k));
 
     return UserModel.findById(user._id).select('-passwordHash') as Promise<IUser>;
   }
@@ -55,6 +68,7 @@ export class UserService {
 
     sharedCache.delete(`users:list:${user.unitId || 'all'}`);
     sharedCache.delete('users:list:all');
+    sharedCache.keys().filter(k => k.startsWith('users:list:owner:')).forEach(k => sharedCache.delete(k));
 
     return user;
   }
@@ -65,5 +79,6 @@ export class UserService {
 
     sharedCache.delete(`users:list:${user.unitId || 'all'}`);
     sharedCache.delete('users:list:all');
+    sharedCache.keys().filter(k => k.startsWith('users:list:owner:')).forEach(k => sharedCache.delete(k));
   }
 }

@@ -98,9 +98,9 @@
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: 12px;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
+  overflow: visible;
 }
 
 .tableHeader {
@@ -110,16 +110,20 @@
 
 .tableWrapper {
   overflow-x: auto;
+  border-radius: 0 0 12px 12px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .table {
   width: 100%;
+  min-width: 880px;
   border-collapse: collapse;
   text-align: left;
+  table-layout: fixed;
 }
 
 .th {
-  padding: 1rem 1.5rem;
+  padding: 0.75rem 1rem;
   font-size: 0.6875rem;
   font-weight: 700;
   color: var(--text-muted);
@@ -127,14 +131,25 @@
   letter-spacing: 0.05em;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-elevated);
+  white-space: nowrap;
+  overflow: hidden;
+
+  &:nth-child(1) { width: 160px; }  // Usuário
+  &:nth-child(2) { width: 100px; }  // Papel
+  &:nth-child(3) { width: 130px; }  // Sistema
+  &:nth-child(4) { width: 200px; }  // Identificador
+  &:nth-child(5) { width: 160px; }  // Senha
+  &:nth-child(6) { width: 80px;  }  // Status
+  &:nth-child(7) { width: 80px;  }  // Ações
 }
 
 .td {
-  padding: 1rem 1.5rem;
+  padding: 0.75rem 1rem;
   font-size: 0.875rem;
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-subtle);
   vertical-align: middle;
+  overflow: hidden;
 }
 
 .tr:hover .td {
@@ -180,15 +195,24 @@
 .passCell {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.4rem;
   font-family: monospace;
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  min-width: 0;
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
 }
 
 .actions {
   display: flex;
-  gap: 0.5rem;
+  gap: 0.4rem;
   justify-content: flex-end;
+  white-space: nowrap;
 }
 
 .btnAction {
@@ -432,6 +456,7 @@
 .accordionTd {
   padding: 0;
   border-bottom: 1px solid var(--border-subtle);
+  overflow: visible;
 }
 
 .accordionContent {

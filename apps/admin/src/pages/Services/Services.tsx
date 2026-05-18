@@ -89,6 +89,7 @@ interface DetailProps {
 function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { svc: Service, allServices: Service[], onEdit: () => void, onToggle: () => void, isToggling: boolean }) {
   const packageId = svc._id;
   const qc = useQueryClient();
+  const [isOpen, setIsOpen] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState("");
   const [editingClient, setEditingClient] = useState<{ client: any; limits: { [key: string]: string } } | null>(null);
@@ -155,7 +156,7 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
 
   return (
     <div className={`${styles.dashboardCard} ${!svc.isActive ? styles.inactive : ''}`}>
-      <div className={styles.dashHeader}>
+      <div className={styles.dashHeader} style={{ cursor: 'pointer' }} onClick={() => setIsOpen(o => !o)}>
         <div className={styles.dashHeaderMain}>
           <div className={styles.dashTitleRow}>
             <h2 className={styles.dashTitle}>{svc.name}</h2>
@@ -173,19 +174,33 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
           <span className={styles.dashPrice}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>
           <p className={styles.dashDesc}>{svc.description}</p>
         </div>
-        <div className={styles.dashActions}>
+        <div className={styles.dashActions} onClick={e => e.stopPropagation()}>
           <button className={styles.editBtn} onClick={onEdit}>Editar</button>
           <button
             className={`${styles.toggleBtn} ${svc.isActive ? styles.deactivate : styles.activate}`}
             onClick={onToggle}
             disabled={isToggling}
           >
-            {svc.isActive ? 'Desativar' : 'Ativar'}
+            {'Excluir'}
+          </button>
+          <button
+            onClick={() => setIsOpen(o => !o)}
+            style={{
+              background: 'none', border: '1px solid var(--border-default)', borderRadius: 6,
+              padding: '0.4rem 0.6rem', cursor: 'pointer', color: 'var(--text-muted)',
+              display: 'flex', alignItems: 'center', transition: 'all 0.2s',
+            }}
+            title={isOpen ? 'Recolher' : 'Expandir'}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
           </button>
         </div>
       </div>
 
-      <div className={styles.dashContent}>
+      {isOpen && <div className={styles.dashContent}>
         <div className={styles.packageDetails}>
           <h4 className={styles.packageDetailTitle}>Itens inclusos ({formatValidity(svc.packageValidity)})</h4>
           <ul className={styles.packageItemList}>
@@ -394,7 +409,7 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
             </>
           )}
         </div>
-      </div>
+      </div>}
 
       {confirmRemoveId && (
         <div className={styles.modalOverlay} onClick={() => setConfirmRemoveId(null)}>
@@ -525,7 +540,7 @@ function ServiceDetail({ svc, allServices, onClose, onEdit, onToggle, isToggling
             onClick={onToggle}
             disabled={isToggling}
           >
-            {svc.isActive ? 'Desativar' : 'Ativar'}
+            {'Excluir'}
           </button>
         </div>
 
@@ -668,7 +683,7 @@ export default function Services() {
                   onClick={() => svc.isActive ? setConfirmDeactivate(svc) : toggleActive.mutate(svc)}
                   disabled={toggleActive.isPending}
                 >
-                  {svc.isActive ? 'Desativar' : 'Ativar'}
+                  {'Excluir'}
                 </button>
               </div>
             </div>
@@ -702,9 +717,9 @@ export default function Services() {
 
       {confirmDeactivate && (
         <ConfirmModal
-          title="Desativar serviço?"
-          message={`"${confirmDeactivate.name}" não aparecerá mais como opção nos agendamentos.`}
-          confirmLabel="Desativar"
+          title="Excluir serviço?"
+          message={`"${confirmDeactivate.name}" será removido dos agendamentos.`}
+          confirmLabel="Excluir"
           danger
           onConfirm={() => toggleActive.mutate(confirmDeactivate)}
           onCancel={() => setConfirmDeactivate(null)}

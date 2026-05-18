@@ -29,6 +29,10 @@ export class SimpleCache {
     this.cache.delete(key);
   }
 
+  keys(): string[] {
+    return [...this.cache.keys()];
+  }
+
   clear(): void {
     this.cache.clear();
   }
