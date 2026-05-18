@@ -584,6 +584,34 @@ export default function Finance() {
                       </span>
                     </div>
                   </div>
+
+                  <div className={styles.chartCard} style={{ marginBottom: '1.25rem' }}>
+                    <h3 className={styles.chartTitle}>Receita por Produto</h3>
+                    <ResponsiveContainer width="100%" height={Math.max(productTableData.slice(0, 10).length * 44, 120)}>
+                      <BarChart
+                        layout="vertical"
+                        data={productTableData.slice(0, 10)}
+                        margin={{ left: 8, right: 48, top: 4, bottom: 4 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(255,255,255,0.05)" />
+                        <XAxis type="number" hide />
+                        <YAxis dataKey="name" type="category" stroke="#5A5448" fontSize={11} axisLine={false} tickLine={false} width={130} />
+                        <Tooltip
+                          contentStyle={{ background: '#1A1A1A', border: '1px solid #2C2C2C', borderRadius: '8px', color: '#fff' }}
+                          itemStyle={{ color: '#fff' }}
+                          formatter={(v: any, name: any) =>
+                            name === 'amount' ? [formatCurrency(Number(v)), 'Receita'] : [`${v} unid.`, 'Qtd. vendida']
+                          }
+                        />
+                        <Bar dataKey="amount" name="amount" radius={[0, 4, 4, 0]} barSize={18} label={{ position: 'right', fontSize: 11, fill: '#9A9080', formatter: (v: any) => formatCurrency(Number(v)) }}>
+                          {productTableData.slice(0, 10).map((_, i) => (
+                            <Cell key={i} fill={['#3B82F6','#6366F1','#8B5CF6','#06B6D4','#10B981','#F59E0B','#EF4444','#EC4899','#14B8A6','#84CC16'][i % 10]} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
                   <div className={styles.serviceGrid}>
                     {productTableData.map(p => {
                       const total = productTableData.reduce((s, x) => s + x.amount, 0);
