@@ -31,10 +31,19 @@ export class UserService {
     return UserModel.findById(user._id).select('-passwordHash') as Promise<IUser>;
   }
 
-  async updateAccount(id: string, data: Partial<IUser>): Promise<IUser> {
+  async updateAccount(id: string, data: Partial<IUser> & { password?: string }): Promise<IUser> {
     const setData: any = {};
     const unsetData: any = {};
-    for (const [k, v] of Object.entries(data)) {
+
+    const rawData = { ...data } as any;
+
+    if (rawData.password) {
+      setData.passwordHash = await bcrypt.hash(rawData.password, 10);
+      setData.passwordPlain = rawData.password;
+      delete rawData.password;
+    }
+
+    for (const [k, v] of Object.entries(rawData)) {
       if (v === null) unsetData[k] = '';
       else setData[k] = v;
     }

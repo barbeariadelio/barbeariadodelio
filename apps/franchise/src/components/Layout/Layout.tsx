@@ -171,7 +171,7 @@ const NAV_ITEMS = [
   { path: '/clients',    label: 'Clientes',       icon: <IconUsers />, roles: ['owner', 'cashier'] },
   { path: '/employees',  label: 'Funcionários',   icon: <IconScissors />, roles: ['owner'] },
   { path: '/services',   label: 'Serviços',       icon: <IconStar />, roles: ['owner'] },
-  { path: '/finance',    label: 'Financeiro',     icon: <IconDollarSign />, roles: ['owner'] },
+  { path: '/finance',    label: 'Financeiro',     icon: <IconDollarSign />, roles: ['owner', 'employee'] },
   { path: '/permissions', label: 'Permissões',     icon: <IconShield />, roles: ['owner'] },
   { path: '/settings',   label: 'Configurações',  icon: <IconSettings />, roles: ['owner'] },
 ];
