@@ -428,6 +428,7 @@ export class FinanceService {
       byService: Array.from(byServiceMap.values()),
       byEmployee: Array.from(byEmployeeMap.values()),
       byPaymentMethod: Array.from(byPaymentMap.entries()).map(([method, { amount, count }]) => ({ method, amount, count })),
+      byProduct: Array.from(byProductMap.entries()).map(([name, { amount, quantity, count }]) => ({ name, amount, quantity, count })),
       chart,
     };
   }
