@@ -15,7 +15,9 @@ export function errorHandler(
 
   // Handle MongoDB Duplicate Key Error
   if ((err as any).code === 11000) {
-    const field = Object.keys((err as any).keyPattern || {})[0] || 'campo';
+    const keyPattern = (err as any).keyPattern || {};
+    const preferredFields = ['email', 'phone', 'name'];
+    const field = preferredFields.find(f => f in keyPattern) || Object.keys(keyPattern)[0] || 'campo';
     const messageMap: Record<string, string> = {
       email: 'Já existe um cadastro com este e-mail.',
       phone: 'Já existe um cadastro com este telefone.',

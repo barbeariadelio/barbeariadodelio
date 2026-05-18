@@ -20,6 +20,12 @@ export class ServiceService {
   }
 
   async create(data: Partial<IService>): Promise<IService> {
+    if (data.unitId && data.name) {
+      await ServiceModel.updateMany(
+        { unitId: data.unitId, name: data.name, isActive: false },
+        { $set: { name: `${data.name}_removed_${Date.now()}` } },
+      );
+    }
     const svc = await ServiceModel.create(data);
     sharedCache.delete(`services:${data.unitId}`);
     return svc;

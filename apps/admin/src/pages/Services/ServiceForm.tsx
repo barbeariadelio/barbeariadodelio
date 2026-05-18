@@ -75,7 +75,8 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
         : api.post('/services', payload),
     onSuccess,
     onError: (err: unknown) => {
-      setError(err instanceof Error ? err.message : 'Erro ao salvar serviço.');
+      const msg = (err as any)?.response?.data?.message;
+      setError(msg || 'Erro ao salvar serviço.');
     },
   });
 

@@ -5,7 +5,6 @@ import ServiceForm from './ServiceForm';
 import { ConfirmModal } from '@barber/ui';
 import styles from './Services.module.scss';
 import { addDays, addWeeks, addMonths, addYears, differenceInDays, format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 interface PackageItem {
   serviceId: string;
@@ -28,6 +27,32 @@ interface Service {
     value?: number;
   };
   packageItems?: PackageItem[];
+}
+
+interface ClientPackageItem {
+  serviceId: string | { _id: string };
+  quantity: number;
+  used: number;
+}
+
+interface ClientPackage {
+  packageId: { _id: string } | null;
+  active: boolean;
+  startDate: string | Date;
+  itemLimits?: ClientPackageItem[];
+}
+
+interface Client {
+  _id: string;
+  name: string;
+  phone?: string;
+  packages?: ClientPackage[];
+}
+
+interface SubscriberEntry {
+  client: Client;
+  status: ReturnType<typeof getSubscriptionStatus>;
+  sub: ClientPackage | undefined;
 }
 
 function formatCurrency(v: number) {
@@ -91,11 +116,11 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
   const qc = useQueryClient();
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState("");
-  const [editingClient, setEditingClient] = useState<{ client: any; limits: { [key: string]: string } } | null>(null);
+  const [editingClient, setEditingClient] = useState<{ client: Client; limits: Record<string, string> } | null>(null);
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
 
 
-  const { data: clients = [], isLoading } = useQuery<any[]>({
+  const { data: clients = [], isLoading } = useQuery<Client[]>({
     queryKey: ['clients-for-package'],
     queryFn: async () => {
       const { data } = await api.get(`/clients`);
@@ -145,8 +170,8 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
     updateAllLimitsMutation.mutate({ clientId: editingClient.client._id, limits: editingClient.limits });
   };
 
-  const subscribed = clients.filter(c => c.packages?.some((p: any) => p.packageId?._id === packageId && p.active));
-  const available = clients.filter(c => !c.packages?.some((p: any) => p.packageId?._id === packageId && p.active));
+  const subscribed = clients.filter(c => c.packages?.some(p => p.packageId?._id === packageId && p.active));
+  const available = clients.filter(c => !c.packages?.some(p => p.packageId?._id === packageId && p.active));
   
   const filteredAvailable = available.filter(c => 
     c.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -170,7 +195,7 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
               {svc.isActive ? 'Ativo' : 'Inativo'}
             </span>
           </div>
-          {svc.showPrice !== false && <span className={styles.dashPrice}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>}
+          <span className={styles.dashPrice}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>
           <p className={styles.dashDesc}>{svc.description}</p>
         </div>
         <div className={styles.dashActions}>
@@ -238,7 +263,7 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
                   
                   <div className={styles.addClientResults}>
                     {search.length > 0 && filteredAvailable.length === 0 && (
-                      <p className={styles.emptyResults}>Nenhum cliente encontrado com "{search}".</p>
+                      <p className={styles.emptyResults}>Nenhum cliente encontrado com &ldquo;{search}&rdquo;.</p>
                     )}
                     
                     {search.length === 0 && (
@@ -261,19 +286,19 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
 
               <div className={styles.groupedSubscribers}>
                 {(() => {
-                  const groupedClients = subscribed.reduce((acc: any, c: any) => {
-                    const sub = c.packages?.find((p: any) => p.packageId?._id === packageId && p.active);
+                  const groupedClients = subscribed.reduce((acc: Record<string, SubscriberEntry[]>, c: Client) => {
+                    const sub = c.packages?.find(p => p.packageId?._id === packageId && p.active);
                     const status = getSubscriptionStatus(sub?.startDate || new Date(), svc.packageValidity);
                     if (!acc[status.status]) acc[status.status] = [];
                     acc[status.status].push({ client: c, status, sub });
                     return acc;
                   }, { ok: [], warning: [], overdue: [] });
 
-                  const renderCard = ({ client: c, status, sub }: any) => {
+                  const renderCard = ({ client: c, status, sub }: SubscriberEntry) => {
                     const handleCardClick = () => {
-                      const limits: any = {};
+                      const limits: Record<string, string> = {};
                       svc.packageItems?.forEach(item => {
-                        const customLimit = sub?.itemLimits?.find((l: any) => l.serviceId === item.serviceId);
+                        const customLimit = sub?.itemLimits?.find((l: ClientPackageItem) => l.serviceId === item.serviceId);
                         if (customLimit) limits[item.serviceId] = customLimit.quantity.toString();
                       });
                       setEditingClient({ client: c, limits });
@@ -324,9 +349,9 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
                       {svc.packageItems?.map((item, idx) => {
                         const childSvc = allServices.find(s => s._id === item.serviceId);
                         
-                        const sub = c.packages?.find((p: any) => p.packageId?._id === packageId && p.active);
-                        const limitEntry = sub?.itemLimits?.find((l: any) => {
-                          const lId = l.serviceId?._id ?? l.serviceId;
+                        const sub = c.packages?.find(p => p.packageId?._id === packageId && p.active);
+                        const limitEntry = sub?.itemLimits?.find((l: ClientPackageItem) => {
+                          const lId = typeof l.serviceId === 'object' ? l.serviceId._id : l.serviceId;
                           return lId?.toString() === item.serviceId;
                         });
 
@@ -476,7 +501,7 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
   );
 }
 
-function ServiceDetail({ svc, allServices, onClose, onEdit, onToggle, isToggling }: DetailProps) {
+function ServiceDetail({ svc, allServices: _allServices, onClose, onEdit, onToggle, isToggling }: DetailProps) {
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className={styles.panel}>
@@ -496,7 +521,7 @@ function ServiceDetail({ svc, allServices, onClose, onEdit, onToggle, isToggling
 
         <div className={styles.panelBody}>
           <div className={styles.priceRow}>
-            {svc.showPrice !== false && <span className={styles.bigPrice}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>}
+            <span className={styles.bigPrice}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>
             <span className={styles.durationChip}>
               {svc.type === 'package' ? 'Pacote' : `${svc.durationMinutes} min`}
             </span>
@@ -632,7 +657,7 @@ export default function Services() {
               )}
 
               <div className={styles.meta}>
-                {svc.showPrice !== false && <span className={styles.price}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>}
+                <span className={styles.price}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>
                 <span className={styles.duration}>
                   {`${svc.durationMinutes} min`}
                 </span>
@@ -662,7 +687,7 @@ export default function Services() {
                       transition: 'all 0.15s',
                     }}
                   >
-                    {svc.showPricePrefix !== false ? '✓' : '✕'} "A partir de"
+                    {svc.showPricePrefix !== false ? '✓' : '✕'} &ldquo;A partir de&rdquo;
                   </button>
                 )}
               </div>
