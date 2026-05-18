@@ -268,5 +268,18 @@
 
 .deactivateAction { border: 1px solid rgba(239, 68, 68, 0.3); color: #EF4444; &:hover { background: rgba(239, 68, 68, 0.05); } }
 .activateAction { border: 1px solid rgba(34, 197, 94, 0.3); color: #22C55E; &:hover { background: rgba(34, 197, 94, 0.05); } }
+.deleteAction {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 8px;
+  padding: 0.625rem 1rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.5); }
+}
 
 .empty { padding: 4rem; text-align: center; color: var(--text-muted); font-size: 1rem; }

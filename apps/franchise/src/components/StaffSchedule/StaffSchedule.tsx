@@ -60,6 +60,7 @@ export interface ScheduleEmployee {
     lunchStart?: string;
     lunchEnd?: string;
   };
+  daySchedules?: { day: number; slots: { start: string; end: string }[] }[];
   vacations?: { start: string; end: string }[];
   blockedDays?: string[];
 }
@@ -639,6 +640,13 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
             const dayOfWeek = selectedDate.getDay();
             const isUnitClosedDay = workingDays != null && !workingDays.includes(dayOfWeek);
 
+            // Per-day employee schedule for current weekday
+            const empDaySchedule = emp.daySchedules?.length
+              ? (emp.daySchedules.find(ds => ds.day === dayOfWeek) ?? null)
+              : null;
+            const isOffDay = (emp.daySchedules?.length ?? 0) > 0 && !empDaySchedule;
+            const fullyBlocked = isBlockedDay || isOffDay;
+
             return (
               <div key={emp._id} className={styles.empCol} style={{ height: TOTAL_H }}>
                 {TIME_SLOTS.map((t, si) => {
@@ -648,10 +656,10 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
                     <div
                       key={t}
                       className={`${styles.slot} ${si % 2 === 0 ? styles.slotHour : ''}`}
-                      style={{ height: SLOT_H, cursor: (isBlockedDay || isUnitClosedDay) ? 'default' : 'pointer' }}
+                      style={{ height: SLOT_H, cursor: (fullyBlocked || isUnitClosedDay) ? 'default' : 'pointer' }}
                       data-time={`${t} – ${endT}`}
                       onClick={() => {
-                        if (!isBlockedDay && !isUnitClosedDay) {
+                        if (!fullyBlocked && !isUnitClosedDay) {
                           setBlockPrompt({ employeeId: emp._id, employeeName: emp.name.split(' ')[0], time: t });
                         }
                       }}
@@ -659,7 +667,7 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
                   );
                 })}
 
-                {(isBlockedDay || isUnitClosedDay) ? (
+                {(fullyBlocked || isUnitClosedDay) ? (
                   <div
                     className={styles.lunchBreak}
                     style={{ top: 0, height: TOTAL_H, display: 'flex', flexDirection: 'column', justifyContent: 'center', pointerEvents: 'none' }}
@@ -670,27 +678,33 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
                   </div>
                 ) : (
                   <>
-                    {/* ── Unit working hours overlays ── */}
-                    {workingHours && (
-                      <>
-                        {timeToTop(workingHours.start) > 0 && (
-                          <div className={styles.offHours} style={{ top: 0, height: timeToTop(workingHours.start), pointerEvents: 'none' }} />
-                        )}
-                        {timeToTop(workingHours.end) < TOTAL_H && (
-                          <div className={styles.offHours} style={{ top: timeToTop(workingHours.end), height: TOTAL_H - timeToTop(workingHours.end), pointerEvents: 'none' }} />
-                        )}
-                        {workingHours.lunchStart && workingHours.lunchEnd && !emp.workSchedule?.lunchStart && (
-                          <div
-                            className={styles.lunchBreak}
-                            style={{ top: timeToTop(workingHours.lunchStart), height: timeToHeight(workingHours.lunchStart, workingHours.lunchEnd), pointerEvents: 'none' }}
-                          >
-                            <span>ALMOÇO</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                    {/* ── Employee work schedule overlays ── */}
-                    {emp.workSchedule && (
+                    {empDaySchedule ? (
+                      // Per-day schedule overrides unit working hours
+                      (() => {
+                        const sortedSlots = [...empDaySchedule.slots].sort((a, b) => a.start.localeCompare(b.start));
+                        const firstStart = sortedSlots[0]?.start;
+                        const lastEnd = sortedSlots[sortedSlots.length - 1]?.end;
+                        return (
+                          <>
+                            {firstStart && timeToTop(firstStart) > 0 && (
+                              <div className={styles.offHours} style={{ top: 0, height: timeToTop(firstStart), pointerEvents: 'none' }} />
+                            )}
+                            {lastEnd && timeToTop(lastEnd) < TOTAL_H && (
+                              <div className={styles.offHours} style={{ top: timeToTop(lastEnd), height: TOTAL_H - timeToTop(lastEnd), pointerEvents: 'none' }} />
+                            )}
+                            {sortedSlots.slice(0, -1).map((slot, idx) => {
+                              const gapTop = timeToTop(slot.end);
+                              const gapHeight = timeToTop(sortedSlots[idx + 1].start) - gapTop;
+                              return gapHeight > 0 ? (
+                                <div key={idx} className={styles.lunchBreak} style={{ top: gapTop, height: gapHeight, pointerEvents: 'none' }}>
+                                  <span>ALMOÇO</span>
+                                </div>
+                              ) : null;
+                            })}
+                          </>
+                        );
+                      })()
+                    ) : emp.workSchedule ? (
                       <>
                         {timeToTop(emp.workSchedule.start) > 0 && (
                           <div className={styles.offHours} style={{ top: 0, height: timeToTop(emp.workSchedule.start), pointerEvents: 'none' }} />
@@ -707,12 +721,29 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
                           </div>
                         )}
                       </>
-                    )}
+                    ) : workingHours ? (
+                      <>
+                        {timeToTop(workingHours.start) > 0 && (
+                          <div className={styles.offHours} style={{ top: 0, height: timeToTop(workingHours.start), pointerEvents: 'none' }} />
+                        )}
+                        {timeToTop(workingHours.end) < TOTAL_H && (
+                          <div className={styles.offHours} style={{ top: timeToTop(workingHours.end), height: TOTAL_H - timeToTop(workingHours.end), pointerEvents: 'none' }} />
+                        )}
+                        {workingHours.lunchStart && workingHours.lunchEnd && (
+                          <div
+                            className={styles.lunchBreak}
+                            style={{ top: timeToTop(workingHours.lunchStart), height: timeToHeight(workingHours.lunchStart, workingHours.lunchEnd), pointerEvents: 'none' }}
+                          >
+                            <span>ALMOÇO</span>
+                          </div>
+                        )}
+                      </>
+                    ) : null}
                   </>
                 )}
 
-                {!isBlockedDay && isT && <div className={styles.nowLine} style={{ top: nowTop }} />}
-                {!isBlockedDay && appts.map(appt => (
+                {!fullyBlocked && isT && <div className={styles.nowLine} style={{ top: nowTop }} />}
+                {!fullyBlocked && appts.map(appt => (
                   <div
                     key={appt._id}
                     className={styles.apptCard}

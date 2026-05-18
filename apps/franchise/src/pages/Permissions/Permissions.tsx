@@ -1,4 +1,4 @@
-import { useState, useMemo, FormEvent, useEffect, Fragment } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, getSelectedUnitId } from '../../api/client';
 import styles from './Permissions.module.scss';
@@ -47,7 +47,7 @@ export default function Permissions() {
   const [pendingLoginType, setPendingLoginType] = useState<'email' | 'phone'>('email');
   const [pendingPassword, setPendingPassword] = useState<string>('');
   const [showModal, setShowModal] = useState(false);
-  const [confirmModal, setConfirmModal] = useState<{ show: boolean; userId: string; userName: string; isActive: boolean } | null>(null);
+  const [confirmModal, setConfirmModal] = useState<{ show: boolean; userId: string; userName: string; isActive: boolean; action?: string } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   
   const [newUser, setNewUser] = useState({ name: '', email: '', phone: '19', password: '', role: 'employee', allowedApps: ['franchise'] });
@@ -324,7 +324,7 @@ export default function Permissions() {
                           </div>
                           <button className={`${styles.btnAction} ${styles.btnActionDanger}`} title="Excluir" onClick={(e) => {
                             e.stopPropagation();
-                            if (confirm(`Excluir ${u.name}?`)) deleteMutation.mutate(u._id);
+                            setConfirmModal({ show: true, userId: u._id, userName: u.name, isActive: u.isActive !== false, action: 'delete' });
                           }}>
                             <IconTrash />
                           </button>

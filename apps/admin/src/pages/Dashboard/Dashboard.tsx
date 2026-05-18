@@ -127,6 +127,7 @@ export default function Dashboard() {
     qc.invalidateQueries({ queryKey: ['appointments-day'] });
     qc.invalidateQueries({ queryKey: ['appointments-month'] });
     qc.invalidateQueries({ queryKey: ['unit-config', unitId] });
+    qc.invalidateQueries({ queryKey: ['employees'] });
   }
 
   function handleMonthUpdate() {

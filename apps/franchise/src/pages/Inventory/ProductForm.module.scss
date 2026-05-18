@@ -131,6 +131,16 @@
   @media (max-width: 480px) { grid-template-columns: 1fr; }
 }
 
+.errorMsg {
+  font-size: 0.8125rem;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin-top: 0.25rem;
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;

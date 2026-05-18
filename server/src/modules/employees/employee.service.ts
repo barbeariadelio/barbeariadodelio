@@ -68,12 +68,30 @@ export class EmployeeService {
       updateData.passwordPlain = updateData.password;
       delete updateData.password;
     }
+
+    // Free unique indexes held by inactive users (excluding the document being updated)
+    const orConditions: any[] = [];
+    if (updateData.email) orConditions.push({ email: updateData.email.toLowerCase(), _id: { $ne: id } });
+    if (updateData.phone) orConditions.push({ phone: updateData.phone, _id: { $ne: id } });
+    if (orConditions.length > 0) {
+      await UserModel.updateMany(
+        { $or: orConditions, isActive: false },
+        { $unset: { email: '', phone: '' } },
+      );
+    }
+
+    // Avoid setting empty strings for unique-indexed fields
+    if (updateData.phone === '') delete updateData.phone;
+    if (updateData.email === '') delete updateData.email;
+
     const emp = await UserModel.findByIdAndUpdate(
       id,
       { $set: updateData },
       { new: true, runValidators: true },
     ).select('-passwordHash');
     if (!emp) throw new NotFoundError('Employee');
+    sharedCache.delete(`users:list:${emp.unitId?.toString() ?? 'all'}`);
+    sharedCache.delete('users:list:all');
     return emp;
   }
 
@@ -85,5 +103,12 @@ export class EmployeeService {
     ).select('-passwordHash');
     if (!emp) throw new NotFoundError('Employee');
     return emp;
+  }
+
+  async hardDelete(id: string): Promise<void> {
+    const emp = await UserModel.findByIdAndDelete(id);
+    if (!emp) throw new NotFoundError('Employee');
+    sharedCache.delete(`users:list:${emp.unitId?.toString() ?? 'all'}`);
+    sharedCache.delete('users:list:all');
   }
 }

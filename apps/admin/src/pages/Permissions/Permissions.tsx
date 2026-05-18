@@ -43,6 +43,7 @@ export default function Permissions() {
   const [pendingEmail, setPendingEmail] = useState<string>('');
   const [pendingPhone, setPendingPhone] = useState<string>('');
   const [pendingLoginType, setPendingLoginType] = useState<'email' | 'phone'>('email');
+  const [pendingPassword, setPendingPassword] = useState<string>('');
   const [showModal, setShowModal] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{ show: boolean; userId: string; userName: string; isActive: boolean; action: 'toggle' | 'delete' } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -87,6 +88,7 @@ export default function Permissions() {
         setPendingPhone(u.phone || '');
         const isAutoEmail = !u.email || u.email.includes('@barbeariadodelio') || u.email.includes('@delio.staff') || u.email.includes('@delio.internal') || u.email.includes('@delio.guest');
         setPendingLoginType(u.phone && isAutoEmail ? 'phone' : u.email ? 'email' : 'phone');
+        setPendingPassword('');
       }
     }
   }, [expandedRow, users]);
@@ -110,7 +112,10 @@ export default function Permissions() {
       setNewUser({ name: '', email: '', phone: '19', password: '', role: 'employee', allowedApps: ['admin'] });
       setToast({ message: 'Usuário criado com sucesso!', type: 'success' });
     },
-    onError: () => setToast({ message: 'Erro ao criar usuário. Verifique os dados.', type: 'error' })
+    onError: (err: any) => {
+      const message = err.response?.data?.message || 'Erro ao criar usuário. Verifique os dados.';
+      setToast({ message, type: 'error' });
+    }
   });
 
   const updateMutation = useMutation({
@@ -254,10 +259,11 @@ export default function Permissions() {
                 const role = normalizeRole(u.role);
                 const isPassVisible = visiblePasswords.has(u._id);
                 const isExpanded = expandedRow === u._id;
-                const hasChanges = pendingRole !== role || 
+                const hasChanges = pendingRole !== role ||
                                  JSON.stringify(u.allowedApps || []) !== JSON.stringify(pendingAllowedApps) ||
                                  (pendingLoginType === 'email' ? pendingEmail !== (u.email || '') : pendingPhone !== (u.phone || '')) ||
-                                 (u.email && pendingLoginType === 'phone') || (u.phone && pendingLoginType === 'email');
+                                 (u.email && pendingLoginType === 'phone') || (u.phone && pendingLoginType === 'email') ||
+                                 pendingPassword.length > 0;
 
                 return (
                   <Fragment key={u._id}>
@@ -363,6 +369,28 @@ export default function Permissions() {
                                 )}
                               </div>
                               <div className={styles.accordionCol}>
+                                <label className={styles.label}>Nova Senha (opcional)</label>
+                                <div className={styles.inputGroup}>
+                                  <input
+                                    className={styles.input}
+                                    type="text"
+                                    value={pendingPassword}
+                                    onChange={e => setPendingPassword(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                    onClick={e => e.stopPropagation()}
+                                    placeholder="6 dígitos numéricos"
+                                    maxLength={6}
+                                  />
+                                  <button
+                                    type="button"
+                                    className={styles.btnSecondary}
+                                    style={{ whiteSpace: 'nowrap' }}
+                                    onClick={(e) => { e.stopPropagation(); setPendingPassword(Math.floor(100000 + Math.random() * 900000).toString()); }}
+                                  >
+                                    Gerar
+                                  </button>
+                                </div>
+                              </div>
+                              <div className={styles.accordionCol}>
                                 <label className={styles.label}>Nível de Acesso</label>
                                 <div className={styles.roleActionRow}>
                                   <select 
@@ -389,7 +417,8 @@ export default function Permissions() {
                                             payload.phone = pendingPhone.replace(/\D/g, '');
                                             payload.email = null;
                                           }
-                                          updateMutation.mutate(payload); 
+                                          if (pendingPassword.length > 0) payload.password = pendingPassword;
+                                          updateMutation.mutate(payload);
                                         }}
                                         disabled={updateMutation.isPending}
                                       >

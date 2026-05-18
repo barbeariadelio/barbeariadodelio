@@ -336,6 +336,20 @@
   border-radius: 8px;
 }
 
+.deleteAction {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 8px;
+  padding: 0.625rem 1rem;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  &:hover { background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.5); }
+}
+
 .toggleBtn {
   border-radius: 6px;
   padding: 0.5rem 0.875rem;

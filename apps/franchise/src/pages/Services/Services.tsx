@@ -170,7 +170,7 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
               {svc.isActive ? 'Ativo' : 'Inativo'}
             </span>
           </div>
-          <span className={styles.dashPrice}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>
+          {svc.showPrice !== false && <span className={styles.dashPrice}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>}
           <p className={styles.dashDesc}>{svc.description}</p>
         </div>
         <div className={styles.dashActions}>
@@ -496,7 +496,7 @@ function ServiceDetail({ svc, allServices, onClose, onEdit, onToggle, isToggling
 
         <div className={styles.panelBody}>
           <div className={styles.priceRow}>
-            <span className={styles.bigPrice}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>
+            {svc.showPrice !== false && <span className={styles.bigPrice}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>}
             <span className={styles.durationChip}>
               {svc.type === 'package' ? 'Pacote' : `${svc.durationMinutes} min`}
             </span>
@@ -632,7 +632,7 @@ export default function Services() {
               )}
 
               <div className={styles.meta}>
-                <span className={styles.price}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>
+                {svc.showPrice !== false && <span className={styles.price}>{svc.showPricePrefix !== false ? 'A partir de ' : ''}{formatCurrency(svc.price)}</span>}
                 <span className={styles.duration}>
                   {`${svc.durationMinutes} min`}
                 </span>

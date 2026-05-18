@@ -75,7 +75,6 @@ export async function deactivateEmployee(req: AuthRequest, res: Response, next: 
   try {
     const emp = await service.findById(req.params.id);
 
-    // Security check
     const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor && emp.unitId?.toString() !== req.user!.unitId?.toString()) {
       throw new AppError('Access denied to this unit', 403);
@@ -83,5 +82,21 @@ export async function deactivateEmployee(req: AuthRequest, res: Response, next: 
 
     const result = await service.deactivate(req.params.id);
     ok(res, result);
+  } catch (e) { next(e); }
+}
+
+export async function hardDeleteEmployee(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const emp = await service.findById(req.params.id);
+
+    if (req.user!.role !== 'owner') {
+      throw new AppError('Apenas proprietários podem excluir funcionários permanentemente', 403);
+    }
+    if (emp.unitId?.toString() !== req.user!.unitId?.toString() && req.user!.role !== 'owner') {
+      throw new AppError('Access denied to this unit', 403);
+    }
+
+    await service.hardDelete(req.params.id);
+    ok(res, { message: 'Funcionário excluído permanentemente.' });
   } catch (e) { next(e); }
 }

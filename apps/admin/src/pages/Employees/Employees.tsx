@@ -199,10 +199,11 @@ interface DetailProps {
   onClose: () => void;
   onEdit: () => void;
   onToggle: () => void;
+  onDelete: () => void;
   isToggling: boolean;
 }
 
-function EmployeeDetail({ emp, onClose, onEdit, onToggle, isToggling }: DetailProps) {
+function EmployeeDetail({ emp, onClose, onEdit, onToggle, onDelete, isToggling }: DetailProps) {
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className={styles.panel} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
@@ -302,6 +303,11 @@ function EmployeeDetail({ emp, onClose, onEdit, onToggle, isToggling }: DetailPr
           >
             {emp.isActive ? 'Desativar' : 'Ativar'}
           </button>
+          {!emp.isActive && (
+            <button className={styles.deleteAction} onClick={onDelete}>
+              Excluir
+            </button>
+          )}
         </div>
 
       </div>
@@ -312,9 +318,10 @@ function EmployeeDetail({ emp, onClose, onEdit, onToggle, isToggling }: DetailPr
 export default function Employees() {
   const { user } = useAuth();
   const unitId = getSelectedUnitId() || (user as any)?.unitId;
-  const [formTarget, setFormTarget]         = useState<Employee | null | 'new'>(null);
-  const [detailTarget, setDetailTarget]     = useState<Employee | null>(null);
+  const [formTarget, setFormTarget]               = useState<Employee | null | 'new'>(null);
+  const [detailTarget, setDetailTarget]           = useState<Employee | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<Employee | null>(null);
+  const [confirmDelete, setConfirmDelete]         = useState<Employee | null>(null);
   const qc = useQueryClient();
 
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
@@ -331,8 +338,19 @@ export default function Employees() {
       api.patch(`/employees/${emp._id}`, { isActive: !emp.isActive }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['users'] });
       setDetailTarget(null);
       setConfirmDeactivate(null);
+    },
+  });
+
+  const hardDelete = useMutation({
+    mutationFn: (emp: Employee) => api.delete(`/employees/${emp._id}/permanent`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['users'] });
+      setDetailTarget(null);
+      setConfirmDelete(null);
     },
   });
 
@@ -383,6 +401,15 @@ export default function Employees() {
               >
                 {emp.isActive ? 'Desativar' : 'Ativar'}
               </button>
+              {!emp.isActive && (
+                <button
+                  className={`${styles.toggleBtn} ${styles.deactivate}`}
+                  style={{ background: 'rgba(239,68,68,.08)', color: '#ef4444', borderColor: 'rgba(239,68,68,.25)' }}
+                  onClick={() => setConfirmDelete(emp)}
+                >
+                  Excluir
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -394,6 +421,7 @@ export default function Employees() {
           onClose={() => setDetailTarget(null)}
           onEdit={() => setFormTarget(detailTarget)}
           onToggle={() => detailTarget.isActive ? setConfirmDeactivate(detailTarget) : toggleActive.mutate(detailTarget)}
+          onDelete={() => { setDetailTarget(null); setConfirmDelete(detailTarget); }}
           isToggling={toggleActive.isPending}
         />
       )}
@@ -407,6 +435,18 @@ export default function Employees() {
           onConfirm={() => toggleActive.mutate(confirmDeactivate)}
           onCancel={() => setConfirmDeactivate(null)}
           isPending={toggleActive.isPending}
+        />
+      )}
+
+      {confirmDelete && (
+        <ConfirmModal
+          title="Excluir funcionário permanentemente?"
+          message={`Esta ação remove ${confirmDelete.name} do sistema definitivamente, incluindo o acesso à página de permissões. Não pode ser desfeita.`}
+          confirmLabel="Excluir permanentemente"
+          danger
+          onConfirm={() => hardDelete.mutate(confirmDelete)}
+          onCancel={() => setConfirmDelete(null)}
+          isPending={hardDelete.isPending}
         />
       )}
 
