@@ -33,7 +33,8 @@ export async function listUnits(req: AuthRequest, res: Response, next: NextFunct
       const franchise = await FranchiseModel.findOne({ franchisors: new mongoose.Types.ObjectId(id) });
 
       if (appScope === 'admin') {
-        units = ownUnits;
+        const franchiseUnitIds = new Set((franchise?.units ?? []).map(u => u.toString()));
+        units = ownUnits.filter(u => !franchiseUnitIds.has(u._id.toString()));
       } else if (appScope === 'franchise') {
         units = franchise && franchise.units.length > 0
           ? await service.findByIds(franchise.units.map(u => u.toString()))

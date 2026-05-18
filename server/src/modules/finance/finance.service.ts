@@ -124,7 +124,10 @@ export class FinanceService {
         ? franchise.units.map(u => u.toString())
         : [];
 
-      if (appScope === 'admin') return ownIds;
+      if (appScope === 'admin') {
+        const franchiseSet = new Set(franchiseIds);
+        return ownIds.filter(id => !franchiseSet.has(id));
+      }
       if (appScope === 'franchise') return franchiseIds;
 
       // No scope — return all (backwards compatible)
