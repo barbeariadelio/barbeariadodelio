@@ -103,20 +103,6 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
     },
   });
 
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const start = `${year}-${month}-01`;
-  const end = `${year}-${month}-31`;
-
-  const { data: appointments = [] } = useQuery<any[]>({
-    queryKey: ['appointments-for-package', start, end],
-    queryFn: async () => {
-      const { data } = await api.get(`/appointments?start=${start}&end=${end}`);
-      return Array.isArray(data) ? data : data.appointments ?? [];
-    },
-  });
-
   const assignMutation = useMutation({
     mutationFn: async (clientId: string) => {
       return api.post(`/clients/${clientId}/packages`, { packageId });
@@ -339,15 +325,13 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
                         const childSvc = allServices.find(s => s._id === item.serviceId);
                         
                         const sub = c.packages?.find((p: any) => p.packageId?._id === packageId && p.active);
-                        const customLimit = sub?.itemLimits?.find((l: any) => l.serviceId === item.serviceId);
-                        
-                        const total = customLimit ? customLimit.quantity : item.quantity;
-                        
-                        const used = appointments.filter(a => 
-                           a.clientId?._id === c._id && 
-                           a.serviceId?._id === item.serviceId && 
-                           a.status === 'completed'
-                        ).length;
+                        const limitEntry = sub?.itemLimits?.find((l: any) => {
+                          const lId = l.serviceId?._id ?? l.serviceId;
+                          return lId?.toString() === item.serviceId;
+                        });
+
+                        const total = limitEntry?.quantity ?? item.quantity;
+                        const used = limitEntry?.used ?? 0;
                         const perc = Math.min(100, Math.round((used / total) * 100));
                         const isExhausted = used >= total;
 
@@ -356,7 +340,7 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
                             <div className={styles.subscriberUsageRow}>
                               <span className={styles.subscriberUsageServiceName}>
                                 {childSvc?.name || 'Serviço'}
-                                {customLimit && <span className={styles.customLimitBadge}>*</span>}
+                                {limitEntry && limitEntry.quantity !== item.quantity && <span className={styles.customLimitBadge}>*</span>}
                               </span>
                               <span className={styles.subscriberUsageCount} style={{ color: isExhausted ? '#EF4444' : 'var(--blue-600)' }}>
                                 {used} de {total}

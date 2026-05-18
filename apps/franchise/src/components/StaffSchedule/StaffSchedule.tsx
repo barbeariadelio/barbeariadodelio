@@ -74,6 +74,9 @@ export interface ScheduleAppointment {
   endTime: string;
   price: number;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'blocked';
+  isBilled?: boolean;
+  isPackage?: boolean;
+  notes?: string;
 }
 
 function timeToHeight(s: string, e: string) {

@@ -74,6 +74,8 @@ export interface ScheduleAppointment {
   endTime: string;
   price: number;
   isBilled?: boolean;
+  isPackage?: boolean;
+  notes?: string;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'blocked';
 }
 

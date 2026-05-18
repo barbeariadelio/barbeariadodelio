@@ -396,6 +396,11 @@ export class AppointmentService {
       }
     }
 
+    if (isBuyingPackage) {
+      const totalSessions = svc.packageItems?.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1;
+      finalPrice = Math.round((svc.price / totalSessions) * 100) / 100;
+    }
+
     const finalIsPackage = isUsingPackage || isBuyingPackage;
 
     const conflict = await AppointmentModel.findOne({

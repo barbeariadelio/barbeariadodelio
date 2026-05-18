@@ -4,7 +4,7 @@ import { apiBaseUrl, getStoredAccessToken } from '../api/client';
 
 const EVENT_INVALIDATIONS: Record<string, string[][]> = {
   'appointments:change': [['appointments-day'], ['appointments-month'], ['emp-history']],
-  'clients:change': [['clients'], ['client-detail']],
+  'clients:change': [['clients'], ['client-detail'], ['clients-for-package']],
   'finance:change': [['finance'], ['transactions'], ['emp-vales']],
   'employees:change': [['employees']],
   'products:change': [['products']],
