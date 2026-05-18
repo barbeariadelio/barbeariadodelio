@@ -14,8 +14,6 @@ interface Unit {
   workingHours?: { start: string; end: string; lunchStart?: string; lunchEnd?: string };
   slotInterval?: number;
   calendarGrid?: number;
-  whatsappNumber?: string;
-  whatsappInstance?: string;
 }
 
 type Tab = 'profile' | 'unit';
@@ -51,8 +49,6 @@ export default function Settings() {
   const [whLunchEnd, setWhLunchEnd] = useState('');
   const [slotInterval, setSlotInterval] = useState<number>(0);
   const [calendarGrid, setCalendarGrid] = useState<number>(15);
-  const [whatsappNumber, setWhatsappNumber] = useState('5519982771959');
-  const [whatsappInstance, setWhatsappInstance] = useState('');
   const [unitSuccess, setUnitSuccess] = useState(false);
   const [unitError, setUnitError] = useState<string | null>(null);
 
@@ -80,8 +76,6 @@ export default function Settings() {
       setWhLunchEnd(unit.workingHours?.lunchEnd ?? '');
       setSlotInterval(unit.slotInterval ?? 0);
       setCalendarGrid(unit.calendarGrid ?? 15);
-      setWhatsappNumber(unit.whatsappNumber ?? '5519982771959');
-      setWhatsappInstance(unit.whatsappInstance ?? '');
     }
   }, [unit]);
 
@@ -131,8 +125,6 @@ export default function Settings() {
       },
       slotInterval,
       calendarGrid,
-      whatsappNumber: whatsappNumber.replace(/\D/g, '') || undefined,
-      whatsappInstance: whatsappInstance.trim() || undefined,
     });
   }
 
@@ -277,32 +269,6 @@ export default function Settings() {
                 <option value={15}>15 minutos</option>
                 <option value={30}>30 minutos</option>
               </select>
-            </div>
-
-            {/* ── WhatsApp ── */}
-            <div className={styles.field}>
-              <label className={styles.label}>
-                Número WhatsApp para confirmações
-                <span className={styles.optional}> (com DDI e DDD, sem +)</span>
-              </label>
-              <input
-                className={styles.input}
-                value={whatsappNumber}
-                onChange={e => setWhatsappNumber(e.target.value)}
-                placeholder="5519982771959"
-              />
-            </div>
-            <div className={styles.field}>
-              <label className={styles.label}>
-                Instância Evolution API
-                <span className={styles.optional}> (deixe vazio se não usar Evolution API)</span>
-              </label>
-              <input
-                className={styles.input}
-                value={whatsappInstance}
-                onChange={e => setWhatsappInstance(e.target.value)}
-                placeholder="nome-da-instancia"
-              />
             </div>
 
             {unitSuccess && <p className={styles.success}>Dados salvos com sucesso!</p>}
