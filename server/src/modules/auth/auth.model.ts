@@ -28,6 +28,7 @@ export interface IUser extends Document {
   blockedDays?: string[];
   isActive: boolean;
   allowedApps?: string[];
+  serviceIds?: mongoose.Types.ObjectId[];
   theme?: 'light' | 'dark';
   commissionRate?: number;
   tokenVersion: number;
@@ -65,6 +66,7 @@ const userSchema = new Schema<IUser>(
     blockedDays: [String],
     isActive: { type: Boolean, default: true },
     allowedApps: { type: [String], default: [] },
+    serviceIds: [{ type: Schema.Types.ObjectId, ref: 'Service' }],
     theme: { type: String, enum: ['light', 'dark'], default: 'light' },
     commissionRate: { type: Number },
     tokenVersion: { type: Number, default: 0 },
