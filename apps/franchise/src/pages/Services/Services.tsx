@@ -19,6 +19,7 @@ interface Service {
   durationMinutes: number;
   image?: string;
   isActive: boolean;
+  isOnline?: boolean;
   type?: 'single' | 'package';
   showPrice?: boolean;
   showPricePrefix?: boolean;
@@ -114,6 +115,12 @@ interface DetailProps {
 function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { svc: Service, allServices: Service[], onEdit: () => void, onToggle: () => void, isToggling: boolean }) {
   const packageId = svc._id;
   const qc = useQueryClient();
+
+  const updateDisplay = useMutation({
+    mutationFn: ({ id, ...patch }: { id: string; isOnline?: boolean }) =>
+      api.patch(`/services/${id}`, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['services'] }),
+  });
   const [isOpen, setIsOpen] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [search, setSearch] = useState("");
@@ -201,6 +208,17 @@ function PackageDashboard({ svc, allServices, onEdit, onToggle, isToggling }: { 
         </div>
         <div className={styles.dashActions} onClick={e => e.stopPropagation()}>
           <button className={styles.editBtn} onClick={onEdit}>Editar</button>
+          <button
+            title="Disponível para agendamento online"
+            onClick={e => { e.stopPropagation(); updateDisplay.mutate({ id: svc._id, isOnline: !svc.isOnline }); }}
+            style={{
+              fontSize: '0.75rem', fontWeight: 600, padding: '0.35rem 0.65rem', borderRadius: 6, border: 'none', cursor: 'pointer',
+              background: svc.isOnline ? 'rgba(234,179,8,0.15)' : 'rgba(120,120,120,0.12)',
+              color: svc.isOnline ? '#eab308' : 'var(--text-muted)',
+            }}
+          >
+            {svc.isOnline ? 'Online ✓' : 'Offline'}
+          </button>
           <button
             className={`${styles.toggleBtn} ${svc.isActive ? styles.deactivate : styles.activate}`}
             onClick={onToggle}
@@ -602,7 +620,7 @@ export default function Services() {
   });
 
   const updateDisplay = useMutation({
-    mutationFn: ({ id, ...patch }: { id: string; showPrice?: boolean; showPricePrefix?: boolean }) =>
+    mutationFn: ({ id, ...patch }: { id: string; showPrice?: boolean; showPricePrefix?: boolean; isOnline?: boolean }) =>
       api.patch(`/services/${id}`, patch),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['services'] }),
   });
@@ -705,6 +723,18 @@ export default function Services() {
                     {svc.showPricePrefix !== false ? '✓' : '✕'} &ldquo;A partir de&rdquo;
                   </button>
                 )}
+                <button
+                  title="Disponível para agendamento online"
+                  onClick={() => updateDisplay.mutate({ id: svc._id, isOnline: !svc.isOnline })}
+                  style={{
+                    fontSize: '0.7rem', fontWeight: 600, padding: '0.2rem 0.5rem', borderRadius: 20, border: 'none', cursor: 'pointer',
+                    background: svc.isOnline ? 'rgba(234,179,8,0.15)' : 'rgba(120,120,120,0.12)',
+                    color: svc.isOnline ? '#eab308' : 'var(--text-muted)',
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  {svc.isOnline ? '✓' : '✕'} Online
+                </button>
               </div>
 
               <div className={styles.cardActions} onClick={e => e.stopPropagation()}>
