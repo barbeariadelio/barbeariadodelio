@@ -115,13 +115,9 @@ export default function Permissions() {
       }
       // Explicitly set unitId from the active franchise unit so the employee is
       // scoped to this unit even when the owner's JWT has no unitId.
-      const activeUnitId = getSelectedUnitId();
-      if (activeUnitId) {
-        payload.unitId = activeUnitId;
-        // allowedApps must contain the unit ID so the auth service can validate
-        // the login appId (which is also the unit ID in the franchise app).
-        payload.allowedApps = [activeUnitId];
-      }
+      const activeUnitId = getSelectedUnitId() || '69fa463aa078044937f70250';
+      payload.unitId = activeUnitId;
+      payload.allowedApps = [activeUnitId];
       return api.post('/users/register', payload);
     },
     onSuccess: () => {

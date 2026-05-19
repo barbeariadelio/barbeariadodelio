@@ -31,7 +31,7 @@ export class EmployeeService {
     // Free unique indexes held by deactivated users so the new employee can use the same email/phone
     const orConditions: any[] = [];
     if (data.email) orConditions.push({ email: data.email.toLowerCase() });
-    if (data.phone) orConditions.push({ phone: data.phone });
+    if (rawPhone) orConditions.push({ phone: rawPhone });
     if (orConditions.length > 0) {
       await UserModel.updateMany(
         { $or: orConditions, isActive: false },
@@ -53,7 +53,7 @@ export class EmployeeService {
       vacations: data.vacations,
       blockedDays: data.blockedDays,
       isActive: true,
-      allowedApps: ['admin'],
+      allowedApps: data.allowedApps ?? ['admin'],
     });
 
     sharedCache.delete(`users:list:${data.unitId || 'all'}`);

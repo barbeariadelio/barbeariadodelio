@@ -68,7 +68,8 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
         : api.post('/employees', payload),
     onSuccess,
     onError: (err: unknown) => {
-      setError(err instanceof Error ? err.message : 'Erro ao salvar funcionário.');
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(msg || 'Erro ao salvar funcionário.');
     },
   });
 
@@ -110,7 +111,9 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
       avatar,
       daySchedules,
       vacations,
-      blockedDays: finalBlockedDays.sort()
+      blockedDays: finalBlockedDays.sort(),
+      unitId: '69fa463aa078044937f7024e',
+      allowedApps: ['69fa463aa078044937f7024e'],
     };
     if (password) payload.password = password;
 

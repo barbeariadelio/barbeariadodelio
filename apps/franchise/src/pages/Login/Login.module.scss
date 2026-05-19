@@ -116,6 +116,37 @@
   &:hover { color: var(--text-secondary); }
 }
 
+.modeToggle {
+  display: flex;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 3px;
+  margin-bottom: 0.5rem;
+}
+
+.modeBtn {
+  flex: 1;
+  padding: 0.5rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover:not(.modeBtnActive) { color: var(--text-primary); }
+}
+
+.modeBtnActive {
+  background: var(--bg-surface);
+  color: var(--gold);
+  box-shadow: var(--shadow-sm);
+}
+
 .btn {
   background: var(--gold);
   color: white;
