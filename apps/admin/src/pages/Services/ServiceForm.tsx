@@ -30,6 +30,7 @@ interface Service {
   durationMinutes: number;
   image?: string;
   isActive: boolean;
+  isOnline?: boolean;
   type?: 'single' | 'package';
   showPrice?: boolean;
   showPricePrefix?: boolean;
@@ -65,6 +66,7 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
   const [image, setImage] = useState(service?.image ?? '');
   const [showPrice, setShowPrice] = useState(service?.showPrice !== false);
   const [showPricePrefix, setShowPricePrefix] = useState(service?.showPricePrefix !== false);
+  const [isOnline, setIsOnline] = useState(service?.isOnline === true);
   const [error, setError] = useState<string | null>(null);
 
   // Package fields
@@ -133,6 +135,7 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
       type,
       showPrice,
       showPricePrefix,
+      isOnline,
     };
 
     if (unitId && !isEdit) payload.unitId = unitId;
@@ -249,6 +252,24 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
                 </label>
               )}
             </div>
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Disponibilidade Online</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', cursor: 'pointer', marginTop: '0.25rem' }}>
+              <input
+                type="checkbox"
+                checked={isOnline}
+                onChange={e => setIsOnline(e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: 'var(--gold)', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>
+                Disponível para agendamento online pelo cliente
+              </span>
+            </label>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+              Novos serviços começam desabilitados. Ative quando quiser que clientes possam agendar.
+            </p>
           </div>
 
           {type === 'package' && (
