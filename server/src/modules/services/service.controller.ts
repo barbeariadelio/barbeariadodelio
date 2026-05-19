@@ -15,7 +15,8 @@ export async function listServices(req: AuthRequest, res: Response, next: NextFu
       ? resolveUnitId(req)
       : (req.query.unitId as string | undefined) || null;
     if (!unitId) { ok(res, []); return; }
-    const services = await service.findByUnit(unitId);
+    const onlineOnly = req.query.online === 'true';
+    const services = await service.findByUnit(unitId, onlineOnly);
     ok(res, services);
   } catch (e) { next(e); }
 }
