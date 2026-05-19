@@ -13,7 +13,7 @@ function maskPhone(raw: string) {
 }
 
 interface Unit { _id: string; name: string; apiUrl?: string; }
-interface Employee { _id: string; name: string; }
+interface Employee { _id: string; name: string; serviceIds?: string[]; }
 interface Client {
   _id: string;
   name: string;
@@ -145,6 +145,11 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     queryFn: () => unitApi.get(`/services${unitId ? `?unitId=${unitId}` : ''}`).then(r => Array.isArray(r.data) ? r.data : r.data?.services ?? []),
     enabled: !!unitId,
   });
+
+  const selectedEmployee = employees.find(e => e._id === employeeId);
+  const visibleServices = selectedEmployee?.serviceIds?.length
+    ? services.filter(s => selectedEmployee.serviceIds!.includes(s._id))
+    : services;
 
   const filteredClients = clientSearch.trim()
     ? clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase().trim()))
@@ -370,7 +375,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
 
           <div className={styles.field} style={{ opacity: unitId ? 1 : 0.5, pointerEvents: unitId ? 'auto' : 'none' }}>
             <label className={styles.label}>Barbeiro *</label>
-            <select className={styles.select} value={employeeId} onChange={e => setEmployeeId(e.target.value)} required>
+            <select className={styles.select} value={employeeId} onChange={e => { setEmployeeId(e.target.value); setServiceId(''); }} required>
               <option value="">Selecione um barbeiro</option>
               {employees.map(emp => <option key={emp._id} value={emp._id}>{emp.name}</option>)}
             </select>
@@ -380,7 +385,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
             <label className={styles.label}>Serviço *</label>
             <select className={styles.select} value={serviceId} onChange={e => setServiceId(e.target.value)} required>
               <option value="">Selecione um serviço</option>
-              {services.map(s => (
+              {visibleServices.map(s => (
                 <option key={s._id} value={s._id}>
                   {s.name} — {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(s.price)} ({s.durationMinutes > 0 ? `${s.durationMinutes}min` : 'Pacote'})
                 </option>
