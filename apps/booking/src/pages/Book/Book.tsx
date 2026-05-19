@@ -8,11 +8,11 @@ import styles from './Book.module.scss';
 
 interface Unit { _id: string; name: string; apiUrl?: string; workingDays?: number[]; }
 interface Service { _id: string; name: string; description?: string; price: number; durationMinutes: number; isActive?: boolean; image?: string; showPrice?: boolean; showPricePrefix?: boolean; }
-interface Employee { _id: string; name: string; avatar?: string; daySchedules?: { day: number; slots: { start: string; end: string }[] }[]; workSchedule?: { workDays?: number[] }; }
+interface Employee { _id: string; name: string; avatar?: string; serviceIds?: string[]; daySchedules?: { day: number; slots: { start: string; end: string }[] }[]; workSchedule?: { workDays?: number[] }; }
 
-type Step = 'service' | 'barber' | 'datetime' | 'confirm';
-const STEPS: Step[] = ['service', 'barber', 'datetime', 'confirm'];
-const STEP_LABELS = ['Serviço', 'Barbeiro', 'Data & Hora', 'Confirmação'];
+type Step = 'barber' | 'service' | 'datetime' | 'confirm';
+const STEPS: Step[] = ['barber', 'service', 'datetime', 'confirm'];
+const STEP_LABELS = ['Barbeiro', 'Serviço', 'Data & Hora', 'Confirmação'];
 const MONTHS_PT = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const MONTHS_SHORT = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 const WEEK_SHORT = ['D','S','T','Q','Q','S','S'];
@@ -179,7 +179,7 @@ export default function Book() {
     return instance;
   }, [unit?.apiUrl]);
 
-  const [step, setStep] = useState<Step>('service');
+  const [step, setStep] = useState<Step>('barber');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [selectedDate, setSelectedDate] = useState(todayISO());
@@ -205,7 +205,7 @@ export default function Book() {
 
   const { data: services = [], isLoading: svcLoading } = useQuery<Service[]>({
     queryKey: ['services', unitId, unit?.apiUrl],
-    queryFn: async () => { const { data } = await unitApi.get(`/services?unitId=${unitId}`); return Array.isArray(data) ? data : data.services ?? []; },
+    queryFn: async () => { const { data } = await unitApi.get(`/services?unitId=${unitId}&online=true`); return Array.isArray(data) ? data : data.services ?? []; },
     enabled: !!unitId && !!unit,
   });
 
@@ -214,6 +214,10 @@ export default function Book() {
     queryFn: async () => { const { data } = await unitApi.get(`/employees/public?unitId=${unitId}`); return Array.isArray(data) ? data : data.employees ?? []; },
     enabled: !!unitId && !!unit,
   });
+
+  const visibleServices = selectedEmployee?.serviceIds?.length
+    ? services.filter(s => selectedEmployee.serviceIds!.includes(s._id))
+    : services;
 
   const { data: slots = [], isFetching: slotsLoading } = useQuery<string[]>({
     queryKey: ['slots', unitId, selectedEmployee?._id, selectedDate, selectedService?.durationMinutes, unit?.apiUrl],
@@ -385,11 +389,11 @@ export default function Book() {
             {step === 'service' && (
               <div className={styles.serviceList}>
                 {svcLoading && <p className={styles.loading}>Carregando serviços...</p>}
-                {services.filter(s => s.isActive !== false).map(svc => (
+                {visibleServices.filter(s => s.isActive !== false).map(svc => (
                   <button
                     key={svc._id}
                     className={`${styles.svcRow} ${selectedService?._id === svc._id ? styles.svcRowSel : ''}`}
-                    onClick={() => { setSelectedService(svc); setStep(editId ? 'confirm' : 'barber'); }}
+                    onClick={() => { setSelectedService(svc); setStep(editId ? 'confirm' : 'datetime'); }}
                   >
                     <div className={styles.svcIcon}>
                       {svc.image ? (
@@ -426,7 +430,7 @@ export default function Book() {
                   <button
                     key={emp._id}
                     className={`${styles.empCard} ${selectedEmployee?._id === emp._id ? styles.empCardSel : ''}`}
-                    onClick={() => { setSelectedEmployee(emp); setStep(editId ? 'confirm' : 'datetime'); }}
+                    onClick={() => { setSelectedEmployee(emp); setStep(editId ? 'confirm' : 'service'); }}
                   >
                     <div className={styles.empAvatarWrap}>
                       <div className={styles.empAvatar}>
