@@ -1,8 +1,10 @@
 import { FormEvent, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { api, getSelectedUnitId } from '../../api/client';
 import styles from './EmployeeForm.module.scss';
+
+interface ServiceOption { _id: string; name: string; type?: string; }
 
 type DaySlot = { start: string; end: string };
 type DaySchedule = { day: number; slots: DaySlot[] };
@@ -59,6 +61,9 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
   const [blockedDays, setBlockedDays] = useState<string[]>(employee?.blockedDays ?? []);
   const [newBlockedDay, setNewBlockedDay] = useState('');
   const [initialVale, setInitialVale] = useState('');
+  const [serviceIds, setServiceIds] = useState<string[]>(
+    (employee as any)?.serviceIds?.map((id: any) => typeof id === 'object' ? id._id : id) ?? []
+  );
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
@@ -70,6 +75,15 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       setError(msg || 'Erro ao salvar funcionário.');
+    },
+  });
+
+  const franchiseUnitId = getSelectedUnitId() || '69fa463aa078044937f70250';
+  const { data: availableServices = [] } = useQuery<ServiceOption[]>({
+    queryKey: ['services-for-form', franchiseUnitId],
+    queryFn: async () => {
+      const { data } = await api.get(`/services?unitId=${franchiseUnitId}`);
+      return (Array.isArray(data) ? data : data.services ?? []).filter((s: ServiceOption) => s.type !== 'package');
     },
   });
 
@@ -115,6 +129,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
       blockedDays: finalBlockedDays.sort(),
       unitId: franchiseUnitId,
       allowedApps: [franchiseUnitId],
+      serviceIds,
     };
     if (!isEdit || password) payload.password = password;
     
@@ -315,6 +330,32 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
                 />
               </div>
               <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>Este valor será descontado automaticamente do primeiro salário.</p>
+            </div>
+          )}
+
+          {availableServices.length > 0 && (
+            <div className={styles.field}>
+              <label className={styles.label}>Serviços que realiza</label>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2, marginBottom: '0.5rem' }}>
+                Deixe em branco para habilitar todos os serviços.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                {availableServices.map(svc => (
+                  <label key={svc._id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={serviceIds.includes(svc._id)}
+                      onChange={e => {
+                        setServiceIds(prev =>
+                          e.target.checked ? [...prev, svc._id] : prev.filter(id => id !== svc._id)
+                        );
+                      }}
+                      style={{ width: 15, height: 15, accentColor: 'var(--gold)', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>{svc.name}</span>
+                  </label>
+                ))}
+              </div>
             </div>
           )}
 

@@ -1,7 +1,9 @@
 import { FormEvent, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import styles from './EmployeeForm.module.scss';
+
+interface ServiceOption { _id: string; name: string; type?: string; }
 
 type DaySlot = { start: string; end: string };
 type DaySchedule = { day: number; slots: DaySlot[] };
@@ -58,6 +60,9 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
   const [blockedDays, setBlockedDays] = useState<string[]>(employee?.blockedDays ?? []);
   const [newBlockedDay, setNewBlockedDay] = useState('');
   const [initialVale, setInitialVale] = useState('');
+  const [serviceIds, setServiceIds] = useState<string[]>(
+    (employee as any)?.serviceIds?.map((id: any) => typeof id === 'object' ? id._id : id) ?? []
+  );
   const [error, setError] = useState<string | null>(null);
   const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null);
 
@@ -73,6 +78,15 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
     },
   });
 
+  const adminUnitId = '69fa463aa078044937f7024e';
+  const { data: availableServices = [] } = useQuery<ServiceOption[]>({
+    queryKey: ['services-for-form', adminUnitId],
+    queryFn: async () => {
+      const { data } = await api.get(`/services?unitId=${adminUnitId}`);
+      return (Array.isArray(data) ? data : data.services ?? []).filter((s: ServiceOption) => s.type !== 'package');
+    },
+  });
+
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -80,7 +94,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
     reader.onloadend = () => setAvatar(reader.result as string);
     reader.readAsDataURL(file);
   }
-  
+
   function addBlockedDay() {
     if (newBlockedDay && !blockedDays.includes(newBlockedDay)) {
       setBlockedDays([...blockedDays, newBlockedDay].sort());
@@ -114,6 +128,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
       blockedDays: finalBlockedDays.sort(),
       unitId: '69fa463aa078044937f7024e',
       allowedApps: ['69fa463aa078044937f7024e'],
+      serviceIds,
     };
     if (password) payload.password = password;
 
@@ -350,6 +365,32 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
                 />
               </div>
               <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>Este valor será descontado automaticamente do primeiro salário.</p>
+            </div>
+          )}
+
+          {availableServices.length > 0 && (
+            <div className={styles.field}>
+              <label className={styles.label}>Serviços que realiza</label>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 2, marginBottom: '0.5rem' }}>
+                Deixe em branco para habilitar todos os serviços.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                {availableServices.map(svc => (
+                  <label key={svc._id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={serviceIds.includes(svc._id)}
+                      onChange={e => {
+                        setServiceIds(prev =>
+                          e.target.checked ? [...prev, svc._id] : prev.filter(id => id !== svc._id)
+                        );
+                      }}
+                      style={{ width: 15, height: 15, accentColor: 'var(--gold)', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontSize: '0.875rem', color: 'var(--text-primary)' }}>{svc.name}</span>
+                  </label>
+                ))}
+              </div>
             </div>
           )}
 
