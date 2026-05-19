@@ -241,12 +241,14 @@ export default function Dashboard() {
                 {monthAppointments.length} agendamento{monthAppointments.length !== 1 ? 's' : ''}
               </span>
             </div>
-            <button className={styles.newApptBtn} onClick={() => setShowForm(true)}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
-              Novo Agendamento
-            </button>
+            {!isStaff && (
+              <button className={styles.newApptBtn} onClick={() => setShowForm(true)}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Novo Agendamento
+              </button>
+            )}
           </div>
           <CalendarView
             appointments={monthAppointments}
@@ -260,7 +262,9 @@ export default function Dashboard() {
             isDeleting={deleteMut.isPending}
             isProcessing={statusMut.isPending || deleteMut.isPending}
             onEdit={(appt) => { setEditAppt(appt); setShowForm(true); }}
-            onViewProfile={(clientId) => navigate(`/clients?id=${clientId}`)}
+            onViewProfile={!isStaff ? (clientId) => navigate(`/clients?id=${clientId}`) : undefined}
+            canEdit={!isStaff}
+            canDelete={!isStaff}
             canBill={!isStaff}
           />
         </div>
@@ -299,13 +303,14 @@ export default function Dashboard() {
           isProcessing={statusMut.isPending || blockMut.isPending || updateApptMut.isPending}
           isDeleting={deleteMut.isPending}
           businessName="Barber Franchise"
-          onProfileClick={(clientId) => navigate(`/clients?id=${clientId}`)}
+          onProfileClick={!isStaff ? (clientId) => navigate(`/clients?id=${clientId}`) : undefined}
           onEmployeeClick={(employeeId) => navigate(`/employees?id=${employeeId}`)}
+          canManageAppointments={!isStaff}
           canBill={!isStaff}
         />
       )}
 
-      {showForm && (
+      {showForm && !isStaff && (
         <AppointmentForm
           appointment={editAppt}
           initialDate={!editAppt && view === 'schedule' ? dateISO(selectedDay) : undefined}

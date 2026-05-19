@@ -187,6 +187,7 @@ interface ModalProps {
   onProfileClick?: (clientId: string) => void;
   businessName?: string;
   canBill?: boolean;
+  canManageAppointments?: boolean;
 }
 
 function ApptModal({
@@ -202,6 +203,7 @@ function ApptModal({
   onProfileClick,
   businessName,
   canBill = true,
+  canManageAppointments = true,
 }: ModalProps) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -233,9 +235,9 @@ function ApptModal({
         <div className={styles.panelHead}>
           <div className={styles.panelActions}>
              <button className={styles.actionIcon} title="Enviar WhatsApp" onClick={() => setShowWhatsApp(true)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
-             <button className={styles.actionIcon} title="Editar" onClick={() => onEdit?.(appt)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-             {!appt.isBilled && !appt.productsBilled && <button className={styles.actionIcon} title="Excluir" onClick={() => appt.seriesId ? setConfirmDeleteSeries(true) : setConfirmDelete(true)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>}
-             <button className={styles.actionIcon} title="Perfil do Cliente" onClick={() => appt.clientId?._id && onProfileClick?.(appt.clientId._id)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+             {canManageAppointments && <button className={styles.actionIcon} title="Editar" onClick={() => onEdit?.(appt)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>}
+             {canManageAppointments && !appt.isBilled && !appt.productsBilled && <button className={styles.actionIcon} title="Excluir" onClick={() => appt.seriesId ? setConfirmDeleteSeries(true) : setConfirmDelete(true)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>}
+             {onProfileClick && appt.clientId?._id && <button className={styles.actionIcon} title="Perfil do Cliente" onClick={() => onProfileClick(appt.clientId!._id!)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>}
           </div>
           <button className={styles.closeBtn} onClick={onClose}><XIcon /></button>
         </div>
@@ -255,17 +257,21 @@ function ApptModal({
             <div className={styles.infoRow}>
               <div className={styles.infoIcon}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg></div>
               <div className={styles.statusSelectWrap}>
-                <select 
-                  className={styles.statusSelect}
-                  value={appt.status}
-                  onChange={(e) => onStatusChange(appt._id, e.target.value)}
-                  disabled={isPending}
-                >
-                  {Object.entries(STATUS_LABELS).map(([val, label]) => (
-                    <option key={val} value={val}>{label}</option>
-                  ))}
-                  <option value="blocked" disabled>Bloqueado</option>
-                </select>
+                {canManageAppointments ? (
+                  <select 
+                    className={styles.statusSelect}
+                    value={appt.status}
+                    onChange={(e) => onStatusChange(appt._id, e.target.value)}
+                    disabled={isPending}
+                  >
+                    {Object.entries(STATUS_LABELS).map(([val, label]) => (
+                      <option key={val} value={val}>{label}</option>
+                    ))}
+                    <option value="blocked" disabled>Bloqueado</option>
+                  </select>
+                ) : (
+                  <span className={styles.statusSelect}>{STATUS_LABELS[appt.status] ?? appt.status}</span>
+                )}
               </div>
             </div>
 
@@ -336,7 +342,7 @@ function ApptModal({
           })()}
         </div>
 
-        {appt.status !== 'blocked' && (
+        {canManageAppointments && appt.status !== 'blocked' && (
           <div className={styles.panelFooter}>
             <span className={styles.footerLabel}>Alterar status</span>
             <div className={styles.footerBtns}>
@@ -687,6 +693,7 @@ interface Props {
   onEmployeeClick?: (employeeId: string) => void;
   businessName?: string;
   canBill?: boolean;
+  canManageAppointments?: boolean;
   slotDuration?: number;
 }
 
@@ -713,6 +720,7 @@ export default function StaffSchedule({
   onEmployeeClick,
   businessName,
   canBill = true,
+  canManageAppointments = true,
   slotDuration = 30,
 }: Props) {
   const startHour = workingHours?.start ? parseInt(workingHours.start.split(':')[0], 10) : 8;
@@ -729,6 +737,7 @@ export default function StaffSchedule({
     : PALETTES[0];
 
   function confirmBlock(endTime: string) {
+    if (!canManageAppointments) return;
     if (!blockPrompt) return;
     onBlock({
       employeeId: blockPrompt.employeeId,
@@ -802,13 +811,15 @@ export default function StaffSchedule({
             <span className={styles.showMobile}>{shortDateLabel}</span>
           </span>
         </div>
-        <button className={styles.newBtn} onClick={onNewAppt}>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          <span className={styles.hideMobile}>Novo Agendamento</span>
-          <span className={styles.showMobile}>Novo</span>
-        </button>
+        {canManageAppointments && (
+          <button className={styles.newBtn} onClick={onNewAppt}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            <span className={styles.hideMobile}>Novo Agendamento</span>
+            <span className={styles.showMobile}>Novo</span>
+          </button>
+        )}
       </div>
 
       <div className={styles.scheduleOuter} ref={scrollRef}>
@@ -871,10 +882,10 @@ export default function StaffSchedule({
                     <div
                       key={t}
                       className={`${styles.slot} ${si % slotsPerHour === 0 ? styles.slotHour : ''}`}
-                      style={{ height: SLOT_H, cursor: (fullyBlocked || isUnitClosedDay) ? 'default' : 'pointer' }}
+                      style={{ height: SLOT_H, cursor: (fullyBlocked || isUnitClosedDay || !canManageAppointments) ? 'default' : 'pointer' }}
                       data-time={`${t} – ${endT}`}
                       onClick={() => {
-                        if (!fullyBlocked && !isUnitClosedDay) {
+                        if (canManageAppointments && !fullyBlocked && !isUnitClosedDay) {
                           setSlotMenu({ employeeId: emp._id, employeeName: emp.name.split(' ')[0], time: t });
                         }
                       }}
@@ -1030,6 +1041,7 @@ export default function StaffSchedule({
           onProfileClick={onProfileClick}
           businessName={businessName}
           canBill={canBill}
+          canManageAppointments={canManageAppointments}
           onEdit={(a) => {
             setSelectedAppt(null);
             onEdit?.(a);
@@ -1037,7 +1049,7 @@ export default function StaffSchedule({
         />
       )}
 
-      {slotMenu && (
+      {canManageAppointments && slotMenu && (
         <SlotChoiceModal
           prompt={slotMenu}
           onNewAppt={() => {

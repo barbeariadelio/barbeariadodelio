@@ -699,10 +699,13 @@ export default function Finance() {
                       {unitName}
                     </div>
                     <div className={styles.commissionTable}>
-                      <div className={styles.commissionHeader}>
+                      <div
+                        className={styles.commissionHeader}
+                        style={isStaff ? { gridTemplateColumns: '2.5fr 80px 1.2fr 1fr 1.2fr', minWidth: 0 } : undefined}
+                      >
                         <span>Profissional</span>
                         <span>Atend.</span>
-                        <span>Receita Gerada</span>
+                        {!isStaff && <span>Receita Gerada</span>}
                         {!isStaff && <span style={{ textAlign: 'center' }}>%</span>}
                         <span>Comissão</span>
                         <span>Vales</span>
@@ -714,13 +717,17 @@ export default function Finance() {
                         const gross = emp.grossRevenue * (rate / 100);
                         const salonShare = emp.grossRevenue - gross;
                         return (
-                          <div key={emp.id} className={styles.commissionRow}>
+                          <div
+                            key={emp.id}
+                            className={styles.commissionRow}
+                            style={isStaff ? { gridTemplateColumns: '2.5fr 80px 1.2fr 1fr 1.2fr', minWidth: 0 } : undefined}
+                          >
                             <div className={styles.empName}>
                               <div className={styles.empAvatar}>{emp.name.charAt(0).toUpperCase()}</div>
                               <span>{emp.name}</span>
                             </div>
                             <span className={styles.commissionCell}>{emp.appointments}</span>
-                            <span className={`${styles.commissionCell} ${styles.amber}`}>{formatCurrency(emp.grossRevenue)}</span>
+                            {!isStaff && <span className={`${styles.commissionCell} ${styles.amber}`}>{formatCurrency(emp.grossRevenue)}</span>}
                             {!isStaff && (
                               <div className={styles.miniRateInputWrap}>
                                 <input
