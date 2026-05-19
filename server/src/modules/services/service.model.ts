@@ -14,6 +14,7 @@ export interface IService extends Document {
   unitId: mongoose.Types.ObjectId;
   image?: string;
   isActive: boolean;
+  isOnline: boolean;
   type: 'single' | 'package';
   showPrice: boolean;
   showPricePrefix: boolean;
@@ -33,6 +34,7 @@ const serviceSchema = new Schema<IService>(
     unitId:          { type: Schema.Types.ObjectId, ref: 'Unit', required: true },
     image:            String,
     isActive:         { type: Boolean, default: true },
+    isOnline:         { type: Boolean, default: false },
     type:             { type: String, enum: ['single', 'package'], default: 'single' },
     showPrice:        { type: Boolean, default: true },
     showPricePrefix:  { type: Boolean, default: true },
