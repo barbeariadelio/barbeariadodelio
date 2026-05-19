@@ -8,6 +8,14 @@ interface Props {
   onSuccess: () => void;
 }
 
+function maskPhone(val: string): string {
+  const d = val.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 2) return d;
+  if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
 export default function ClientForm({ onClose, onSuccess }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -26,7 +34,7 @@ export default function ClientForm({ onClose, onSuccess }: Props) {
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    mutation.mutate({ name, email, phone, notes });
+    mutation.mutate({ name, email, phone: phone.replace(/\D/g, ''), notes });
   }
 
   return (
@@ -54,7 +62,14 @@ export default function ClientForm({ onClose, onSuccess }: Props) {
 
           <div className={styles.field}>
             <label className={styles.label}>Telefone</label>
-            <input className={styles.input} value={phone} onChange={e => setPhone(e.target.value)} placeholder="(19) 9XXXX-XXXX" />
+            <input
+              className={styles.input}
+              type="tel"
+              inputMode="numeric"
+              value={phone}
+              onChange={e => setPhone(maskPhone(e.target.value))}
+              placeholder="(19) 9XXXX-XXXX"
+            />
           </div>
 
           <div className={styles.field}>

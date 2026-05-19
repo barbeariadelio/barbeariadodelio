@@ -42,18 +42,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function init() {
       const token = getStoredAccessToken();
-      if (token && !user) {
+      if (token) {
         try {
           const { data } = await api.get('/auth/me');
           handleSetUser(data);
         } catch {
-          localStorage.removeItem(storageKeys.accessToken);
+          // refresh failed inside interceptor → auth storage already cleared
+          setUser(null);
         }
+      } else {
+        setUser(null);
       }
       setLoading(false);
     }
     init();
-  }, [user]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleSetUser(u: User | null) {
     if (u) {

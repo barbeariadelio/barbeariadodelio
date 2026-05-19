@@ -1,7 +1,7 @@
 import { FormEvent, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { api, resolveApiBaseUrl } from '../../api/client';
+import { api, resolveApiBaseUrl, getStoredAccessToken } from '../../api/client';
 import styles from './AppointmentForm.module.scss';
 
 function maskPhone(raw: string) {
@@ -108,10 +108,32 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  const envUnitId = (import.meta.env.VITE_UNIT_ID as string | undefined) || '';
+
   const { data: units = [] } = useQuery<Unit[]>({
-    queryKey: ['units'],
-    queryFn: () => api.get('/units').then(r => Array.isArray(r.data) ? r.data : r.data?.units ?? []),
+    queryKey: ['units', envUnitId],
+    queryFn: async () => {
+      try {
+        const r = await api.get('/units');
+        const list: Unit[] = Array.isArray(r.data) ? r.data : r.data?.units ?? [];
+        if (list.length > 0) return list;
+      } catch { /* fallback below */ }
+      // Fallback: busca a unidade pela rota pública (sem autenticação)
+      if (envUnitId) {
+        const r = await api.get(`/units/public/${envUnitId}`);
+        const unit = r.data;
+        return unit ? [unit] : [];
+      }
+      return [];
+    },
   });
+
+  // Auto-seleciona quando as unidades carregam e unitId ainda está vazio
+  useEffect(() => {
+    if (units.length === 1 && !unitId) {
+      setUnitId(units[0]._id);
+    }
+  }, [units, unitId]);
 
   const selectedUnit = units.find(u => u._id === unitId);
 
@@ -119,6 +141,11 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     const base = resolveApiBaseUrl(selectedUnit?.apiUrl);
     const instance = axios.create({ baseURL: base, withCredentials: true });
     instance.interceptors.request.use(config => {
+      const token = getStoredAccessToken();
+      if (token && token !== 'undefined' && token !== 'null') {
+        config.headers = config.headers || {};
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
       return config;
     });
     instance.interceptors.response.use(res => {

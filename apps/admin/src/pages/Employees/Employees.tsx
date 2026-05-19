@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { api, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import EmployeeForm from './EmployeeForm';
@@ -323,6 +324,7 @@ export default function Employees() {
   const [confirmDeactivate, setConfirmDeactivate] = useState<Employee | null>(null);
   const [confirmDelete, setConfirmDelete]         = useState<Employee | null>(null);
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
     queryKey: ['employees', unitId],
@@ -332,6 +334,17 @@ export default function Employees() {
     },
     enabled: !!user,
   });
+
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (id && employees.length > 0) {
+      const emp = employees.find(e => e._id === id);
+      if (emp) {
+        setDetailTarget(emp);
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [searchParams, employees]);
 
   const toggleActive = useMutation({
     mutationFn: (emp: Employee) =>

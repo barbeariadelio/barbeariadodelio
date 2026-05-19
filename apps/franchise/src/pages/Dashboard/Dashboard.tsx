@@ -300,6 +300,7 @@ export default function Dashboard() {
           isDeleting={deleteMut.isPending}
           businessName="Barber Franchise"
           onProfileClick={(clientId) => navigate(`/clients?id=${clientId}`)}
+          onEmployeeClick={(employeeId) => navigate(`/employees?id=${employeeId}`)}
           canBill={!isStaff}
         />
       )}

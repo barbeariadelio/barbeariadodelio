@@ -684,6 +684,7 @@ interface Props {
   isProcessing?: boolean;
   isDeleting?: boolean;
   onProfileClick?: (clientId: string) => void;
+  onEmployeeClick?: (employeeId: string) => void;
   businessName?: string;
   canBill?: boolean;
   slotDuration?: number;
@@ -709,6 +710,7 @@ export default function StaffSchedule({
   isDeleting = false,
   onUpdateAppt,
   onProfileClick,
+  onEmployeeClick,
   businessName,
   canBill = true,
   slotDuration = 30,
@@ -816,7 +818,12 @@ export default function StaffSchedule({
             const pal = PALETTES[i % PALETTES.length];
             return (
               <div key={emp._id} className={styles.empHeader} style={{ height: HEADER_H }}>
-                <div className={styles.avatar} style={{ background: pal.avatar }}>
+                <div
+                  className={styles.avatar}
+                  style={{ background: pal.avatar, cursor: onEmployeeClick ? 'pointer' : 'default' }}
+                  title={onEmployeeClick ? `Ver perfil de ${emp.name}` : undefined}
+                  onClick={() => onEmployeeClick?.(emp._id)}
+                >
                   {emp.avatar ? (
                     <img src={emp.avatar} alt={emp.name} className={styles.avatarImg} />
                   ) : (

@@ -95,17 +95,22 @@ export function setupInterceptors(instance: any) {
       const config = error.config;
       const isAuthRoute = config?.url?.includes('/auth/login') || config?.url?.includes('/auth/refresh');
 
-      if (error.response?.status === 401 && !isAuthRoute && !config?._retry) {
-        config._retry = true;
-        const newToken = await refreshAccessToken();
-        if (newToken) {
-          config.headers = config.headers || {};
-          config.headers.Authorization = `Bearer ${newToken}`;
-          return instance(config);
+      if (error.response?.status === 401 && !isAuthRoute) {
+        if (!config?._retry) {
+          config._retry = true;
+          const newToken = await refreshAccessToken();
+          if (newToken) {
+            config.headers = config.headers || {};
+            config.headers.Authorization = `Bearer ${newToken}`;
+            return instance(config);
+          }
         }
+        // Refresh falhou ou o retry também deu 401 → deslogar
         clearAuthStorage();
         const loginUrl = `${import.meta.env.BASE_URL}login`.replace('//', '/');
-        window.location.href = loginUrl;
+        if (!window.location.pathname.includes('/login')) {
+          window.location.href = loginUrl;
+        }
       }
       return Promise.reject(error);
     },

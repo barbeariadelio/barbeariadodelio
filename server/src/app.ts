@@ -38,7 +38,8 @@ app.use(helmet({
 }));
 app.use(cors({ origin: true, credentials: true }));
 app.use(compression());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '65mb' }));
+app.use(express.urlencoded({ extended: true, limit: '65mb' }));
 app.use(cookieParser());
 app.use(mongoSanitize()); // Prevent NoSQL Injection
 app.use(hpp()); // Prevent Parameter Pollution

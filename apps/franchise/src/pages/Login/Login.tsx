@@ -43,14 +43,18 @@ export default function Login() {
     setError(null);
     try {
       const raw = loginMode === 'phone' ? identifier.replace(/\D/g, '') : identifier.trim();
-      const unitId = getSelectedUnitId() || '69fa463aa078044937f70250';
       const { data: auth } = await api.post('/auth/login', {
         identifier: raw,
         password,
-        appId: unitId,
+        appId: 'franchise',
       });
       localStorage.setItem(storageKeys.accessToken, auth.accessToken);
       localStorage.setItem(storageKeys.refreshToken, auth.refreshToken);
+      // Garante o unitId da franquia mesmo se não vier no user
+      const envUnitId = import.meta.env.VITE_UNIT_ID || '69fa463aa078044937f70250';
+      if (!localStorage.getItem(storageKeys.selectedUnitId)) {
+        localStorage.setItem(storageKeys.selectedUnitId, envUnitId);
+      }
       const me = auth.user || (await api.get('/auth/me')).data;
 
       if (me.role === 'client') {

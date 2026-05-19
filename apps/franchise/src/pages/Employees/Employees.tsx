@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { api, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import EmployeeForm from './EmployeeForm';
@@ -10,6 +11,133 @@ import styles from './Employees.module.scss';
 interface DaySchedule { day: number; slots: { start: string; end: string }[]; }
 
 const DAY_SHORT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  confirmed: 'Confirmado',
+  pending: 'Pendente',
+  completed: 'Concluído',
+  blocked: 'Bloqueado',
+};
+
+const STATUS_COLOR: Record<string, { bg: string; color: string }> = {
+  confirmed: { bg: 'rgba(59,130,246,.12)', color: '#3b82f6' },
+  pending:   { bg: 'rgba(234,179,8,.12)',  color: '#ca8a04' },
+  completed: { bg: 'rgba(34,197,94,.12)',  color: '#16a34a' },
+  blocked:   { bg: 'rgba(107,114,128,.12)', color: '#6b7280' },
+};
+
+const fmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+function EmployeeHistory({ employeeId, unitId }: { employeeId: string; unitId?: string }) {
+  const now = new Date();
+  const [mode, setMode] = useState<'dia' | 'mes' | 'ano'>('mes');
+  const [day,   setDay]   = useState(todayISO());
+  const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+  const [year,  setYear]  = useState(String(now.getFullYear()));
+
+  const years = useMemo(() => Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i)), []);
+
+  const { start, end } = useMemo(() => {
+    if (mode === 'dia') return { start: day, end: day };
+    if (mode === 'mes') {
+      const [y, m] = month.split('-').map(Number);
+      const last = new Date(y, m, 0).getDate();
+      return {
+        start: `${y}-${String(m).padStart(2, '0')}-01`,
+        end:   `${y}-${String(m).padStart(2, '0')}-${String(last).padStart(2, '0')}`,
+      };
+    }
+    return { start: `${year}-01-01`, end: `${year}-12-31` };
+  }, [mode, day, month, year]);
+
+  const qs = new URLSearchParams({ start, end, employeeId, limit: '500' });
+  if (unitId) qs.set('unitId', unitId);
+
+  const { data: appts = [], isLoading } = useQuery<any[]>({
+    queryKey: ['emp-history', employeeId, start, end],
+    queryFn: () =>
+      api.get(`/appointments?${qs}`).then(r => Array.isArray(r.data) ? r.data : []),
+    enabled: !!employeeId,
+  });
+
+  const completed = appts.filter(a => a.status === 'completed');
+  const totalRevenue = completed.reduce((acc, a) => acc + (a.price ?? 0), 0);
+
+  return (
+    <div className={styles.historySection}>
+      <div className={styles.historyHeader}>
+        <span className={styles.historySectionTitle}>Histórico de Atendimentos</span>
+      </div>
+
+      <div className={styles.historyFilters}>
+        <div className={styles.modeToggle}>
+          {(['dia', 'mes', 'ano'] as const).map(m => (
+            <button
+              key={m}
+              className={`${styles.modeBtn} ${mode === m ? styles.modeBtnActive : ''}`}
+              onClick={() => setMode(m)}
+            >
+              {m === 'dia' ? 'Dia' : m === 'mes' ? 'Mês' : 'Ano'}
+            </button>
+          ))}
+        </div>
+        {mode === 'dia' && (
+          <input type="date" className={styles.historyDateInput} value={day} onChange={e => setDay(e.target.value)} />
+        )}
+        {mode === 'mes' && (
+          <input type="month" className={styles.historyDateInput} value={month} onChange={e => setMonth(e.target.value)} />
+        )}
+        {mode === 'ano' && (
+          <select className={styles.historyDateInput} value={year} onChange={e => setYear(e.target.value)}>
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        )}
+      </div>
+
+      {!isLoading && appts.length > 0 && (
+        <div className={styles.historySummary}>
+          <span>{appts.length} atend. · {completed.length} concluído{completed.length !== 1 ? 's' : ''}</span>
+          <span>{fmt.format(totalRevenue)}</span>
+        </div>
+      )}
+
+      {isLoading ? (
+        <p className={styles.historyEmpty}>Carregando...</p>
+      ) : appts.length === 0 ? (
+        <p className={styles.historyEmpty}>Nenhum atendimento neste período.</p>
+      ) : (
+        <div className={styles.historyList}>
+          {appts.map((a: any) => {
+            const st = STATUS_COLOR[a.status] ?? STATUS_COLOR.confirmed;
+            return (
+              <div key={a._id} className={styles.historyRow}>
+                <div className={styles.historyRowLeft}>
+                  <span className={styles.historyDate}>{a.date ? a.date.split('-').reverse().slice(0, 2).join('/') : '—'}</span>
+                  <span className={styles.historyTime}>{a.startTime}</span>
+                </div>
+                <div className={styles.historyRowMid}>
+                  <span className={styles.historyClient}>{a.clientId?.name || '—'}</span>
+                  <span className={styles.historySvc}>{a.serviceId?.name || '—'}</span>
+                </div>
+                <div className={styles.historyRowRight}>
+                  <span className={styles.historyPrice}>{fmt.format(a.price ?? 0)}</span>
+                  <span className={styles.historyStatus} style={{ background: st.bg, color: st.color }}>
+                    {STATUS_LABEL[a.status] || a.status}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface Employee {
   _id: string;
@@ -61,7 +189,7 @@ interface DetailProps {
 function EmployeeDetail({ emp, onClose, onEdit, onToggle, onDelete, isToggling }: DetailProps) {
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className={styles.panel} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+      <div className={styles.panel}>
 
         <div className={styles.panelTop}>
           <div className={styles.panelAvatar}>
@@ -136,9 +264,14 @@ function EmployeeDetail({ emp, onClose, onEdit, onToggle, onDelete, isToggling }
             )}
           </div>
 
-          <EmployeeVales 
-            employeeId={emp._id} 
-            unitId={typeof emp.unitId === 'object' ? emp.unitId._id : emp.unitId} 
+          <EmployeeVales
+            employeeId={emp._id}
+            unitId={typeof emp.unitId === 'object' ? emp.unitId._id : emp.unitId}
+          />
+
+          <EmployeeHistory
+            employeeId={emp._id}
+            unitId={typeof emp.unitId === 'object' ? emp.unitId._id : emp.unitId}
           />
         </div>
 
@@ -173,6 +306,7 @@ export default function Employees() {
   const [confirmDeactivate, setConfirmDeactivate] = useState<Employee | null>(null);
   const [confirmDelete, setConfirmDelete]         = useState<Employee | null>(null);
   const qc = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
     queryKey: ['employees', unitId],
@@ -182,6 +316,17 @@ export default function Employees() {
     },
     enabled: !!user,
   });
+
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (id && employees.length > 0) {
+      const emp = employees.find(e => e._id === id);
+      if (emp) {
+        setDetailTarget(emp);
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [searchParams, employees]);
 
   const toggleActive = useMutation({
     mutationFn: (emp: Employee) =>
