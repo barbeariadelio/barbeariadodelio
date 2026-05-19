@@ -3,6 +3,19 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import styles from './ServiceForm.module.scss';
 
+const DURATION_OPTIONS = [
+  { label: '15 min', value: 15 },
+  { label: '30 min', value: 30 },
+  { label: '45 min', value: 45 },
+  { label: '1h',     value: 60 },
+  { label: '1h 15',  value: 75 },
+  { label: '1h 30',  value: 90 },
+  { label: '1h 45',  value: 105 },
+  { label: '2h',     value: 120 },
+  { label: '2h 30',  value: 150 },
+  { label: '3h',     value: 180 },
+];
+
 interface PackageItem {
   serviceId: string;
   quantity: number;
@@ -48,7 +61,7 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
   const [name, setName] = useState(service?.name ?? '');
   const [description, setDescription] = useState(service?.description ?? '');
   const [price, setPrice] = useState(service?.price != null ? formatBR(service.price) : '');
-  const [durationMinutes, setDurationMinutes] = useState(String(service?.durationMinutes ?? '30'));
+  const [durationMinutes, setDurationMinutes] = useState(String(service?.durationMinutes ?? 30));
   const [image, setImage] = useState(service?.image ?? '');
   const [showPrice, setShowPrice] = useState(service?.showPrice !== false);
   const [showPricePrefix, setShowPricePrefix] = useState(service?.showPricePrefix !== false);
@@ -203,8 +216,12 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
             </div>
             
             <div className={styles.field}>
-              <label className={styles.label}>Duração (min) *</label>
-              <input type="number" min="5" step="5" className={styles.input} value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} required />
+              <label className={styles.label}>Duração *</label>
+              <select className={styles.select} value={durationMinutes} onChange={e => setDurationMinutes(e.target.value)} required>
+                {DURATION_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
             </div>
           </div>
 
