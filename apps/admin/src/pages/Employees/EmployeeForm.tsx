@@ -23,6 +23,7 @@ interface Employee {
   vacations?: { start: string; end: string }[];
   blockedDays?: string[];
   isActive: boolean;
+  allowOnlineBooking?: boolean;
   unitId?: string;
 }
 
@@ -58,6 +59,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
   const [vacationEnd, setVacationEnd] = useState(employee?.vacations?.[0]?.end ?? '');
   
   const [blockedDays, setBlockedDays] = useState<string[]>(employee?.blockedDays ?? []);
+  const [allowOnlineBooking, setAllowOnlineBooking] = useState<boolean>(employee?.allowOnlineBooking ?? true);
   const [newBlockedDay, setNewBlockedDay] = useState('');
   const [initialVale, setInitialVale] = useState('');
   const [serviceIds, setServiceIds] = useState<string[]>(
@@ -126,6 +128,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
       daySchedules,
       vacations,
       blockedDays: finalBlockedDays.sort(),
+      allowOnlineBooking,
       unitId: '69fa463aa078044937f7024e',
       allowedApps: ['69fa463aa078044937f7024e'],
       serviceIds,
@@ -393,6 +396,16 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
               </div>
             </div>
           )}
+
+          <div className={styles.field} style={{ marginTop: '0.5rem' }}>
+            <label className={styles.label}>Disponível para agendamentos online</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <input type="checkbox" checked={allowOnlineBooking} onChange={e => setAllowOnlineBooking(e.target.checked)} />
+              <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                {allowOnlineBooking ? 'Sim — aparecerá na página de agendamento público' : 'Não — não aparecerá no agendamento público'}
+              </span>
+            </div>
+          </div>
 
           <hr style={{ borderColor: 'var(--border-subtle)', margin: '0.5rem 0' }} />
 

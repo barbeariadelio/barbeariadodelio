@@ -26,6 +26,7 @@ export interface IUser extends Document {
     end: string;
   }[];
   blockedDays?: string[];
+  allowOnlineBooking?: boolean;
   isActive: boolean;
   allowedApps?: string[];
   serviceIds?: mongoose.Types.ObjectId[];
@@ -64,6 +65,7 @@ const userSchema = new Schema<IUser>(
       slots: [{ start: String, end: String }],
     }],
     blockedDays: [String],
+    allowOnlineBooking: { type: Boolean, default: true },
     isActive: { type: Boolean, default: true },
     allowedApps: { type: [String], default: [] },
     serviceIds: [{ type: Schema.Types.ObjectId, ref: 'Service' }],

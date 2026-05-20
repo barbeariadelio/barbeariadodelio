@@ -11,7 +11,9 @@ export async function listPublicEmployees(req: Request, res: Response, next: Nex
     const unitId = req.query.unitId as string;
     if (!unitId) { ok(res, []); return; }
     const employees = await service.findByUnit(unitId);
-    ok(res, employees);
+    // Only return employees that are available for online booking (explicitly false means opt-out)
+    const publicEmployees = (employees as any[]).filter(e => e.allowOnlineBooking !== false);
+    ok(res, publicEmployees);
   } catch (e) { next(e); }
 }
 

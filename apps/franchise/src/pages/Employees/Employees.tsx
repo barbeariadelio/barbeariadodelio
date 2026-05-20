@@ -156,6 +156,7 @@ interface Employee {
   vacations?: { start: string; end: string }[];
   blockedDays?: string[];
   isActive: boolean;
+  allowOnlineBooking?: boolean;
   unitId?: string | { _id: string; name: string };
 }
 
@@ -182,11 +183,13 @@ interface DetailProps {
   onClose: () => void;
   onEdit: () => void;
   onToggle: () => void;
+  onToggleOnline?: () => void;
   onDelete: () => void;
   isToggling: boolean;
+  isTogglingOnline?: boolean;
 }
 
-function EmployeeDetail({ emp, onClose, onEdit, onToggle, onDelete, isToggling }: DetailProps) {
+function EmployeeDetail({ emp, onClose, onEdit, onToggle, onToggleOnline, onDelete, isToggling, isTogglingOnline }: DetailProps) {
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className={styles.panel}>
@@ -280,6 +283,13 @@ function EmployeeDetail({ emp, onClose, onEdit, onToggle, onDelete, isToggling }
             Editar cadastro
           </button>
           <button
+            className={`${styles.toggleAction} ${(emp.allowOnlineBooking !== false) ? styles.activateAction : styles.deactivateAction}`}
+            onClick={onToggleOnline}
+            disabled={Boolean(isTogglingOnline)}
+          >
+            {(emp.allowOnlineBooking !== false) ? 'Disponível online' : 'Indisponível online'}
+          </button>
+          <button
             className={`${styles.toggleAction} ${emp.isActive ? styles.deactivateAction : styles.activateAction}`}
             onClick={onToggle}
             disabled={isToggling}
@@ -349,6 +359,15 @@ export default function Employees() {
     },
   });
 
+  const toggleOnline = useMutation({
+    mutationFn: (emp: Employee) => api.patch(`/employees/${emp._id}`, { allowOnlineBooking: !(emp.allowOnlineBooking !== false) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['users'] });
+      setDetailTarget(null);
+    },
+  });
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -390,6 +409,13 @@ export default function Employees() {
                 Editar
               </button>
               <button
+                className={`${styles.toggleBtn} ${(emp.allowOnlineBooking !== false) ? styles.activate : styles.deactivate}`}
+                onClick={() => toggleOnline.mutate(emp)}
+                disabled={toggleOnline.isPending}
+              >
+                {(emp.allowOnlineBooking !== false) ? 'Disponível' : 'Indisponível'}
+              </button>
+              <button
                 className={`${styles.toggleBtn} ${emp.isActive ? styles.deactivate : styles.activate}`}
                 onClick={() => emp.isActive ? setConfirmDeactivate(emp) : toggleActive.mutate(emp)}
                 disabled={toggleActive.isPending}
@@ -416,8 +442,10 @@ export default function Employees() {
           onClose={() => setDetailTarget(null)}
           onEdit={() => setFormTarget(detailTarget)}
           onToggle={() => detailTarget.isActive ? setConfirmDeactivate(detailTarget) : toggleActive.mutate(detailTarget)}
+          onToggleOnline={() => toggleOnline.mutate(detailTarget)}
           onDelete={() => { setDetailTarget(null); setConfirmDelete(detailTarget); }}
           isToggling={toggleActive.isPending}
+          isTogglingOnline={toggleOnline.isPending}
         />
       )}
 
