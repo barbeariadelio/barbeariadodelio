@@ -42,6 +42,38 @@ export async function listTransactions(req: AuthRequest, res: Response, next: Ne
   } catch (e) { next(e); }
 }
 
+export async function listRemunerations(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { role } = req.user!;
+    const rawQueryUnitId = Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string);
+    const unitId = rawQueryUnitId || (req.user!.unitId as string) || 'all';
+    const employeeId = (role === 'employee') ? req.user!.id : (req.query.employeeId as string);
+    if (!employeeId) { ok(res, []); return; }
+    const appScope = req.headers['x-app-scope'] as string | undefined;
+    const jwtUnitId = req.user!.unitId;
+    const result = await service.listRemunerations(req.user!.id, role, unitId, employeeId, appScope, jwtUnitId);
+    ok(res, result);
+  } catch (e) { next(e); }
+}
+
+export async function registerPayment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { role } = req.user!;
+    const { employeeId, commissionIds, amount, description, date, unitId: bodyUnitId } = req.body;
+    const rawQueryUnitId = Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string);
+    const unitId = bodyUnitId || rawQueryUnitId || (req.user!.unitId as string);
+    if (!employeeId || !commissionIds?.length || !amount || !date) {
+      res.status(400).json({ message: 'Campos obrigatórios: employeeId, commissionIds, amount, date.' });
+      return;
+    }
+    const appScope = req.headers['x-app-scope'] as string | undefined;
+    const jwtUnitId = req.user!.unitId;
+    const desc = description || `Pagamento de comissões (${commissionIds.length} atend.)`;
+    const payment = await service.registerPayment(req.user!.id, role, unitId, employeeId, commissionIds, amount, desc, date, appScope, jwtUnitId);
+    created(res, payment);
+  } catch (e) { next(e); }
+}
+
 export async function createTransaction(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const unitId = req.body.unitId || req.user!.unitId;

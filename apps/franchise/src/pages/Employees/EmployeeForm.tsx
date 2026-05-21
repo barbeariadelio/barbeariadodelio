@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useState, useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { api, getSelectedUnitId } from '../../api/client';
@@ -49,6 +49,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
   const [email, setEmail] = useState(employee?.email ?? '');
   const [phone, setPhone] = useState(employee?.phone ?? '');
   const [avatar, setAvatar] = useState(employee?.avatar ?? '');
+  const [uploading, setUploading] = useState(false);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [daySchedules, setDaySchedules] = useState<DaySchedule[]>(() => {
@@ -67,6 +68,19 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
     (employee as any)?.serviceIds?.map((id: any) => typeof id === 'object' ? id._id : id) ?? []
   );
   const [error, setError] = useState<string | null>(null);
+
+  const { data: fullEmployee } = useQuery<Employee>({
+    queryKey: ['employee-detail', employee?._id],
+    queryFn: async () => {
+      const { data } = await api.get(`/employees/${employee!._id}`);
+      return data;
+    },
+    enabled: isEdit,
+  });
+
+  useEffect(() => {
+    if (fullEmployee?.avatar && !avatar) setAvatar(fullEmployee.avatar);
+  }, [fullEmployee]);
 
   const mutation = useMutation({
     mutationFn: (payload: object) =>
@@ -89,12 +103,20 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
     },
   });
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => setAvatar(reader.result as string);
-    reader.readAsDataURL(file);
+    const formData = new FormData();
+    formData.append('file', file);
+    setUploading(true);
+    try {
+      const { data } = await api.post('/upload/avatar', formData);
+      setAvatar(data.url);
+    } catch {
+      setError('Falha ao enviar imagem. Tente novamente.');
+    } finally {
+      setUploading(false);
+    }
   }
 
   function addBlockedDay() {
@@ -179,9 +201,9 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
                   {name ? name[0].toUpperCase() : '?'}
                 </div>
               )}
-              <label className={styles.avatarLabel}>
-                <input type="file" accept="image/*" onChange={handleFile} hidden />
-                <span>Mudar Foto</span>
+              <label className={styles.avatarLabel} style={uploading ? { opacity: 0.6, pointerEvents: 'none' } : {}}>
+                <input type="file" accept="image/*" onChange={handleFile} hidden disabled={uploading} />
+                <span>{uploading ? 'Enviando...' : 'Mudar Foto'}</span>
               </label>
             </div>
           </div>

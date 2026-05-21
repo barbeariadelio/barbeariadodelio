@@ -12,8 +12,10 @@
     "royalty:batch": "tsx src/jobs/batchRoyalty.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1052.0",
     "@barber/types": "*",
     "@types/cookie-parser": "^1.4.10",
+    "@types/multer": "^2.1.0",
     "bcryptjs": "^2.4.3",
     "cls-rtracer": "^2.6.4",
     "compression": "^1.8.1",
@@ -30,6 +32,7 @@
     "http-proxy-middleware": "^4.0.0",
     "jsonwebtoken": "^9.0.0",
     "mongoose": "^8.3.0",
+    "multer": "^2.1.1",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
     "zod": "^3.23.0",

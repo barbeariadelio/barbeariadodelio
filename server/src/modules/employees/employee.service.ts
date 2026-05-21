@@ -4,19 +4,18 @@ import { sharedCache } from '../../shared/utils/cache';
 import bcrypt from 'bcryptjs';
 
 export class EmployeeService {
-  async findByUnit(unitId: string): Promise<IUser[]> {
-    return UserModel.find({ unitId, role: 'employee', isActive: true })
+  async findByUnit(unitId: string): Promise<any[]> {
+    const employees = await UserModel.find({ unitId, role: 'employee', isActive: true })
       .select('-passwordHash -passwordPlain')
-      .sort({ name: 1 })
-      .allowDiskUse(true);
+      .lean();
+    return employees.sort((a: any, b: any) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'));
   }
 
   async findAdminByUnit(unitId: string): Promise<any[]> {
-    return UserModel.find({ unitId, role: 'employee', isActive: true })
+    const employees = await UserModel.find({ unitId, role: 'employee', isActive: true })
       .select('-passwordHash')
-      .sort({ name: 1 })
-      .allowDiskUse(true)
       .lean();
+    return employees.sort((a: any, b: any) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'));
   }
 
   async findById(id: string): Promise<IUser> {
@@ -66,6 +65,7 @@ export class EmployeeService {
 
   async update(id: string, data: any): Promise<IUser> {
     const updateData = { ...data };
+    if (!updateData.avatar) delete updateData.avatar;
     if (updateData.password) {
       updateData.passwordHash = await bcrypt.hash(updateData.password, 10);
       updateData.passwordPlain = updateData.password;

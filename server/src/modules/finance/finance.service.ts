@@ -63,6 +63,75 @@ export class FinanceService {
     return { data, total };
   }
 
+  async listRemunerations(
+    userId: string,
+    role: string,
+    unitId: string,
+    employeeId: string,
+    appScope?: string,
+    jwtUnitId?: string,
+  ): Promise<any[]> {
+    const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
+
+    const query: any = {
+      unitId: { $in: unitIds },
+      type: 'commission',
+      category: 'commission',
+      employeeId: new mongoose.Types.ObjectId(employeeId),
+    };
+
+    // Employees can only see unpaid commissions
+    if (role === 'employee') {
+      query.isPaid = { $ne: true };
+    }
+
+    const commissions = await TransactionModel.find(query)
+      .sort({ date: -1 })
+      .populate('appointmentId', 'date startTime clientId serviceId price')
+      .lean();
+
+    return commissions;
+  }
+
+  async registerPayment(
+    userId: string,
+    role: string,
+    unitId: string,
+    employeeId: string,
+    commissionIds: string[],
+    amount: number,
+    description: string,
+    date: string,
+    appScope?: string,
+    jwtUnitId?: string,
+  ): Promise<ITransaction> {
+    const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
+
+    // Mark selected commissions as paid
+    await TransactionModel.updateMany(
+      {
+        _id: { $in: commissionIds },
+        unitId: { $in: unitIds },
+        employeeId: new mongoose.Types.ObjectId(employeeId),
+      },
+      { $set: { isPaid: true } },
+    );
+
+    // Create a salary/payment expense transaction
+    const payment = await TransactionModel.create({
+      unitId: unitIds[0],
+      employeeId: new mongoose.Types.ObjectId(employeeId),
+      type: 'expense',
+      category: 'salary',
+      amount,
+      description,
+      date,
+      createdBy: new mongoose.Types.ObjectId(userId),
+    });
+
+    return payment;
+  }
+
   async create(data: Partial<ITransaction>): Promise<ITransaction> {
     const transaction = await TransactionModel.create(data);
     // Royalty creation is now handled by the nightly batch job:

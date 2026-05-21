@@ -29,6 +29,7 @@ import { productRoutes } from './modules/inventory/product.routes';
 import { userRoutes } from './modules/auth/user.routes';
 import { notificationRoutes } from './modules/notifications/notification.routes';
 import { sseRoutes } from './modules/events/sse.routes';
+import { uploadRoutes } from './modules/upload/upload.routes';
 
 const app = express();
 
@@ -38,8 +39,8 @@ app.use(helmet({
 }));
 app.use(cors({ origin: true, credentials: true }));
 app.use(compression());
-app.use(express.json({ limit: '65mb' }));
-app.use(express.urlencoded({ extended: true, limit: '65mb' }));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(cookieParser());
 app.use(mongoSanitize()); // Prevent NoSQL Injection
 app.use(hpp()); // Prevent Parameter Pollution
@@ -89,6 +90,7 @@ app.use('/products', productRoutes);
 app.use('/users', userRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/events', sseRoutes);
+app.use('/upload', uploadRoutes);
 
 app.get('/health', (_req, res) => {
   const mongoStatus = mongoose.connection.readyState === 1 ? 'up' : 'down';

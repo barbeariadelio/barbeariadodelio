@@ -309,8 +309,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  background: rgba(0, 0, 0, 0.4);
-  backdrop-filter: grayscale(0.8);
+  background: rgba(160, 160, 160, 0.18);
   pointer-events: none;
   z-index: 1;
 }
@@ -319,13 +318,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  background: repeating-linear-gradient(
-    45deg,
-    var(--bg-overlay),
-    var(--bg-overlay) 10px,
-    var(--bg-elevated) 10px,
-    var(--bg-elevated) 20px
-  );
+  background: rgba(160, 160, 160, 0.15);
   border-top: 1px solid var(--border-subtle);
   border-bottom: 1px solid var(--border-subtle);
   display: flex;

@@ -12,6 +12,7 @@ export interface ITransaction extends Document {
   date: string;
   paymentMethod?: 'money' | 'debit' | 'credit' | 'pix' | 'package' | 'other';
   createdBy: mongoose.Types.ObjectId;
+  isPaid?: boolean;
 }
 
 const transactionSchema = new Schema<ITransaction>(
@@ -26,6 +27,7 @@ const transactionSchema = new Schema<ITransaction>(
     date:        { type: String, required: true },
     paymentMethod: { type: String, enum: ['money', 'debit', 'credit', 'pix', 'package', 'other'] },
     createdBy:   { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    isPaid:      { type: Boolean, default: false },
   },
   { timestamps: true },
 );

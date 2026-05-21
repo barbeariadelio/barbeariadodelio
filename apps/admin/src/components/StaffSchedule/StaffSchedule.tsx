@@ -675,10 +675,10 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
                     <div
                       key={t}
                       className={`${styles.slot} ${si % 2 === 0 ? styles.slotHour : ''}`}
-                      style={{ height: SLOT_H, cursor: (fullyBlocked || isUnitClosedDay) ? 'default' : 'pointer' }}
+                      style={{ height: SLOT_H, cursor: isUnitClosedDay ? 'default' : 'pointer' }}
                       data-time={`${t} – ${endT}`}
                       onClick={() => {
-                        if (!fullyBlocked && !isUnitClosedDay) {
+                        if (!isUnitClosedDay) {
                           setBlockPrompt({ employeeId: emp._id, employeeName: emp.name.split(' ')[0], time: t });
                         }
                       }}
@@ -689,10 +689,10 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
                 {(fullyBlocked || isUnitClosedDay) ? (
                   <div
                     className={styles.lunchBreak}
-                    style={{ top: 0, height: TOTAL_H, display: 'flex', flexDirection: 'column', justifyContent: 'center', pointerEvents: 'none' }}
+                    style={{ top: 0, height: TOTAL_H, display: 'flex', flexDirection: 'column', justifyContent: 'center', pointerEvents: 'none', zIndex: 0 }}
                   >
-                    <span style={{ fontSize: '1.2rem', fontWeight: 600, opacity: 0.8 }}>
-                      {isUnitClosedDay ? 'FECHADO' : 'FOLGA / INDISPONÍVEL'}
+                    <span style={{ fontSize: '1rem', fontWeight: 600, opacity: 0.45 }}>
+                      {isUnitClosedDay ? 'FECHADO' : 'FOLGA'}
                     </span>
                   </div>
                 ) : (
