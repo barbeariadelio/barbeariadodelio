@@ -97,6 +97,39 @@ export class ClientService {
     return this.findById(id);
   }
 
+  async mergeClients(
+    sourceId: string,
+    targetId: string,
+    keepFields: { name?: boolean; phone?: boolean; email?: boolean; notes?: boolean },
+  ): Promise<IClient> {
+    const [source, target] = await Promise.all([
+      ClientModel.findById(sourceId),
+      ClientModel.findById(targetId),
+    ]);
+    if (!source) throw new NotFoundError('Client');
+    if (!target) throw new NotFoundError('Client');
+
+    const { AppointmentModel } = await import('../appointments/appointment.model');
+    await AppointmentModel.updateMany({ clientId: sourceId }, { $set: { clientId: targetId } });
+
+    if (source.packages && source.packages.length > 0) {
+      if (!target.packages) target.packages = [];
+      for (const pkg of source.packages) {
+        target.packages.push(pkg as any);
+      }
+    }
+
+    if (keepFields.name && source.name) target.name = source.name;
+    if (keepFields.phone && source.phone) target.phone = source.phone;
+    if (keepFields.email && source.email) target.email = source.email;
+    if (keepFields.notes && source.notes) target.notes = source.notes;
+
+    await target.save();
+    await ClientModel.findByIdAndDelete(sourceId);
+
+    return this.findById(targetId);
+  }
+
   async updatePackageItemLimit(id: string, packageId: string, serviceId: string, quantity?: number | null, used?: number): Promise<IClient> {
     const client = await ClientModel.findById(id);
     if (!client) throw new NotFoundError('Client');

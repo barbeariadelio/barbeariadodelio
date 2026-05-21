@@ -147,6 +147,14 @@ export default function Clients() {
   const [whatsappMessage, setWhatsappMessage] = useState('');
   const [showPackageModal, setShowPackageModal] = useState(false);
 
+  // Merge clients
+  const [showMerge, setShowMerge] = useState(false);
+  const [mergeSearch, setMergeSearch] = useState('');
+  const [mergeTarget, setMergeTarget] = useState<Client | null>(null);
+  const [mergeKeep, setMergeKeep] = useState<{ name: boolean; phone: boolean; email: boolean; notes: boolean }>({ name: false, phone: false, email: false, notes: false });
+  const [mergeSubmitting, setMergeSubmitting] = useState(false);
+  const debouncedMergeSearch = useDebounce(mergeSearch, 350);
+
   // FAB
   const [showFab, setShowFab] = useState(false);
   const fabRef = useRef<HTMLDivElement>(null);
@@ -260,6 +268,45 @@ export default function Clients() {
     },
     enabled: !!user,
   });
+
+  const { data: mergeSearchResults = [] } = useQuery<Client[]>({
+    queryKey: ['clients-merge-search', debouncedMergeSearch, unitId],
+    queryFn: async () => {
+      if (!debouncedMergeSearch.trim()) return [];
+      const { data } = await api.get(`/clients?q=${encodeURIComponent(debouncedMergeSearch)}`);
+      const all: Client[] = Array.isArray(data) ? data : data.clients ?? [];
+      return all.filter(c => c._id !== selectedId);
+    },
+    enabled: showMerge && !!debouncedMergeSearch.trim(),
+  });
+
+  function openMerge() {
+    setMergeSearch('');
+    setMergeTarget(null);
+    setMergeKeep({ name: false, phone: false, email: false, notes: false });
+    setShowMerge(true);
+  }
+
+  async function confirmMerge() {
+    if (!selectedClient || !mergeTarget) return;
+    setMergeSubmitting(true);
+    try {
+      await api.post(`/clients/${selectedClient._id}/merge`, {
+        targetClientId: mergeTarget._id,
+        keepFields: mergeKeep,
+      });
+      qc.invalidateQueries({ queryKey: ['clients'] });
+      setShowMerge(false);
+      setSelectedId(mergeTarget._id);
+      qc.invalidateQueries({ queryKey: ['client-appointments', mergeTarget._id] });
+      qc.invalidateQueries({ queryKey: ['client-detail', mergeTarget._id] });
+      setToast({ message: 'Clientes mesclados com sucesso!', type: 'success' });
+    } catch {
+      setToast({ message: 'Erro ao mesclar clientes.', type: 'error' });
+    } finally {
+      setMergeSubmitting(false);
+    }
+  }
 
   const selectedClient = clientDetail ?? clients.find(c => c._id === selectedId) ?? null;
 
@@ -568,6 +615,10 @@ export default function Clients() {
 
               {/* Action buttons */}
               <div style={{ display: 'flex', gap: '0.5rem', alignSelf: 'flex-start', flexShrink: 0 }}>
+                <button className={styles.mergeBtn} onClick={openMerge} title="Mesclar com outro cliente">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3"/><polyline points="15 3 12 6 9 3"/><line x1="12" y1="3" x2="12" y2="13"/></svg>
+                  Mesclar
+                </button>
                 {comandaItemsList.length > 0 && (
                   <button className={styles.comandaBtn} onClick={openComanda}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
@@ -1172,6 +1223,136 @@ export default function Clients() {
             qc.invalidateQueries({ queryKey: ['clients'] });
           }}
         />
+      )}
+
+      {/* ── Merge Modal ── */}
+      {showMerge && selectedClient && createPortal(
+        <div className={styles.mergeOverlay} onClick={e => { if (e.target === e.currentTarget) setShowMerge(false); }}>
+          <div className={styles.mergeModal}>
+            <div className={styles.mergeHeader}>
+              <div>
+                <h2 className={styles.mergeTitle}>Mesclar Cliente</h2>
+                <p className={styles.mergeSubtitle}>O cliente abaixo será <strong>removido</strong> e seus dados transferidos</p>
+              </div>
+              <button className={styles.psCloseBtn} onClick={() => setShowMerge(false)}>✕</button>
+            </div>
+
+            <div className={styles.mergeBody}>
+              <div className={styles.mergeSourceCard}>
+                <div className={styles.mergeCardLabel}>Será removido</div>
+                <div className={styles.mergeClientRow}>
+                  <div className={styles.mergeAvatar}>{selectedClient.name[0].toUpperCase()}</div>
+                  <div>
+                    <div className={styles.mergeClientName}>{selectedClient.name}</div>
+                    {selectedClient.phone && <div className={styles.mergeClientMeta}>{selectedClient.phone}</div>}
+                    {selectedClient.email && !isGuestEmail(selectedClient.email) && <div className={styles.mergeClientMeta}>{selectedClient.email}</div>}
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.mergeArrow}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                <span>mesclar em</span>
+              </div>
+
+              {!mergeTarget ? (
+                <div className={styles.mergeSearchWrap}>
+                  <div className={styles.mergeSearchBox}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input
+                      autoFocus
+                      type="text"
+                      className={styles.mergeSearchInput}
+                      placeholder="Buscar cliente para mesclar..."
+                      value={mergeSearch}
+                      onChange={e => setMergeSearch(e.target.value)}
+                    />
+                  </div>
+                  {debouncedMergeSearch.trim() && mergeSearchResults.length === 0 && (
+                    <p className={styles.mergeEmpty}>Nenhum cliente encontrado.</p>
+                  )}
+                  {mergeSearchResults.length > 0 && (
+                    <div className={styles.mergeResultList}>
+                      {mergeSearchResults.map(c => (
+                        <button key={c._id} className={styles.mergeResultItem} onClick={() => setMergeTarget(c)}>
+                          <div className={styles.mergeResultAvatar}>{c.name[0].toUpperCase()}</div>
+                          <div>
+                            <div className={styles.mergeResultName}>{c.name}</div>
+                            {c.phone && <div className={styles.mergeResultMeta}>{c.phone}</div>}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className={styles.mergeTargetCard}>
+                    <div className={styles.mergeCardLabel}>Será mantido</div>
+                    <div className={styles.mergeClientRow}>
+                      <div className={styles.mergeAvatar} style={{ background: 'var(--gold)' }}>{mergeTarget.name[0].toUpperCase()}</div>
+                      <div style={{ flex: 1 }}>
+                        <div className={styles.mergeClientName}>{mergeTarget.name}</div>
+                        {mergeTarget.phone && <div className={styles.mergeClientMeta}>{mergeTarget.phone}</div>}
+                        {mergeTarget.email && !isGuestEmail(mergeTarget.email) && <div className={styles.mergeClientMeta}>{mergeTarget.email}</div>}
+                      </div>
+                      <button className={styles.mergeClearTarget} onClick={() => setMergeTarget(null)}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                      </button>
+                    </div>
+                  </div>
+
+                  {(selectedClient.name !== mergeTarget.name || selectedClient.phone || selectedClient.email || selectedClient.notes) && (
+                    <div className={styles.mergeFieldsWrap}>
+                      <div className={styles.mergeFieldsLabel}>Sobrescrever dados do cliente mantido com os do removido:</div>
+                      <div className={styles.mergeFieldsList}>
+                        {selectedClient.name !== mergeTarget.name && (
+                          <label className={styles.mergeFieldItem}>
+                            <input type="checkbox" checked={mergeKeep.name} onChange={e => setMergeKeep(p => ({ ...p, name: e.target.checked }))} />
+                            <span>Nome: <strong>{selectedClient.name}</strong></span>
+                          </label>
+                        )}
+                        {selectedClient.phone && selectedClient.phone !== mergeTarget.phone && (
+                          <label className={styles.mergeFieldItem}>
+                            <input type="checkbox" checked={mergeKeep.phone} onChange={e => setMergeKeep(p => ({ ...p, phone: e.target.checked }))} />
+                            <span>Telefone: <strong>{selectedClient.phone}</strong></span>
+                          </label>
+                        )}
+                        {selectedClient.email && !isGuestEmail(selectedClient.email) && selectedClient.email !== mergeTarget.email && (
+                          <label className={styles.mergeFieldItem}>
+                            <input type="checkbox" checked={mergeKeep.email} onChange={e => setMergeKeep(p => ({ ...p, email: e.target.checked }))} />
+                            <span>E-mail: <strong>{selectedClient.email}</strong></span>
+                          </label>
+                        )}
+                        {selectedClient.notes && selectedClient.notes !== mergeTarget.notes && (
+                          <label className={styles.mergeFieldItem}>
+                            <input type="checkbox" checked={mergeKeep.notes} onChange={e => setMergeKeep(p => ({ ...p, notes: e.target.checked }))} />
+                            <span>Observações: <strong>{selectedClient.notes}</strong></span>
+                          </label>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className={styles.mergeWarning}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    Atenção: esta ação é irreversível. Todos os atendimentos de <strong>{selectedClient.name}</strong> serão transferidos para <strong>{mergeTarget.name}</strong> e o primeiro será excluído.
+                  </div>
+                </>
+              )}
+            </div>
+
+            {mergeTarget && (
+              <div className={styles.mergeFooter}>
+                <button className={styles.psCancelBtn} onClick={() => setShowMerge(false)}>Cancelar</button>
+                <button className={styles.mergeConfirmBtn} onClick={confirmMerge} disabled={mergeSubmitting}>
+                  {mergeSubmitting ? 'Mesclando...' : 'Confirmar Mesclagem'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
       )}
 
       {showPackageModal && (

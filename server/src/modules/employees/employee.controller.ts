@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { EmployeeService } from './employee.service';
 import { AuthRequest } from '../../shared/middlewares/auth.middleware';
+import { resolveUnitId } from '../../shared/middlewares/rbac.middleware';
 import { ok, created } from '../../shared/utils/responseHelper';
 import { AppError } from '../../shared/errors/AppError';
 
@@ -19,10 +20,7 @@ export async function listPublicEmployees(req: Request, res: Response, next: Nex
 
 export async function listEmployees(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const isSuperUser = req.user!.role === 'owner';
-    const unitId = isSuperUser
-      ? ((req.query.unitId as string) || req.user!.unitId)
-      : req.user!.unitId;
+    const unitId = resolveUnitId(req);
     if (!unitId) { ok(res, []); return; }
     const employees = await service.findAdminByUnit(unitId);
     ok(res, employees);

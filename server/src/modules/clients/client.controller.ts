@@ -105,6 +105,25 @@ export async function removePackage(req: AuthRequest, res: Response, next: NextF
   } catch (e) { next(e); }
 }
 
+export async function mergeClient(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const source = await service.findById(req.params.id);
+
+    const isOwnerOrFranchisor = req.user!.role === 'owner';
+    if (!isOwnerOrFranchisor && source.unitId?.toString() !== req.user!.unitId?.toString()) {
+      throw new AppError('Access denied to this unit', 403);
+    }
+
+    const { targetClientId, keepFields = {} } = req.body;
+    if (!targetClientId) throw new AppError('targetClientId is required', 400);
+
+    const result = await service.mergeClients(req.params.id, targetClientId, keepFields);
+    const uid = result.unitId?.toString();
+    if (uid) sseService.emit(uid, 'clients:change');
+    ok(res, result);
+  } catch (e) { next(e); }
+}
+
 export async function updatePackageItemLimit(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const { id, packageId, serviceId } = req.params;

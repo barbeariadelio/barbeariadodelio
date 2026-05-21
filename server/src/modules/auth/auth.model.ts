@@ -76,4 +76,6 @@ const userSchema = new Schema<IUser>(
   { timestamps: true },
 );
 
+userSchema.index({ unitId: 1, role: 1, isActive: 1, name: 1 });
+
 export const UserModel = mongoose.model<IUser>('User', userSchema);

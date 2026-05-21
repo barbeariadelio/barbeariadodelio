@@ -321,10 +321,10 @@ export default function Employees() {
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
     queryKey: ['employees', unitId],
     queryFn: async () => {
-      const { data } = await api.get('/employees');
+      const { data } = await api.get('/employees', { params: { unitId } });
       return Array.isArray(data) ? data : data.employees ?? [];
     },
-    enabled: !!user,
+    enabled: !!user && !!unitId,
   });
 
   useEffect(() => {

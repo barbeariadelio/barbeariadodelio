@@ -7,13 +7,16 @@ export class EmployeeService {
   async findByUnit(unitId: string): Promise<IUser[]> {
     return UserModel.find({ unitId, role: 'employee', isActive: true })
       .select('-passwordHash -passwordPlain')
-      .sort({ name: 1 });
+      .sort({ name: 1 })
+      .allowDiskUse(true);
   }
 
-  async findAdminByUnit(unitId: string): Promise<IUser[]> {
+  async findAdminByUnit(unitId: string): Promise<any[]> {
     return UserModel.find({ unitId, role: 'employee', isActive: true })
       .select('-passwordHash')
-      .sort({ name: 1 });
+      .sort({ name: 1 })
+      .allowDiskUse(true)
+      .lean();
   }
 
   async findById(id: string): Promise<IUser> {
