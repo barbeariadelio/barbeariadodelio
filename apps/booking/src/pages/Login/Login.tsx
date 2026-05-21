@@ -66,7 +66,7 @@ export default function Login() {
         </div>
         
         <h1 className={styles.title}>Acesse sua conta</h1>
-        <p className={styles.subtitle}>Informe seu nome e telefone para continuar</p>
+        <p className={styles.subtitle}>Já foi atendido na barbearia? Use o mesmo nome e telefone cadastrado para acessar seu histórico e agendar novamente.</p>
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.field}>

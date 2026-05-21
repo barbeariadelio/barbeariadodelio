@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { api, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import ClientForm from './ClientForm';
+import AppointmentForm from '../../components/AppointmentForm/AppointmentForm';
 import styles from './Clients.module.scss';
 
 interface PackageItem {
@@ -55,6 +56,27 @@ interface AppointmentItem {
   products?: Array<{ productId: string; name: string; quantity: number; unitPrice: number }>;
 }
 
+interface Employee {
+  _id: string;
+  name: string;
+}
+
+interface Product {
+  _id: string;
+  name: string;
+  price: number;
+  stockQuantity: number;
+  category?: string;
+}
+
+interface CartProduct {
+  productId: string;
+  name: string;
+  price: number;
+  quantity: number;
+  discount: number;
+}
+
 const STATUS_COLORS: Record<string, string> = {
   pending:   '#F59E0B',
   confirmed: '#1E88E5',
@@ -76,6 +98,14 @@ function formatDate(iso: string) {
   return `${d}/${m}/${y}`;
 }
 function isGuestEmail(email?: string) { return email?.includes('@delio.guest') ?? false; }
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function nowTime() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
 function getErrorMessage(err: unknown) {
   if (err && typeof err === 'object' && 'response' in err) {
     const response = (err as { response?: { data?: { message?: unknown } } }).response;
@@ -100,6 +130,7 @@ export default function Clients() {
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('id'));
   const [showForm, setShowForm] = useState(false);
+  const [showApptForm, setShowApptForm] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [editingItem, setEditingItem] = useState<{ pkgId: string; serviceId: string } | null>(null);
@@ -115,8 +146,41 @@ export default function Clients() {
   const [whatsappClient, setWhatsappClient] = useState<{ phone: string; name: string } | null>(null);
   const [whatsappMessage, setWhatsappMessage] = useState('');
   const [showPackageModal, setShowPackageModal] = useState(false);
+
+  // FAB
+  const [showFab, setShowFab] = useState(false);
+  const fabRef = useRef<HTMLDivElement>(null);
+
+  // Product sale modal
+  const [showProductSale, setShowProductSale] = useState(false);
+  const [psDate, setPsDate] = useState(todayISO());
+  const [psEmployeeId, setPsEmployeeId] = useState('');
+  const [psCart, setPsCart] = useState<CartProduct[]>([]);
+  const [psSubmitting, setPsSubmitting] = useState(false);
+  const [psError, setPsError] = useState<string | null>(null);
+
+  // Product browser
+  const [showBrowser, setShowBrowser] = useState(false);
+  const [browserCat, setBrowserCat] = useState<string | null>(null);
+
+  // Comanda
+  const [showComanda, setShowComanda] = useState(false);
+  const [comandaSelected, setComandaSelected] = useState<Set<string>>(new Set());
+  const [comandaPayment, setComandaPayment] = useState<'money' | 'debit' | 'credit' | 'pix' | 'other'>('pix');
+  const [comandaSubmitting, setComandaSubmitting] = useState(false);
+
   const debouncedSearch = useDebounce(search, 400);
   const qc = useQueryClient();
+
+  // Close FAB when clicking outside
+  useEffect(() => {
+    if (!showFab) return;
+    function handler(e: MouseEvent) {
+      if (fabRef.current && !fabRef.current.contains(e.target as Node)) setShowFab(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showFab]);
 
   useEffect(() => {
     const id = searchParams.get('id');
@@ -177,6 +241,24 @@ export default function Clients() {
       return data;
     },
     enabled: !!selectedId,
+  });
+
+  const { data: employees = [] } = useQuery<Employee[]>({
+    queryKey: ['employees', unitId],
+    queryFn: async () => {
+      const { data } = await api.get('/employees');
+      return Array.isArray(data) ? data : data.employees ?? [];
+    },
+    enabled: !!user,
+  });
+
+  const { data: allProducts = [] } = useQuery<Product[]>({
+    queryKey: ['products', unitId],
+    queryFn: async () => {
+      const { data } = await api.get('/products');
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !!user,
   });
 
   const selectedClient = clientDetail ?? clients.find(c => c._id === selectedId) ?? null;
@@ -243,6 +325,175 @@ export default function Clients() {
     ).length;
   }
 
+  // Product categories
+  const productCategories = useMemo(() => {
+    const cats = new Set<string>();
+    allProducts.forEach(p => cats.add(p.category || 'Sem categoria'));
+    return Array.from(cats).sort();
+  }, [allProducts]);
+
+  const productsByCategory = useMemo(() => {
+    const map: Record<string, Product[]> = {};
+    allProducts.forEach(p => {
+      const cat = p.category || 'Sem categoria';
+      if (!map[cat]) map[cat] = [];
+      map[cat].push(p);
+    });
+    return map;
+  }, [allProducts]);
+
+  // Comanda items: all unbilled items for selected client
+  const comandaItemsList = useMemo(() => {
+    const items: Array<{
+      key: string;
+      type: 'service' | 'products';
+      apptId: string;
+      label: string;
+      sublabel?: string;
+      date: string;
+      price: number;
+    }> = [];
+    for (const appt of appointments) {
+      if (appt.status === 'cancelled') continue;
+      if (!appt.isBilled && appt.serviceId) {
+        items.push({
+          key: `service:${appt._id}`,
+          type: 'service',
+          apptId: appt._id,
+          label: appt.serviceId.name,
+          sublabel: appt.employeeId?.name,
+          date: appt.date,
+          price: appt.price,
+        });
+      }
+      if ((appt.products?.length ?? 0) > 0 && !appt.productsBilled) {
+        const total = appt.products!.reduce((s, p) => s + p.quantity * p.unitPrice, 0);
+        items.push({
+          key: `products:${appt._id}`,
+          type: 'products',
+          apptId: appt._id,
+          label: appt.products!.map(p => `${p.name} ×${p.quantity}`).join(', '),
+          sublabel: appt.employeeId?.name,
+          date: appt.date,
+          price: total,
+        });
+      }
+    }
+    return items;
+  }, [appointments]);
+
+  function openComanda() {
+    setComandaSelected(new Set(comandaItemsList.map(i => i.key)));
+    setComandaPayment('pix');
+    setShowComanda(true);
+  }
+
+  const comandaTotal = useMemo(() => {
+    return comandaItemsList
+      .filter(i => comandaSelected.has(i.key))
+      .reduce((s, i) => s + i.price, 0);
+  }, [comandaItemsList, comandaSelected]);
+
+  async function confirmComanda() {
+    if (comandaSelected.size === 0) return;
+    setComandaSubmitting(true);
+    try {
+      const grouped: Record<string, { billService: boolean; billProducts: boolean; price: number }> = {};
+      for (const key of comandaSelected) {
+        const [type, apptId] = key.split(':');
+        if (!grouped[apptId]) grouped[apptId] = { billService: false, billProducts: false, price: 0 };
+        const item = comandaItemsList.find(i => i.key === key);
+        if (type === 'service') {
+          grouped[apptId].billService = true;
+          grouped[apptId].price = item?.price ?? 0;
+        } else {
+          grouped[apptId].billProducts = true;
+        }
+      }
+      await Promise.all(
+        Object.entries(grouped).map(([apptId, opts]) =>
+          api.patch(`/appointments/${apptId}/status`, {
+            status: 'completed',
+            price: opts.price,
+            paymentMethod: comandaPayment,
+            skipBilling: false,
+            billService: opts.billService,
+            billProducts: opts.billProducts,
+          })
+        )
+      );
+      qc.invalidateQueries({ queryKey: ['client-appointments', selectedId] });
+      qc.invalidateQueries({ queryKey: ['clients'] });
+      qc.invalidateQueries({ queryKey: ['client-detail', selectedId] });
+      setShowComanda(false);
+      setToast({ message: 'Comanda finalizada com sucesso!', type: 'success' });
+    } catch {
+      setToast({ message: 'Erro ao finalizar comanda.', type: 'error' });
+    } finally {
+      setComandaSubmitting(false);
+    }
+  }
+
+  function openProductSale() {
+    setPsDate(todayISO());
+    setPsEmployeeId(employees[0]?._id ?? '');
+    setPsCart([]);
+    setPsError(null);
+    setShowProductSale(true);
+  }
+
+  function addToCart(product: Product) {
+    setPsCart(prev => {
+      const existing = prev.find(p => p.productId === product._id);
+      if (existing) {
+        return prev.map(p => p.productId === product._id ? { ...p, quantity: p.quantity + 1 } : p);
+      }
+      return [...prev, { productId: product._id, name: product.name, price: product.price, quantity: 1, discount: 0 }];
+    });
+    setShowBrowser(false);
+    setBrowserCat(null);
+  }
+
+  function removeFromCart(productId: string) {
+    setPsCart(prev => prev.filter(p => p.productId !== productId));
+  }
+
+  function updateCartItem(productId: string, field: 'quantity' | 'price' | 'discount', value: number) {
+    setPsCart(prev => prev.map(p => p.productId === productId ? { ...p, [field]: value } : p));
+  }
+
+  async function submitProductSale() {
+    if (!selectedClient) return;
+    if (psCart.length === 0) { setPsError('Adicione ao menos um produto.'); return; }
+    if (!psEmployeeId) { setPsError('Selecione um profissional.'); return; }
+    setPsSubmitting(true);
+    setPsError(null);
+    try {
+      await api.post('/appointments', {
+        unitId,
+        clientId: selectedClient._id,
+        employeeId: psEmployeeId,
+        date: psDate,
+        startTime: nowTime(),
+        price: 0,
+        status: 'pending',
+        products: psCart.map(p => ({
+          productId: p.productId,
+          name: p.name,
+          quantity: p.quantity,
+          unitPrice: p.price - p.discount,
+        })),
+      });
+      qc.invalidateQueries({ queryKey: ['client-appointments', selectedId] });
+      setShowProductSale(false);
+      setToast({ message: 'Venda de produto registrada!', type: 'success' });
+    } catch (err: any) {
+      setPsError(err.response?.data?.message || 'Erro ao registrar venda.');
+    } finally {
+      setPsSubmitting(false);
+    }
+  }
+
   const IconCopy = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>;
   const IconCheck = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>;
   const IconWhatsApp = () => <svg width="22" height="22" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>;
@@ -253,51 +504,26 @@ export default function Clients() {
       {toast && (
         <div className={`${styles.toast} ${styles[toast.type]}`}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            {toast.type === 'success' ? (
-              <polyline points="20 6 9 17 4 12"/>
-            ) : (
-              <>
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="8" x2="12" y2="12"/>
-                <line x1="12" y1="16" x2="12.01" y2="16"/>
-              </>
-            )}
+            {toast.type === 'success' ? <polyline points="20 6 9 17 4 12"/> : (<><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>)}
           </svg>
           {toast.message}
         </div>
       )}
       <div className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>CLIENTES</h1>
-        <button className={styles.newBtn} onClick={() => setShowForm(true)}>
-          + Novo Cliente
-        </button>
+        <button className={styles.newBtn} onClick={() => setShowForm(true)}>+ Novo Cliente</button>
       </div>
 
       <div className={styles.layout}>
         <div className={styles.listPanel}>
-          <input
-            type="search"
-            className={styles.searchInput}
-            placeholder="Buscar por nome, e-mail ou telefone..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-
+          <input type="search" className={styles.searchInput} placeholder="Buscar por nome, e-mail ou telefone..."
+            value={search} onChange={e => setSearch(e.target.value)} />
           {isLoading && <p className={styles.empty}>Carregando...</p>}
-          {!isLoading && clients.length === 0 && (
-            <p className={styles.empty}>Nenhum cliente encontrado.</p>
-          )}
-
+          {!isLoading && clients.length === 0 && <p className={styles.empty}>Nenhum cliente encontrado.</p>}
           <div className={styles.clientList}>
             {clients.map(client => (
-              <div
-                key={client._id}
-                className={`${styles.clientRow} ${selectedId === client._id ? styles.selected : ''}`}
-                onClick={() => handleSelect(client._id)}
-              >
-                <div className={styles.avatar}>
-                  {client.name[0].toUpperCase()}
-                </div>
+              <div key={client._id} className={`${styles.clientRow} ${selectedId === client._id ? styles.selected : ''}`} onClick={() => handleSelect(client._id)}>
+                <div className={styles.avatar}>{client.name[0].toUpperCase()}</div>
                 <div className={styles.clientInfo}>
                   <span className={styles.clientName}>{client.name}</span>
                   <span className={styles.clientSub}>
@@ -313,10 +539,8 @@ export default function Clients() {
         {selectedClient && (
           <div className={styles.detailPanel}>
             <div className={styles.detailHeader}>
-              <div className={styles.detailAvatar}>
-                {selectedClient.name[0].toUpperCase()}
-              </div>
-              <div>
+              <div className={styles.detailAvatar}>{selectedClient.name[0].toUpperCase()}</div>
+              <div style={{ flex: 1 }}>
                 <h2 className={styles.detailName}>{selectedClient.name}</h2>
                 {selectedClient.phone && (
                   <div className={styles.detailMetaWrapper}>
@@ -324,11 +548,8 @@ export default function Clients() {
                     <button className={styles.copyBtn} onClick={() => copyToClipboard(selectedClient.phone || '', 'phone')} title="Copiar telefone">
                       {copiedField === 'phone' ? <IconCheck /> : <IconCopy />}
                     </button>
-                    <button
-                      onClick={() => openWhatsApp(selectedClient)}
-                      title="Enviar WhatsApp"
-                      style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(37, 211, 102, 0.1)', color: '#25D366', border: '1px solid rgba(37, 211, 102, 0.3)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', marginLeft: '6px', transition: 'all 0.2s' }}
-                    >
+                    <button onClick={() => openWhatsApp(selectedClient)} title="Enviar WhatsApp"
+                      style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(37, 211, 102, 0.1)', color: '#25D366', border: '1px solid rgba(37, 211, 102, 0.3)', borderRadius: '6px', padding: '4px 10px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', marginLeft: '6px', transition: 'all 0.2s' }}>
                       <IconWhatsApp />
                       WHATSAPP
                     </button>
@@ -344,15 +565,46 @@ export default function Clients() {
                 )}
                 {selectedClient.notes && <p className={styles.detailNotes}>{selectedClient.notes}</p>}
               </div>
+
+              {/* Action buttons */}
+              <div style={{ display: 'flex', gap: '0.5rem', alignSelf: 'flex-start', flexShrink: 0 }}>
+                {comandaItemsList.length > 0 && (
+                  <button className={styles.comandaBtn} onClick={openComanda}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></svg>
+                    Comanda
+                    <span className={styles.comandaBadge}>{comandaItemsList.length}</span>
+                  </button>
+                )}
+                {/* FAB */}
+                <div className={styles.fabWrap} ref={fabRef}>
+                  {showFab && (
+                    <div className={styles.fabMenu}>
+                      <button className={styles.fabMenuItem} onClick={() => { setShowFab(false); setShowApptForm(true); }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        Novo Atendimento
+                      </button>
+                      <button className={styles.fabMenuItem} onClick={() => { setShowFab(false); openProductSale(); }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>
+                        Venda de Produto
+                      </button>
+                      <button className={styles.fabMenuItem} onClick={() => { setShowFab(false); setShowPackageModal(true); }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+                        Venda de Pacote
+                      </button>
+                    </div>
+                  )}
+                  <button className={`${styles.fabBtn} ${showFab ? styles.fabOpen : ''}`} onClick={() => setShowFab(v => !v)} title="Ações">
+                    <span className={styles.fabPlus}>+</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             {selectedClient.packages && selectedClient.packages.filter(p => p.packageId).length > 0 && (
               <div className={styles.clientPackages}>
                 <div className={styles.sectionHeader}>
                   <h3 className={styles.historyTitle}>Pacotes e Assinaturas</h3>
-                  <button className={styles.addPackageBtn} onClick={() => setShowPackageModal(true)}>
-                    + Adicionar Pacote
-                  </button>
+                  <button className={styles.addPackageBtn} onClick={() => setShowPackageModal(true)}>+ Adicionar Pacote</button>
                 </div>
                 <div className={styles.packageList}>
                   {selectedClient.packages.filter(p => p.packageId).map(pkg => {
@@ -419,8 +671,7 @@ export default function Clients() {
                                         <span className={styles.usageCount} style={{ color: isExhausted ? '#EF4444' : 'var(--blue-600)' }}>
                                           {used} de {total} {isExhausted ? '(Esgotado)' : `(${remaining} restante${remaining !== 1 ? 's' : ''})`}
                                         </span>
-                                        <button title="Editar sessões"
-                                          style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', lineHeight: 1 }}
+                                        <button title="Editar sessões" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', color: 'var(--text-secondary)', lineHeight: 1 }}
                                           onClick={() => { setEditingItem({ pkgId: pkg.packageId._id, serviceId: item.serviceId._id }); setEditValue(String(total)); setEditUsedValue(String(used)); }}>
                                           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                         </button>
@@ -446,9 +697,7 @@ export default function Clients() {
               <div className={styles.clientPackages}>
                 <div className={styles.sectionHeader}>
                   <h3 className={styles.historyTitle}>Pacotes e Assinaturas</h3>
-                  <button className={styles.addPackageBtn} onClick={() => setShowPackageModal(true)}>
-                    + Adicionar Pacote
-                  </button>
+                  <button className={styles.addPackageBtn} onClick={() => setShowPackageModal(true)}>+ Adicionar Pacote</button>
                 </div>
                 <p className={styles.emptySmall}>Este cliente não possui pacotes.</p>
               </div>
@@ -456,16 +705,10 @@ export default function Clients() {
 
             {/* ── Tabs ── */}
             <div className={styles.clientTabs}>
-              <button
-                className={`${styles.clientTab} ${clientTab === 'history' ? styles.clientTabActive : ''}`}
-                onClick={() => setClientTab('history')}
-              >
+              <button className={`${styles.clientTab} ${clientTab === 'history' ? styles.clientTabActive : ''}`} onClick={() => setClientTab('history')}>
                 Histórico de Atendimentos
               </button>
-              <button
-                className={`${styles.clientTab} ${clientTab === 'products' ? styles.clientTabActive : ''}`}
-                onClick={() => setClientTab('products')}
-              >
+              <button className={`${styles.clientTab} ${clientTab === 'products' ? styles.clientTabActive : ''}`} onClick={() => setClientTab('products')}>
                 Venda de Produto
                 {appointments.some(a => a.products && a.products.length > 0) && (
                   <span style={{ marginLeft: '6px', background: '#111827', color: '#fff', borderRadius: '9px', fontSize: '10px', fontWeight: 700, padding: '1px 6px' }}>
@@ -478,17 +721,13 @@ export default function Clients() {
             {/* ── History tab ── */}
             {clientTab === 'history' && (
               <>
-                {appointments.length === 0 && (
-                  <p className={styles.empty}>Nenhum atendimento registrado.</p>
-                )}
+                {appointments.length === 0 && <p className={styles.empty}>Nenhum atendimento registrado.</p>}
                 <div className={styles.historyList}>
                   {appointments.map(appt => (
                     <div key={appt._id} className={styles.historyRow}>
                       <div className={styles.historyInfo}>
                         <span className={styles.historyDate}>{formatDate(appt.date)} — {appt.startTime}</span>
-                        <span className={styles.historySub}>
-                          {appt.serviceId?.name ?? 'Serviço'} · {appt.employeeId?.name ?? 'Barbeiro'}
-                        </span>
+                        <span className={styles.historySub}>{appt.serviceId?.name ?? 'Serviço'} · {appt.employeeId?.name ?? 'Barbeiro'}</span>
                         {appt.products && appt.products.length > 0 && (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', marginTop: '0.25rem' }}>
                             {appt.products.map((p, i) => (
@@ -511,21 +750,9 @@ export default function Clients() {
                           const canBillMore = !fullyBilled && appt.status !== 'cancelled';
                           return (
                             <>
-                              {fullyBilled && (
-                                <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', color: '#1565C0', background: 'rgba(21,101,192,0.1)', border: '1px solid rgba(21,101,192,0.3)', borderRadius: '4px', padding: '1px 6px' }}>
-                                  FATURADO
-                                </span>
-                              )}
-                              {!fullyBilled && appt.isBilled && (
-                                <span style={{ fontSize: '10px', fontWeight: 700, color: '#22C55E', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '4px', padding: '1px 6px' }}>
-                                  SERVIÇO FAT.
-                                </span>
-                              )}
-                              {!fullyBilled && appt.productsBilled && (
-                                <span style={{ fontSize: '10px', fontWeight: 700, color: '#22C55E', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '4px', padding: '1px 6px' }}>
-                                  PROD. FAT.
-                                </span>
-                              )}
+                              {fullyBilled && <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', color: '#1565C0', background: 'rgba(21,101,192,0.1)', border: '1px solid rgba(21,101,192,0.3)', borderRadius: '4px', padding: '1px 6px' }}>FATURADO</span>}
+                              {!fullyBilled && appt.isBilled && <span style={{ fontSize: '10px', fontWeight: 700, color: '#22C55E', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '4px', padding: '1px 6px' }}>SERVIÇO FAT.</span>}
+                              {!fullyBilled && appt.productsBilled && <span style={{ fontSize: '10px', fontWeight: 700, color: '#22C55E', background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)', borderRadius: '4px', padding: '1px 6px' }}>PROD. FAT.</span>}
                               {canBillMore && (
                                 <button onClick={() => openBilling(appt)} style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.05em', color: '#fff', background: '#1565C0', border: 'none', borderRadius: '5px', padding: '3px 9px', cursor: 'pointer' }}>
                                   {partiallyBilled ? 'FAT. REST.' : 'FATURAR'}
@@ -552,9 +779,7 @@ export default function Clients() {
             {/* ── Product sales tab ── */}
             {clientTab === 'products' && (() => {
               const salesAppts = appointments.filter(a => a.products && a.products.length > 0);
-              if (salesAppts.length === 0) {
-                return <p className={styles.empty}>Nenhuma venda de produto registrada.</p>;
-              }
+              if (salesAppts.length === 0) return <p className={styles.empty}>Nenhuma venda de produto registrada.</p>;
               return (
                 <div className={styles.historyList}>
                   {salesAppts.map(appt => {
@@ -578,18 +803,12 @@ export default function Clients() {
                         </div>
                         <div className={styles.historyRight} style={{ flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
                           {appt.productsBilled ? (
-                            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', color: '#1565C0', background: 'rgba(21,101,192,0.1)', border: '1px solid rgba(21,101,192,0.3)', borderRadius: '4px', padding: '1px 6px' }}>
-                              FATURADO
-                            </span>
+                            <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', color: '#1565C0', background: 'rgba(21,101,192,0.1)', border: '1px solid rgba(21,101,192,0.3)', borderRadius: '4px', padding: '1px 6px' }}>FATURADO</span>
                           ) : (
                             <>
-                              <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', color: '#6B7280', background: '#F3F4F6', border: '1px solid #E5E7EB', borderRadius: '4px', padding: '1px 6px' }}>
-                                PENDENTE
-                              </span>
+                              <span style={{ fontSize: '10px', fontWeight: 700, letterSpacing: '0.05em', color: '#6B7280', background: '#F3F4F6', border: '1px solid #E5E7EB', borderRadius: '4px', padding: '1px 6px' }}>PENDENTE</span>
                               {appt.status !== 'cancelled' && (
-                                <button onClick={() => openBilling(appt)} style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.05em', color: '#fff', background: '#1565C0', border: 'none', borderRadius: '5px', padding: '3px 9px', cursor: 'pointer' }}>
-                                  FATURAR
-                                </button>
+                                <button onClick={() => openBilling(appt)} style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.05em', color: '#fff', background: '#1565C0', border: 'none', borderRadius: '5px', padding: '3px 9px', cursor: 'pointer' }}>FATURAR</button>
                               )}
                             </>
                           )}
@@ -606,56 +825,40 @@ export default function Clients() {
         )}
       </div>
 
+      {/* ── Billing Modal ── */}
       {billingAppt && createPortal(
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={e => { if (e.target === e.currentTarget) setBillingAppt(null); }}
-        >
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={e => { if (e.target === e.currentTarget) setBillingAppt(null); }}>
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: '14px', padding: '2rem', width: '100%', maxWidth: '400px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)' }}>Finalizar Atendimento</span>
               <button onClick={() => setBillingAppt(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--text-muted)' }}>✕</button>
             </div>
-
             <div style={{ marginBottom: '1.25rem', padding: '0.75rem 1rem', background: 'var(--bg-elevated)', borderRadius: '8px', fontSize: '13px' }}>
               <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{billingAppt.serviceId?.name ?? 'Serviço'}</div>
-              <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>
-                {formatDate(billingAppt.date)} — {billingAppt.startTime} · {billingAppt.employeeId?.name ?? 'Barbeiro'}
-              </div>
+              <div style={{ color: 'var(--text-secondary)', marginTop: '2px' }}>{formatDate(billingAppt.date)} — {billingAppt.startTime} · {billingAppt.employeeId?.name ?? 'Barbeiro'}</div>
             </div>
-
             {(billingAppt.products?.length ?? 0) > 0 && (
               <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                  O que faturar
-                </label>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '8px' }}>O que faturar</label>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: billingAppt.isBilled ? 'default' : 'pointer', opacity: billingAppt.isBilled ? 0.55 : 1 }}>
-                    <input type="checkbox" checked={billingAppt.isBilled || billingBillService} disabled={!!billingAppt.isBilled}
-                      onChange={e => setBillingBillService(e.target.checked)} style={{ width: 16, height: 16 }} />
+                    <input type="checkbox" checked={billingAppt.isBilled || billingBillService} disabled={!!billingAppt.isBilled} onChange={e => setBillingBillService(e.target.checked)} style={{ width: 16, height: 16 }} />
                     <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                       <span style={{ color: 'var(--text-primary)' }}>Serviço: {billingAppt.serviceId?.name ?? 'Serviço'}</span>
-                      {billingAppt.isBilled
-                        ? <span style={{ color: '#22C55E', fontWeight: 700 }}>✓ Faturado</span>
-                        : <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formatCurrency(billingAppt.price)}</span>
-                      }
+                      {billingAppt.isBilled ? <span style={{ color: '#22C55E', fontWeight: 700 }}>✓ Faturado</span> : <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formatCurrency(billingAppt.price)}</span>}
                     </div>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: billingAppt.productsBilled ? 'default' : 'pointer', opacity: billingAppt.productsBilled ? 0.55 : 1 }}>
-                    <input type="checkbox" checked={!!billingAppt.productsBilled || billingBillProducts} disabled={!!billingAppt.productsBilled}
-                      onChange={e => setBillingBillProducts(e.target.checked)} style={{ width: 16, height: 16 }} />
+                    <input type="checkbox" checked={!!billingAppt.productsBilled || billingBillProducts} disabled={!!billingAppt.productsBilled} onChange={e => setBillingBillProducts(e.target.checked)} style={{ width: 16, height: 16 }} />
                     <div style={{ flex: 1, display: 'flex', justifyContent: 'space-between', fontSize: '13px' }}>
                       <span style={{ color: 'var(--text-primary)' }}>Produtos ({billingAppt.products!.length} {billingAppt.products!.length === 1 ? 'item' : 'itens'})</span>
-                      {billingAppt.productsBilled
-                        ? <span style={{ color: '#22C55E', fontWeight: 700 }}>✓ Faturado</span>
-                        : <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formatCurrency(billingAppt.products!.reduce((s, p) => s + p.quantity * p.unitPrice, 0))}</span>
-                      }
+                      {billingAppt.productsBilled ? <span style={{ color: '#22C55E', fontWeight: 700 }}>✓ Faturado</span> : <span style={{ color: 'var(--text-primary)', fontWeight: 600 }}>{formatCurrency(billingAppt.products!.reduce((s, p) => s + p.quantity * p.unitPrice, 0))}</span>}
                     </div>
                   </label>
                 </div>
               </div>
             )}
-
             {billingBillService && !billingAppt.isBilled && (
               <div style={{ marginBottom: '1.25rem' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>
@@ -668,7 +871,6 @@ export default function Clients() {
                 </div>
               </div>
             )}
-
             {billingAppt.usedPackageId ? (
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
@@ -677,15 +879,12 @@ export default function Clients() {
                 </div>
                 <div style={{ padding: '1rem', borderRadius: '10px', background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', marginBottom: '1.25rem' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', userSelect: 'none' }}>
-                    <div onClick={() => setBillingRegisterPayment(v => !v)}
-                      style={{ width: '42px', height: '24px', borderRadius: '12px', flexShrink: 0, background: billingRegisterPayment ? 'var(--gold)' : 'var(--border-default)', transition: 'background 0.2s', position: 'relative', cursor: 'pointer' }}>
+                    <div onClick={() => setBillingRegisterPayment(v => !v)} style={{ width: '42px', height: '24px', borderRadius: '12px', flexShrink: 0, background: billingRegisterPayment ? 'var(--gold)' : 'var(--border-default)', transition: 'background 0.2s', position: 'relative', cursor: 'pointer' }}>
                       <div style={{ position: 'absolute', top: '3px', left: billingRegisterPayment ? '21px' : '3px', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
                     </div>
                     <div>
                       <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>{billingRegisterPayment ? 'Registrar pagamento' : 'Sem cobrança'}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-                        {billingRegisterPayment ? 'Gera transação e comissão para o barbeiro' : 'Apenas desconta a sessão do pacote, sem transação'}
-                      </div>
+                      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>{billingRegisterPayment ? 'Gera transação e comissão para o barbeiro' : 'Apenas desconta a sessão do pacote, sem transação'}</div>
                     </div>
                   </label>
                 </div>
@@ -716,14 +915,9 @@ export default function Clients() {
                 </div>
               </div>
             )}
-
             <div style={{ display: 'flex', gap: '10px', marginTop: '0.5rem' }}>
-              <button onClick={() => setBillingAppt(null)}
-                style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-elevated)', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>
-                Voltar
-              </button>
-              <button onClick={confirmBilling} disabled={billMutation.isPending}
-                style={{ flex: 2, padding: '10px', borderRadius: '8px', border: 'none', background: 'var(--gold)', color: '#080808', fontWeight: 700, cursor: 'pointer', opacity: billMutation.isPending ? 0.7 : 1 }}>
+              <button onClick={() => setBillingAppt(null)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-elevated)', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>Voltar</button>
+              <button onClick={confirmBilling} disabled={billMutation.isPending} style={{ flex: 2, padding: '10px', borderRadius: '8px', border: 'none', background: 'var(--gold)', color: '#080808', fontWeight: 700, cursor: 'pointer', opacity: billMutation.isPending ? 0.7 : 1 }}>
                 {billMutation.isPending ? 'Processando...' : 'Confirmar e Concluir'}
               </button>
             </div>
@@ -732,56 +926,242 @@ export default function Clients() {
         document.body
       )}
 
+      {/* ── WhatsApp Modal ── */}
       {whatsappClient && createPortal(
-        <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-          onClick={e => { if (e.target === e.currentTarget) setWhatsappClient(null); }}
-        >
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(3px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={e => { if (e.target === e.currentTarget) setWhatsappClient(null); }}>
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-default)', borderRadius: '14px', padding: '2rem', width: '100%', maxWidth: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', position: 'relative' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ background: '#25D366', color: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <IconWhatsApp />
-                </div>
+                <div style={{ background: '#25D366', color: 'white', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><IconWhatsApp /></div>
                 <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)' }}>Enviar Mensagem</span>
               </div>
               <button onClick={() => setWhatsappClient(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--text-muted)' }}>✕</button>
             </div>
-
             <div style={{ marginBottom: '1.5rem' }}>
-              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                Mensagem para {whatsappClient.name}
-              </label>
-              <textarea
-                value={whatsappMessage}
-                onChange={e => setWhatsappMessage(e.target.value)}
-                rows={5}
-                style={{ width: '100%', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-default)', background: 'var(--bg-base)', color: 'var(--text-primary)', fontSize: '14.5px', resize: 'vertical', outline: 'none', lineHeight: 1.5, fontFamily: 'inherit' }}
-                autoFocus
-              />
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '8px' }}>Mensagem para {whatsappClient.name}</label>
+              <textarea value={whatsappMessage} onChange={e => setWhatsappMessage(e.target.value)} rows={5}
+                style={{ width: '100%', padding: '1rem', borderRadius: '10px', border: '1px solid var(--border-default)', background: 'var(--bg-base)', color: 'var(--text-primary)', fontSize: '14.5px', resize: 'vertical', outline: 'none', lineHeight: 1.5, fontFamily: 'inherit' }} autoFocus />
             </div>
-
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={() => setWhatsappClient(null)}
-                style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-elevated)', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  let num = whatsappClient.phone.replace(/\D/g, '');
-                  if (!num.startsWith('55')) num = '55' + num;
-                  const url = `https://wa.me/${num}?text=${encodeURIComponent(whatsappMessage)}`;
-                  window.open(url, '_blank');
-                  setWhatsappClient(null);
-                }}
+              <button onClick={() => setWhatsappClient(null)} style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-elevated)', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>Cancelar</button>
+              <button onClick={() => { let num = whatsappClient.phone.replace(/\D/g, ''); if (!num.startsWith('55')) num = '55' + num; window.open(`https://wa.me/${num}?text=${encodeURIComponent(whatsappMessage)}`, '_blank'); setWhatsappClient(null); }}
                 style={{ flex: 2, padding: '12px', borderRadius: '8px', border: 'none', background: '#25D366', color: '#fff', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <IconWhatsApp />
-                Abrir WhatsApp
+                <IconWhatsApp /> Abrir WhatsApp
               </button>
             </div>
           </div>
         </div>,
         document.body
+      )}
+
+      {/* ── Product Sale Modal ── */}
+      {showProductSale && createPortal(
+        <div className={styles.psOverlay} onClick={e => { if (e.target === e.currentTarget) setShowProductSale(false); }}>
+          <div className={styles.psModal}>
+            <div className={styles.psHeader}>
+              <h2 className={styles.psTitle}>Venda de Produto</h2>
+              <button className={styles.psCloseBtn} onClick={() => setShowProductSale(false)}>✕</button>
+            </div>
+            <div className={styles.psBody}>
+              <div className={styles.psField}>
+                <label className={styles.psLabel}>Cliente</label>
+                <div className={styles.psReadOnly}>{selectedClient?.name}</div>
+              </div>
+              <div className={styles.psRow}>
+                <div className={styles.psField}>
+                  <label className={styles.psLabel}>Data</label>
+                  <input type="date" className={styles.psInput} value={psDate} onChange={e => setPsDate(e.target.value)} />
+                </div>
+                <div className={styles.psField}>
+                  <label className={styles.psLabel}>Profissional</label>
+                  <select className={styles.psSelect} value={psEmployeeId} onChange={e => setPsEmployeeId(e.target.value)}>
+                    <option value="">Selecionar...</option>
+                    {employees.map(emp => <option key={emp._id} value={emp._id}>{emp.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className={styles.psField}>
+                <label className={styles.psLabel}>Produtos</label>
+                {psCart.length > 0 && (
+                  <div className={styles.psCartList}>
+                    {psCart.map(item => (
+                      <div key={item.productId} className={styles.psCartItem}>
+                        <div className={styles.psCartItemName}>{item.name}</div>
+                        <div className={styles.psCartItemControls}>
+                          <div className={styles.psCartField}>
+                            <span className={styles.psCartFieldLabel}>Qtd</span>
+                            <input type="number" min={1} className={styles.psCartInput} value={item.quantity}
+                              onChange={e => updateCartItem(item.productId, 'quantity', Math.max(1, parseInt(e.target.value) || 1))} />
+                          </div>
+                          <div className={styles.psCartField}>
+                            <span className={styles.psCartFieldLabel}>Preço R$</span>
+                            <input type="number" min={0} step="0.01" className={styles.psCartInput} value={item.price}
+                              onChange={e => updateCartItem(item.productId, 'price', parseFloat(e.target.value) || 0)} />
+                          </div>
+                          <div className={styles.psCartField}>
+                            <span className={styles.psCartFieldLabel}>Desc. R$</span>
+                            <input type="number" min={0} step="0.01" className={styles.psCartInput} value={item.discount}
+                              onChange={e => updateCartItem(item.productId, 'discount', parseFloat(e.target.value) || 0)} />
+                          </div>
+                          <button className={styles.psCartRemove} onClick={() => removeFromCart(item.productId)}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                          </button>
+                        </div>
+                        <div className={styles.psCartItemTotal}>Total: {formatCurrency((item.price - item.discount) * item.quantity)}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button className={styles.psAddProductBtn} onClick={() => { setBrowserCat(null); setShowBrowser(true); }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                  Selecionar produto
+                </button>
+              </div>
+              {psCart.length > 0 && (
+                <div className={styles.psTotalRow}>
+                  <span>Total da venda</span>
+                  <span className={styles.psTotalValue}>{formatCurrency(psCart.reduce((s, p) => s + (p.price - p.discount) * p.quantity, 0))}</span>
+                </div>
+              )}
+              {psError && <p className={styles.psError}>{psError}</p>}
+            </div>
+            <div className={styles.psFooter}>
+              <button className={styles.psCancelBtn} onClick={() => setShowProductSale(false)}>Cancelar</button>
+              <button className={styles.psSubmitBtn} onClick={submitProductSale} disabled={psSubmitting}>
+                {psSubmitting ? 'Registrando...' : 'Registrar Venda'}
+              </button>
+            </div>
+          </div>
+
+          {/* Product Browser */}
+          {showBrowser && (
+            <div className={styles.browserOverlay} onClick={e => { if (e.target === e.currentTarget) { setShowBrowser(false); setBrowserCat(null); } }}>
+              <div className={styles.browserModal}>
+                <div className={styles.browserHeader}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    {browserCat && (
+                      <button className={styles.browserBackBtn} onClick={() => setBrowserCat(null)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                      </button>
+                    )}
+                    <h3 className={styles.browserTitle}>{browserCat ?? 'Categorias'}</h3>
+                  </div>
+                  <button className={styles.psCloseBtn} onClick={() => { setShowBrowser(false); setBrowserCat(null); }}>✕</button>
+                </div>
+                <div className={styles.browserList}>
+                  {!browserCat ? (
+                    productCategories.length === 0
+                      ? <p className={styles.browserEmpty}>Nenhum produto cadastrado.</p>
+                      : productCategories.map(cat => (
+                        <button key={cat} className={styles.browserCatItem} onClick={() => setBrowserCat(cat)}>
+                          <span className={styles.browserCatName}>{cat}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <span className={styles.browserCatCount}>{productsByCategory[cat]?.length ?? 0} itens</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+                          </div>
+                        </button>
+                      ))
+                  ) : (
+                    (productsByCategory[browserCat] ?? []).map(product => (
+                      <button key={product._id} className={styles.browserProductItem} onClick={() => addToCart(product)}>
+                        <div className={styles.browserProductInfo}>
+                          <span className={styles.browserProductName}>{product.name}</span>
+                          <span className={styles.browserProductStock}>{product.stockQuantity} em estoque</span>
+                        </div>
+                        <span className={styles.browserProductPrice}>{formatCurrency(product.price)}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>,
+        document.body
+      )}
+
+      {/* ── Comanda Modal ── */}
+      {showComanda && createPortal(
+        <div className={styles.comandaOverlay} onClick={e => { if (e.target === e.currentTarget) setShowComanda(false); }}>
+          <div className={styles.comandaModal}>
+            <div className={styles.comandaHeader}>
+              <div>
+                <h2 className={styles.comandaTitle}>Comanda</h2>
+                <p className={styles.comandaSubtitle}>{selectedClient?.name}</p>
+              </div>
+              <button className={styles.psCloseBtn} onClick={() => setShowComanda(false)}>✕</button>
+            </div>
+            <div className={styles.comandaBody}>
+              {comandaItemsList.length === 0 ? (
+                <p className={styles.browserEmpty}>Nenhum item pendente para faturar.</p>
+              ) : (
+                <div className={styles.comandaList}>
+                  {comandaItemsList.map(item => {
+                    const checked = comandaSelected.has(item.key);
+                    return (
+                      <label key={item.key} className={`${styles.comandaItem} ${checked ? styles.comandaItemChecked : ''}`}>
+                        <input type="checkbox" checked={checked} className={styles.comandaCheckbox}
+                          onChange={e => {
+                            setComandaSelected(prev => {
+                              const next = new Set(prev);
+                              e.target.checked ? next.add(item.key) : next.delete(item.key);
+                              return next;
+                            });
+                          }} />
+                        <div className={styles.comandaItemContent}>
+                          <div className={styles.comandaItemLabel}>
+                            {item.type === 'service'
+                              ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
+                              : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg>
+                            }
+                            <span>{item.label}</span>
+                          </div>
+                          <div className={styles.comandaItemMeta}>
+                            <span>{formatDate(item.date)}</span>
+                            {item.sublabel && <span>· {item.sublabel}</span>}
+                          </div>
+                        </div>
+                        <span className={styles.comandaItemPrice}>{formatCurrency(item.price)}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className={styles.comandaFooter}>
+              <div className={styles.comandaSummary}>
+                <div className={styles.comandaSummaryRow}><span>Subtotal</span><span>{formatCurrency(comandaTotal)}</span></div>
+                <div className={styles.comandaSummaryRow}><span>Descontos</span><span>R$ 0,00</span></div>
+                <div className={`${styles.comandaSummaryRow} ${styles.comandaSummaryTotal}`}><span>Total</span><span>{formatCurrency(comandaTotal)}</span></div>
+              </div>
+              <div className={styles.psField} style={{ marginBottom: '1rem' }}>
+                <label className={styles.psLabel}>Forma de Pagamento</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                  {(['money', 'debit', 'credit', 'pix', 'other'] as const).map(pm => (
+                    <button key={pm} className={`${styles.pmBtn} ${comandaPayment === pm ? styles.pmBtnActive : ''}`} onClick={() => setComandaPayment(pm)}>
+                      {pm === 'money' ? 'Dinheiro' : pm === 'debit' ? 'Débito' : pm === 'credit' ? 'Crédito' : pm === 'pix' ? 'Pix' : 'Outro'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button className={styles.comandaContinuarBtn} onClick={confirmComanda} disabled={comandaSubmitting || comandaSelected.size === 0}>
+                {comandaSubmitting ? 'Finalizando...' : `Continuar (${formatCurrency(comandaTotal)})`}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showApptForm && (
+        <AppointmentForm
+          onClose={() => setShowApptForm(false)}
+          onSuccess={() => {
+            setShowApptForm(false);
+            qc.invalidateQueries({ queryKey: ['client-appointments', selectedId] });
+          }}
+        />
       )}
 
       {showForm && (
@@ -811,9 +1191,7 @@ export default function Clients() {
               ) : (
                 <div className={styles.packageSelectionList}>
                   {availablePackages.map(pkg => (
-                    <div 
-                      key={pkg._id} 
-                      className={styles.packageOption}
+                    <div key={pkg._id} className={styles.packageOption}
                       onClick={async () => {
                         try {
                           await api.post(`/clients/${selectedId}/packages`, { packageId: pkg._id });
@@ -823,8 +1201,7 @@ export default function Clients() {
                         } catch (err: unknown) {
                           setToast({ message: getErrorMessage(err), type: 'error' });
                         }
-                      }}
-                    >
+                      }}>
                       <div className={styles.packageOptionInfo}>
                         <span className={styles.packageOptionName}>{pkg.name}</span>
                         <span className={styles.packageOptionPrice}>{formatCurrency(pkg.price)}</span>

@@ -77,15 +77,21 @@ export class AuthService {
           allowedApps: ['booking'],
         });
 
-        // Also create a Client document for this user to ensure system compatibility
+        // Link existing Client record (internally created) or create a new one
         const { ClientModel } = await import('../clients/client.model');
-        await ClientModel.create({
-          name,
-          phone: cleanPhone,
-          email: guestEmail,
-          userId: user._id,
-          isActive: true
-        });
+        const existingClient = await ClientModel.findOne({ phone: { $regex: cleanPhone.split('').join('.*') } });
+        if (existingClient) {
+          existingClient.userId = user._id as any;
+          await existingClient.save();
+        } else {
+          await ClientModel.create({
+            name,
+            phone: cleanPhone,
+            email: guestEmail,
+            userId: user._id,
+            isActive: true,
+          });
+        }
       } else {
         // Ensure user is active
         if (!user.isActive) {
@@ -97,6 +103,13 @@ export class AuthService {
           user.name = name;
           await user.save();
         }
+
+        // Ensure any existing Client records for this phone are linked to this user
+        const { ClientModel } = await import('../clients/client.model');
+        await ClientModel.updateMany(
+          { phone: { $regex: cleanPhone.split('').join('.*') }, userId: { $exists: false } },
+          { $set: { userId: user._id } }
+        );
       }
 
       const tokens = this.generateTokens(

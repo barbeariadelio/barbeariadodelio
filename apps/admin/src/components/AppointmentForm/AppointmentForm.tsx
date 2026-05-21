@@ -1,4 +1,4 @@
-import { FormEvent, useState, useRef, useEffect, useCallback } from 'react';
+import { FormEvent, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
@@ -35,13 +35,29 @@ interface Service {
 interface Product { _id: string; name: string; price: number; stockQuantity: number; isActive: boolean; }
 interface ApptProduct { productId: string; name: string; quantity: number; unitPrice: number; }
 
-function advanceDate(iso: string, freq: 'weekly' | 'biweekly' | 'monthly' | 'annual', times: number): string {
+type RepeatUnit = 'days' | 'weeks' | 'months' | 'years';
+
+function advanceDate(iso: string, interval: number, unit: RepeatUnit, step: number): string {
   const d = new Date(iso + 'T12:00:00');
-  if (freq === 'weekly')        d.setDate(d.getDate() + times * 7);
-  else if (freq === 'biweekly') d.setDate(d.getDate() + times * 14);
-  else if (freq === 'monthly')  d.setMonth(d.getMonth() + times);
-  else                          d.setFullYear(d.getFullYear() + times);
+  if (unit === 'days')   d.setDate(d.getDate() + interval * step);
+  if (unit === 'weeks')  d.setDate(d.getDate() + interval * 7 * step);
+  if (unit === 'months') d.setMonth(d.getMonth() + interval * step);
+  if (unit === 'years')  d.setFullYear(d.getFullYear() + interval * step);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+function formatRepeatPreview(baseDate: string, interval: number, unit: RepeatUnit): string {
+  const nextISO = advanceDate(baseDate, interval, unit, 1);
+  const d = new Date(nextISO + 'T12:00:00');
+  const unitLabel =
+    unit === 'days'   ? (interval === 1 ? 'dia' : 'dias')
+    : unit === 'weeks'  ? (interval === 1 ? 'semana' : 'semanas')
+    : unit === 'months' ? (interval === 1 ? 'mês' : 'meses')
+    : (interval === 1 ? 'ano' : 'anos');
+  const dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  return `Repete a cada ${interval} ${unitLabel}. Próxima: ${DAYS_PT[d.getDay()]}, ${dateStr}`;
 }
 
 interface Props {
@@ -99,8 +115,10 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
 
   // Repeat
   const [repeatEnabled, setRepeatEnabled] = useState(false);
-  const [repeatFrequency, setRepeatFrequency] = useState<'weekly' | 'biweekly' | 'monthly' | 'annual'>('weekly');
-  const [repeatCount, setRepeatCount] = useState(3);
+  const [repeatInterval, setRepeatInterval] = useState(7);
+  const [repeatUnit, setRepeatUnit] = useState<RepeatUnit>('days');
+  const [repeatEndType, setRepeatEndType] = useState<'never' | 'date'>('never');
+  const [repeatEndDate, setRepeatEndDate] = useState('');
   const [repeatProgress, setRepeatProgress] = useState<{ current: number; total: number } | null>(null);
 
   // Products
@@ -122,6 +140,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       setStartTime(appointment.startTime);
       setNotes(appointment.notes || '');
       setUsePackage(!!appointment.isPackage);
+      if (Array.isArray(appointment.products)) setApptProducts(appointment.products);
     }
   }, [appointment]);
 
@@ -222,6 +241,21 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  function twoYearsISO(base: string) {
+    const d = new Date(base + 'T12:00:00');
+    d.setFullYear(d.getFullYear() + 2);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  const repeatTotal = useMemo(() => {
+    if (!repeatEnabled || !date) return 1;
+    const endISO = repeatEndType === 'date' && repeatEndDate ? repeatEndDate : twoYearsISO(date);
+    let count = 1, step = 1;
+    let next = advanceDate(date, repeatInterval, repeatUnit, step);
+    while (next <= endISO && step <= 730) { count++; step++; next = advanceDate(date, repeatInterval, repeatUnit, step); }
+    return count;
+  }, [repeatEnabled, repeatEndType, repeatEndDate, date, repeatInterval, repeatUnit]);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!unitId || !clientId || !employeeId || !serviceId) {
@@ -280,12 +314,12 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
           await createOne(date, finalIsPackage);
           onSuccess();
         } else {
-          // Build full list of dates: original + repeatCount more
-          const total = repeatCount + 1;
+          // Build full list of dates
           const dates: string[] = [date];
-          for (let i = 1; i <= repeatCount; i++) {
-            dates.push(advanceDate(date, repeatFrequency, i));
-          }
+          const endISO = repeatEndType === 'date' && repeatEndDate ? repeatEndDate : twoYearsISO(date);
+          let step = 1, next = advanceDate(date, repeatInterval, repeatUnit, step);
+          while (next <= endISO && step <= 730) { dates.push(next); step++; next = advanceDate(date, repeatInterval, repeatUnit, step); }
+          const total = dates.length;
 
           // All appointments in this repeat series share the same seriesId
           const seriesId = Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -595,8 +629,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
           </div>
 
           {/* ── Products ── */}
-          {!appointment && (
-            <div className={styles.field}>
+          <div className={styles.field}>
               <label className={styles.label}>Produtos (opcional)</label>
               {activeProducts.length > 0 && (
                 <div style={{ display: 'flex', gap: '0.5rem', marginBottom: apptProducts.length > 0 ? '0.5rem' : 0 }}>
@@ -657,32 +690,71 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
                 </div>
               )}
             </div>
-          )}
 
           {/* ── Repeat ── */}
           {!appointment && (
-            <div className={styles.field}>
-              <label className={styles.checkboxLabel} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontWeight: 500, fontSize: '0.9rem' }}>
-                <input type="checkbox" checked={repeatEnabled} onChange={e => setRepeatEnabled(e.target.checked)} />
-                Repetir agendamento
-              </label>
+            <div className={styles.repeatSection}>
+              <div className={styles.repeatToggleRow}>
+                <div className={styles.repeatToggleLeft}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                  </svg>
+                  <span className={styles.repeatLabel}>Repetir agendamento</span>
+                </div>
+                <button
+                  type="button"
+                  className={`${styles.toggleSwitch} ${repeatEnabled ? styles.toggleOn : ''}`}
+                  onClick={() => setRepeatEnabled(v => !v)}
+                  aria-pressed={repeatEnabled}
+                >
+                  <span className={styles.toggleKnob} />
+                </button>
+              </div>
+
               {repeatEnabled && (
-                <div className={styles.row} style={{ marginTop: '0.5rem' }}>
-                  <div className={styles.field}>
-                    <label className={styles.label}>Frequência</label>
-                    <select className={styles.select} value={repeatFrequency} onChange={e => setRepeatFrequency(e.target.value as any)}>
-                      <option value="weekly">Semanal</option>
-                      <option value="biweekly">Quinzenal</option>
-                      <option value="monthly">Mensal</option>
-                      <option value="annual">Anual</option>
+                <div className={styles.repeatConfig}>
+                  <div className={styles.repeatRow}>
+                    <span className={styles.repeatRowLabel}>Repetir a cada</span>
+                    <div className={styles.intervalControl}>
+                      <button type="button" className={styles.stepBtn} onClick={() => setRepeatInterval(n => Math.max(1, n - 1))}>−</button>
+                      <span className={styles.intervalValue}>{repeatInterval}</span>
+                      <button type="button" className={styles.stepBtn} onClick={() => setRepeatInterval(n => Math.min(365, n + 1))}>+</button>
+                      <select className={styles.unitSelect} value={repeatUnit} onChange={e => setRepeatUnit(e.target.value as RepeatUnit)}>
+                        <option value="days">dias</option>
+                        <option value="weeks">semanas</option>
+                        <option value="months">meses</option>
+                        <option value="years">anos</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className={styles.repeatRow}>
+                    <span className={styles.repeatRowLabel}>Terminar em</span>
+                    <select className={styles.unitSelect} style={{ flex: 1 }} value={repeatEndType} onChange={e => setRepeatEndType(e.target.value as any)}>
+                      <option value="never">Nunca (2 anos)</option>
+                      <option value="date">Em uma data</option>
                     </select>
                   </div>
-                  <div className={styles.field}>
-                    <label className={styles.label}>Repetições</label>
-                    <select className={styles.select} value={repeatCount} onChange={e => setRepeatCount(Number(e.target.value))}>
-                      {[1, 2, 3, 4, 5, 6, 8, 10, 12].map(n => <option key={n} value={n}>{n}×</option>)}
-                    </select>
-                  </div>
+
+                  {repeatEndType === 'date' && (
+                    <div className={styles.repeatRow}>
+                      <span className={styles.repeatRowLabel}>Até</span>
+                      <input
+                        type="date"
+                        className={styles.input}
+                        style={{ flex: 1 }}
+                        value={repeatEndDate}
+                        min={date}
+                        onChange={e => setRepeatEndDate(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  {date && (
+                    <p className={styles.repeatPreview}>
+                      {formatRepeatPreview(date, repeatInterval, repeatUnit)}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -697,8 +769,9 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
                 ? `Criando ${repeatProgress.current} de ${repeatProgress.total}...`
                 : isSubmitting ? 'Salvando...'
                 : appointment ? 'Salvar Alterações'
-                : repeatEnabled ? `Criar ${repeatCount + 1} Agendamentos`
-                : 'Criar Agendamento'}
+                : repeatEnabled
+                  ? repeatTotal !== null ? `Criar ${repeatTotal} Agendamentos` : 'Criar Agendamentos'
+                  : 'Criar Agendamento'}
             </button>
           </div>
         </form>

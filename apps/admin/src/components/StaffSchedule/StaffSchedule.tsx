@@ -77,6 +77,7 @@ export interface ScheduleAppointment {
   isBilled?: boolean;
   isPackage?: boolean;
   notes?: string;
+  products?: Array<{ productId: string; name: string; quantity: number; unitPrice: number }>;
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'blocked';
 }
 
@@ -252,6 +253,24 @@ function ApptModal({ appt, palette, onClose, onStatusChange, onDelete, isPending
                 </select>
               </div>
             </div>
+
+            {appt.products && appt.products.length > 0 && (
+              <div className={styles.infoRow}>
+                <div className={styles.infoIcon}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg></div>
+                <div className={styles.infoText}>
+                  <span className={styles.notesLabel}>Produtos</span>
+                  <div className={styles.productList}>
+                    {appt.products.map((p, i) => (
+                      <div key={i} className={styles.productItem}>
+                        <span className={styles.productName}>{p.name}</span>
+                        <span className={styles.productQty}>×{p.quantity}</span>
+                        <span className={styles.productPrice}>R$ {(p.unitPrice * p.quantity).toFixed(2).replace('.', ',')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {(appt as any).notes && (
               <div className={styles.infoRow}>

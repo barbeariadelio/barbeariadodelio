@@ -22,7 +22,8 @@ export const createAppointmentSchema = z.object({
     })).optional(),
     seriesId: z.string().optional(),
   }).superRefine((data, ctx) => {
-    if (data.status !== 'blocked' && !data.serviceId) {
+    const hasProducts = (data.products?.length ?? 0) > 0;
+    if (data.status !== 'blocked' && !data.serviceId && !hasProducts) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['serviceId'], message: 'Serviço é obrigatório' });
     }
   }),

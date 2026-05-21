@@ -47,6 +47,37 @@ function todayISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+type RepeatUnit = 'days' | 'weeks' | 'months' | 'years';
+
+function advanceDate(iso: string, interval: number, unit: RepeatUnit, step: number): string {
+  const d = new Date(iso + 'T12:00:00');
+  if (unit === 'days')   d.setDate(d.getDate() + interval * step);
+  if (unit === 'weeks')  d.setDate(d.getDate() + interval * 7 * step);
+  if (unit === 'months') d.setMonth(d.getMonth() + interval * step);
+  if (unit === 'years')  d.setFullYear(d.getFullYear() + interval * step);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function twoYearsISO(base: string): string {
+  const d = new Date(base + 'T12:00:00');
+  d.setFullYear(d.getFullYear() + 2);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const DAYS_PT = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+
+function formatRepeatPreview(baseDate: string, interval: number, unit: RepeatUnit): string {
+  const nextISO = advanceDate(baseDate, interval, unit, 1);
+  const d = new Date(nextISO + 'T12:00:00');
+  const unitLabel =
+    unit === 'days'   ? (interval === 1 ? 'dia' : 'dias')
+    : unit === 'weeks'  ? (interval === 1 ? 'semana' : 'semanas')
+    : unit === 'months' ? (interval === 1 ? 'mês' : 'meses')
+    : (interval === 1 ? 'ano' : 'anos');
+  const dateStr = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+  return `Repete a cada ${interval} ${unitLabel}. Próxima: ${DAYS_PT[d.getDay()]}, ${dateStr}`;
+}
+
 function IconSearch() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -81,6 +112,24 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
   const [usePackage, setUsePackage] = useState(false);
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  // Repeat
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
+  const [repeatInterval, setRepeatInterval] = useState(7);
+  const [repeatUnit, setRepeatUnit] = useState<RepeatUnit>('days');
+  const [repeatEndType, setRepeatEndType] = useState<'never' | 'date'>('never');
+  const [repeatEndDate, setRepeatEndDate] = useState('');
+  const [repeatProgress, setRepeatProgress] = useState<{ current: number; total: number } | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const repeatTotal = useMemo(() => {
+    if (!repeatEnabled || !date) return 1;
+    const endISO = repeatEndType === 'date' && repeatEndDate ? repeatEndDate : twoYearsISO(date);
+    let count = 1, step = 1;
+    let next = advanceDate(date, repeatInterval, repeatUnit, step);
+    while (next <= endISO && step <= 730) { count++; step++; next = advanceDate(date, repeatInterval, repeatUnit, step); }
+    return count;
+  }, [repeatEnabled, repeatEndType, repeatEndDate, date, repeatInterval, repeatUnit]);
 
   const clientBoxRef = useRef<HTMLDivElement>(null);
 
@@ -230,7 +279,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     },
   });
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     if (!unitId || !clientId || !employeeId || !serviceId) {
       setError('Preencha todos os campos obrigatórios.');
@@ -238,35 +287,75 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     }
     const service = services.find(s => s._id === serviceId);
 
-    // Date/Time validation
     const now = new Date();
     const selectedDateTime = new Date(`${date}T${startTime}`);
     if (selectedDateTime < now) {
       setError('Não é possível agendar em uma data ou hora que já passou.');
       return;
     }
-    
-    const finish = (finalIsPackage: boolean) => {
-      mutation.mutate({
-        unitId,
-        clientId,
-        employeeId,
-        serviceId,
-        date,
-        startTime,
-        notes,
-        price: finalIsPackage ? 0 : (service?.price ?? 0),
-        isPackage: finalIsPackage
-      });
+
+    const buildPayload = (apptDate: string, finalIsPackage: boolean, seriesId?: string) => ({
+      unitId, clientId, employeeId, serviceId,
+      date: apptDate, startTime, notes,
+      price: finalIsPackage ? 0 : (service?.price ?? 0),
+      isPackage: finalIsPackage,
+      ...(seriesId ? { seriesId } : {}),
+    });
+
+    const doCreate = async (finalIsPackage: boolean) => {
+      setError(null);
+      setIsSubmitting(true);
+      try {
+        if (!repeatEnabled || appointment?._id) {
+          if (appointment?._id) {
+            await unitApi.patch(`/appointments/${appointment._id}`, buildPayload(date, finalIsPackage));
+          } else {
+            await unitApi.post('/appointments', buildPayload(date, finalIsPackage));
+          }
+          onSuccess();
+        } else {
+          const dates: string[] = [date];
+          const endISO = repeatEndType === 'date' && repeatEndDate ? repeatEndDate : twoYearsISO(date);
+          let step = 1, next = advanceDate(date, repeatInterval, repeatUnit, step);
+          while (next <= endISO && step <= 730) { dates.push(next); step++; next = advanceDate(date, repeatInterval, repeatUnit, step); }
+
+          const seriesId = Date.now().toString(36) + Math.random().toString(36).slice(2);
+          const total = dates.length;
+          setRepeatProgress({ current: 0, total });
+          let created = 0;
+          const skipped: string[] = [];
+
+          for (let i = 0; i < dates.length; i++) {
+            try {
+              await unitApi.post('/appointments', buildPayload(dates[i], finalIsPackage, seriesId));
+              created++;
+            } catch (err: any) {
+              const status = err?.response?.status;
+              if (status === 409 || status === 400) skipped.push(dates[i]);
+              else throw err;
+            }
+            setRepeatProgress({ current: i + 1, total });
+          }
+
+          setRepeatProgress(null);
+          if (created === 0) { setError('Nenhum agendamento criado. Verifique conflitos de horário.'); return; }
+          if (skipped.length > 0) { setError(`${created} criado(s). ${skipped.length} data(s) pulada(s) por conflito.`); return; }
+          onSuccess();
+        }
+      } catch (err: any) {
+        setRepeatProgress(null);
+        setError(err?.response?.data?.message || err?.message || 'Erro ao criar agendamento.');
+      } finally {
+        setIsSubmitting(false);
+      }
     };
 
     if (selectedPackageId && !usePackage) {
-      // User chose to SIGN a new package during this booking
       unitApi.post(`/clients/${clientId}/packages`, { packageId: selectedPackageId })
-        .then(() => finish(true))
+        .then(() => doCreate(true))
         .catch(err => setError(err.response?.data?.message || 'Erro ao assinar pacote.'));
     } else {
-      finish(usePackage);
+      void doCreate(usePackage);
     }
   }
 
@@ -509,12 +598,86 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
             <textarea className={styles.textarea} value={notes} onChange={e => setNotes(e.target.value)} rows={3} />
           </div>
 
+          {/* ── Repeat ── */}
+          {!appointment && (
+            <div className={styles.repeatSection}>
+              <div className={styles.repeatToggleRow}>
+                <div className={styles.repeatToggleLeft}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                  </svg>
+                  <span className={styles.repeatLabel}>Repetir agendamento</span>
+                </div>
+                <button
+                  type="button"
+                  className={`${styles.toggleSwitch} ${repeatEnabled ? styles.toggleOn : ''}`}
+                  onClick={() => setRepeatEnabled(v => !v)}
+                  aria-pressed={repeatEnabled}
+                >
+                  <span className={styles.toggleKnob} />
+                </button>
+              </div>
+
+              {repeatEnabled && (
+                <div className={styles.repeatConfig}>
+                  <div className={styles.repeatRow}>
+                    <span className={styles.repeatRowLabel}>Repetir a cada</span>
+                    <div className={styles.intervalControl}>
+                      <button type="button" className={styles.stepBtn} onClick={() => setRepeatInterval(n => Math.max(1, n - 1))}>−</button>
+                      <span className={styles.intervalValue}>{repeatInterval}</span>
+                      <button type="button" className={styles.stepBtn} onClick={() => setRepeatInterval(n => Math.min(365, n + 1))}>+</button>
+                      <select className={styles.unitSelect} value={repeatUnit} onChange={e => setRepeatUnit(e.target.value as RepeatUnit)}>
+                        <option value="days">dias</option>
+                        <option value="weeks">semanas</option>
+                        <option value="months">meses</option>
+                        <option value="years">anos</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className={styles.repeatRow}>
+                    <span className={styles.repeatRowLabel}>Terminar em</span>
+                    <select className={styles.unitSelect} style={{ flex: 1 }} value={repeatEndType} onChange={e => setRepeatEndType(e.target.value as any)}>
+                      <option value="never">Nunca (2 anos)</option>
+                      <option value="date">Em uma data</option>
+                    </select>
+                  </div>
+
+                  {repeatEndType === 'date' && (
+                    <div className={styles.repeatRow}>
+                      <span className={styles.repeatRowLabel}>Até</span>
+                      <input
+                        type="date"
+                        className={styles.input}
+                        style={{ flex: 1 }}
+                        value={repeatEndDate}
+                        min={date}
+                        onChange={e => setRepeatEndDate(e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  {date && (
+                    <p className={styles.repeatPreview}>
+                      {formatRepeatPreview(date, repeatInterval, repeatUnit)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {error && <p className={styles.error}>{error}</p>}
 
           <div className={styles.actions}>
-            <button type="button" className={styles.cancelBtn} onClick={onClose}>Cancelar</button>
-            <button type="submit" className={styles.submitBtn} disabled={mutation.isPending}>
-              {mutation.isPending ? 'Salvando...' : 'Criar Agendamento'}
+            <button type="button" className={styles.cancelBtn} onClick={onClose} disabled={isSubmitting}>Cancelar</button>
+            <button type="submit" className={styles.submitBtn} disabled={isSubmitting || mutation.isPending}>
+              {repeatProgress
+                ? `Criando ${repeatProgress.current} de ${repeatProgress.total}...`
+                : isSubmitting ? 'Salvando...'
+                : appointment ? 'Salvar Alterações'
+                : repeatEnabled ? `Criar ${repeatTotal} Agendamentos`
+                : 'Criar Agendamento'}
             </button>
           </div>
         </form>
