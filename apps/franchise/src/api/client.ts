@@ -69,7 +69,7 @@ apiClient.interceptors.request.use(config => {
 
 let refreshPromise: Promise<string | null> | null = null;
 
-function refreshAccessToken(): Promise<string | null> {
+export function refreshAccessToken(): Promise<string | null> {
   if (refreshPromise) return refreshPromise;
   refreshPromise = axios
     .post(`${apiBaseUrl}/auth/refresh`, { refreshToken: getStoredRefreshToken() })

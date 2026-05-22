@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { apiBaseUrl, getStoredAccessToken } from '../api/client';
+import { apiBaseUrl, getStoredAccessToken, refreshAccessToken } from '../api/client';
 
 const EVENT_INVALIDATIONS: Record<string, string[][]> = {
   'appointments:change': [['appointments-day'], ['appointments-month'], ['emp-history']],
@@ -38,8 +38,10 @@ export function useServerEvents() {
         es.close();
         esRef.current = null;
         if (!destroyed) {
-          // Reconnect after 5 s using whatever token is current (may have been refreshed)
-          reconnectTimer.current = setTimeout(connect, 5_000);
+          reconnectTimer.current = setTimeout(async () => {
+            await refreshAccessToken();
+            connect();
+          }, 5_000);
         }
       };
     }

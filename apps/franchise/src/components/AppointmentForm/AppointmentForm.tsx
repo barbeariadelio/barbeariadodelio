@@ -1,7 +1,7 @@
 import { FormEvent, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { api, resolveApiBaseUrl, getStoredAccessToken } from '../../api/client';
+import { api, resolveApiBaseUrl, getStoredAccessToken, setupInterceptors } from '../../api/client';
 import styles from './AppointmentForm.module.scss';
 
 function maskPhone(raw: string) {
@@ -197,10 +197,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       }
       return config;
     });
-    instance.interceptors.response.use(res => {
-      if (res.data && typeof res.data === 'object' && 'data' in res.data) res.data = res.data.data;
-      return res;
-    });
+    setupInterceptors(instance);
     return instance;
   }, [selectedUnit?.apiUrl]);
 
