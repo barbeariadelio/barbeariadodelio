@@ -368,7 +368,14 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       }
     };
 
-    if (selectedPackageId && !usePackage) {
+    const isDirectPackageSale = service?.type === 'package' && !appointment?._id;
+    const alreadyHasPackage = selectedClient?.packages?.some(p => p.active && p.packageId === serviceId);
+
+    if (isDirectPackageSale && !alreadyHasPackage) {
+      api.post(`/clients/${clientId}/packages`, { packageId: serviceId })
+        .then(() => doCreate(false))
+        .catch(err => setError(err.response?.data?.message || 'Erro ao registrar pacote.'));
+    } else if (selectedPackageId && !usePackage) {
       api.post(`/clients/${clientId}/packages`, { packageId: selectedPackageId })
         .then(() => doCreate(true))
         .catch(err => setError(err.response?.data?.message || 'Erro ao assinar pacote.'));

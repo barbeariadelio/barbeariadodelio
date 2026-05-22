@@ -224,7 +224,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
 
   const selectedEmployee = employees.find(e => e._id === employeeId);
   const visibleServices = selectedEmployee?.serviceIds?.length
-    ? services.filter(s => selectedEmployee.serviceIds!.includes(s._id))
+    ? services.filter(s => s.type === 'package' || selectedEmployee.serviceIds!.includes(s._id))
     : services;
 
   const filteredClients = clientSearch.trim()
@@ -350,7 +350,14 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       }
     };
 
-    if (selectedPackageId && !usePackage) {
+    const isDirectPackageSale = service?.type === 'package' && !appointment?._id;
+    const alreadyHasPackage = selectedClient?.packages?.some(p => p.active && p.packageId === serviceId);
+
+    if (isDirectPackageSale && !alreadyHasPackage) {
+      unitApi.post(`/clients/${clientId}/packages`, { packageId: serviceId })
+        .then(() => doCreate(false))
+        .catch(err => setError(err.response?.data?.message || 'Erro ao registrar pacote.'));
+    } else if (selectedPackageId && !usePackage) {
       unitApi.post(`/clients/${clientId}/packages`, { packageId: selectedPackageId })
         .then(() => doCreate(true))
         .catch(err => setError(err.response?.data?.message || 'Erro ao assinar pacote.'));
