@@ -15,7 +15,7 @@ export interface IAppointment extends Document {
   isPackage?: boolean;
   usedPackageId?: mongoose.Types.ObjectId;
   seriesId?: string;
-  source?: 'guest' | 'admin';
+  source?: 'guest' | 'admin' | 'client';
   reminderSent?: boolean;
   isBilled?: boolean;
   serviceBilled?: boolean;
@@ -51,7 +51,7 @@ const appointmentSchema = new Schema<IAppointment>(
     isBilled: { type: Boolean, default: false },
     serviceBilled: { type: Boolean, default: false },
     productsBilled: { type: Boolean, default: false },
-    source: { type: String, enum: ['guest', 'admin'], default: undefined },
+    source: { type: String, enum: ['guest', 'admin', 'client'], default: undefined },
     reminderSent: { type: Boolean, default: false },
     billingSkipped: { type: Boolean, default: false },
     products: [{

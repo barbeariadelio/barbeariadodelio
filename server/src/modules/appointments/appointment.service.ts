@@ -215,7 +215,8 @@ export class AppointmentService {
       const today = new Date();
       const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
       const nowTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
-      if (data.date! < todayISO || (data.date === todayISO && data.startTime! < nowTime)) {
+      const canBackfillToday = data.source === 'admin';
+      if (data.date! < todayISO || (!canBackfillToday && data.date === todayISO && data.startTime! < nowTime)) {
         throw new AppError('Não é possível agendar em uma data ou hora retroativa.', 400);
       }
     }

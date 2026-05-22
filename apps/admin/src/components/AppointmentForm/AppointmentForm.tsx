@@ -264,10 +264,8 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     }
     const service = services.find(s => s._id === serviceId);
 
-    const now = new Date();
-    const selectedDateTime = new Date(`${date}T${startTime}`);
-    if (selectedDateTime < now) {
-      setError('Não é possível agendar em uma data ou hora que já passou.');
+    if (date < todayISO()) {
+      setError('Não é possível agendar em uma data que já passou.');
       return;
     }
     if (selectedUnit?.workingDays && selectedUnit.workingDays.length > 0) {

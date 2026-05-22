@@ -117,7 +117,7 @@ export async function createAppointment(req: AuthRequest, res: Response, next: N
         throw new AppError('Client record not found and could not be created', 404);
       }
     }
-    if (!data.source) data.source = 'admin';
+    data.source = req.user!.role === 'client' ? 'client' : 'admin';
     const appt = await service.create(data);
     
     // Create notification
