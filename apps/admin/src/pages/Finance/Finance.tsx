@@ -169,6 +169,7 @@ export default function Finance() {
       const { data } = await api.get('/finance/summary', { params: { unitId, period } });
       return data;
     },
+    staleTime: 60 * 1000,
   });
 
   const { data: transactions = [], isLoading: txLoading } = useQuery<Transaction[]>({
@@ -177,6 +178,7 @@ export default function Finance() {
       const { data } = await api.get('/finance/transactions', { params: { unitId, limit: 1000 } });
       return Array.isArray(data) ? data : data.data ?? [];
     },
+    staleTime: 30 * 1000,
   });
 
   // Derived from all transactions (not period-filtered) — stays consistent with Lançamentos tab

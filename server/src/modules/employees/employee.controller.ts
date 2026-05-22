@@ -11,10 +11,21 @@ export async function listPublicEmployees(req: Request, res: Response, next: Nex
   try {
     const unitId = req.query.unitId as string;
     if (!unitId) { ok(res, []); return; }
-    const employees = await service.findByUnit(unitId);
-    // Only return employees that are available for online booking (explicitly false means opt-out)
+    const employees = await service.findByUnitPublic(unitId);
     const publicEmployees = (employees as any[]).filter(e => e.allowOnlineBooking !== false);
     ok(res, publicEmployees);
+  } catch (e) { next(e); }
+}
+
+export async function getPublicAvatar(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const result = await service.getPublicAvatar(req.params.id);
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    if (!result) { res.status(404).end(); return; }
+    if ('redirect' in result) { res.redirect(302, result.redirect); return; }
+    res.setHeader('Content-Type', result.mimeType);
+    res.setHeader('Cache-Control', 'public, max-age=86400, immutable');
+    res.send(result.data);
   } catch (e) { next(e); }
 }
 

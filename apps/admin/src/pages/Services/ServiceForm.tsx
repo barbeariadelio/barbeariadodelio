@@ -68,6 +68,7 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
   const [showPricePrefix, setShowPricePrefix] = useState(service?.showPricePrefix !== false);
   const [isOnline, setIsOnline] = useState(service?.isOnline === true);
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Package fields
   const [validityType, setValidityType] = useState<'none' | 'days' | 'weeks' | 'months' | 'years'>(service?.packageValidity?.type || 'none');
@@ -95,12 +96,21 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
     },
   });
 
-  function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => setImage(reader.result as string);
-    reader.readAsDataURL(file);
+    setUploading(true);
+    setError(null);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const { data } = await api.post('/upload/service-image', form);
+      setImage(data.url);
+    } catch {
+      setError('Erro ao fazer upload da imagem. Tente novamente.');
+    } finally {
+      setUploading(false);
+    }
   }
 
   function addPackageItem() {
@@ -329,8 +339,8 @@ export default function ServiceForm({ service, unitId, onClose, onSuccess }: Pro
 
           <div className={styles.actions}>
             <button type="button" className={styles.cancelBtn} onClick={onClose}>Cancelar</button>
-            <button type="submit" className={styles.submitBtn} disabled={mutation.isPending}>
-              {mutation.isPending ? 'Salvando...' : 'Salvar'}
+            <button type="submit" className={styles.submitBtn} disabled={mutation.isPending || uploading}>
+              {uploading ? 'Enviando imagem...' : mutation.isPending ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
         </form>

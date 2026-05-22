@@ -59,7 +59,7 @@ export class AppointmentService {
       query = query.skip(pagination.skip).limit(pagination.limit);
     }
 
-    return query;
+    return query.lean() as unknown as Promise<IAppointment[]>;
   }
 
   async findByEmployee(employeeId: string, date?: string): Promise<IAppointment[]> {
@@ -92,13 +92,14 @@ export class AppointmentService {
     date: string,
     durationMinutes: number,
   ): Promise<string[]> {
-    const cached = getSlotCache(unitId, employeeId, date);
+    const cached = getSlotCache(unitId, employeeId, date, durationMinutes);
     if (cached) return cached;
 
-    const employee = await UserModel.findById(employeeId).select('workSchedule daySchedules vacations blockedDays');
+    const [employee, unit] = await Promise.all([
+      UserModel.findById(employeeId).select('workSchedule daySchedules vacations blockedDays').lean(),
+      UnitModel.findById(unitId).select('slotInterval workingDays').lean(),
+    ]);
     if (!employee) throw new NotFoundError('Employee');
-
-    const unit = await UnitModel.findById(unitId).select('slotInterval workingDays');
     if (!unit) throw new NotFoundError('Unit');
 
     // Check if the day is a working day for the unit
@@ -132,7 +133,7 @@ export class AppointmentService {
       employeeId,
       date,
       status: { $nin: ['cancelled'] },
-    }).select('startTime endTime');
+    }).select('startTime endTime').lean();
 
     const gridStep = slotInterval > 0 ? slotInterval : 15;
 
@@ -177,7 +178,7 @@ export class AppointmentService {
       });
     });
 
-    setSlotCache(unitId, employeeId, date, result);
+    setSlotCache(unitId, employeeId, date, durationMinutes, result);
     return result;
   }
 
@@ -331,22 +332,52 @@ export class AppointmentService {
     notes?: string;
   }): Promise<GuestBookResult> {
     const { unitId, serviceId, employeeId, date, startTime, price, guestName, guestPhone, notes } = payload;
-    const svc = await ServiceModel.findById(serviceId);
-    if (!svc) throw new AppError('Service not found', 404);
 
     const today = new Date();
     const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
     const nowTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
-    
     if (date < todayISO || (date === todayISO && startTime < nowTime)) {
       throw new AppError('Não é possível agendar em uma data ou hora retroativa.', 400);
     }
 
-    const endTime = calcEndTime(startTime, svc.durationMinutes || 30);
     const cleanPhone = guestPhone.replace(/\D/g, '');
     const guestEmail = `guest_${cleanPhone}_${unitId}@delio.guest`;
 
-    let client = await ClientModel.findOne({ phone: guestPhone, unitId });
+    // Batch 1: all independent reads in parallel
+    const [svc, existingClient, userByEmail, userByPhone, employee] = await Promise.all([
+      ServiceModel.findById(serviceId),
+      ClientModel.findOne({ phone: guestPhone, unitId }),
+      UserModel.findOne({ email: guestEmail }),
+      UserModel.findOne({ phone: guestPhone }),
+      UserModel.findById(employeeId).select('vacations blockedDays').lean(),
+    ]);
+
+    if (!svc) throw new AppError('Service not found', 404);
+    if (!employee) throw new NotFoundError('Employee');
+
+    if (employee.blockedDays?.includes(date)) {
+      throw new AppError('Profissional indisponível: Dia bloqueado.', 400);
+    }
+    if (employee.vacations?.some((v: { start: string; end: string }) => date >= v.start && date <= v.end)) {
+      throw new AppError('Profissional indisponível: Em período de férias.', 400);
+    }
+
+    const endTime = calcEndTime(startTime, svc.durationMinutes || 30);
+
+    // Batch 2: conflict check (needs endTime from svc) + client/user writes
+    const conflict = await AppointmentModel.findOne({
+      employeeId,
+      date,
+      status: { $nin: ['cancelled'] },
+      $or: [
+        { startTime: { $lt: endTime, $gte: startTime } },
+        { endTime: { $gt: startTime, $lte: endTime } },
+        { startTime: { $lte: startTime }, endTime: { $gte: endTime } },
+      ],
+    }).select('_id').lean();
+    if (conflict) throw new AppError('Time slot already booked', 409);
+
+    let client = existingClient;
     if (!client) {
       client = await ClientModel.create({ name: guestName, phone: guestPhone, email: guestEmail, unitId });
     } else if (client.name !== guestName) {
@@ -354,12 +385,8 @@ export class AppointmentService {
       await client.save();
     }
 
-    let userAccount = await UserModel.findOne({ email: guestEmail });
-    if (!userAccount) {
-      // Phone may already belong to an existing account (different unit, prior booking, etc.)
-      // Reuse it instead of trying to create a duplicate and hitting the unique index.
-      userAccount = await UserModel.findOne({ phone: guestPhone });
-    }
+    // Prefer account matched by guest email, fall back to phone match
+    let userAccount = userByEmail ?? userByPhone ?? null;
     if (!userAccount) {
       const passwordHash = await bcrypt.hash(cleanPhone.slice(-4), 10);
       userAccount = await UserModel.create({
@@ -378,7 +405,7 @@ export class AppointmentService {
       await client.save();
     }
 
-    const activeSub = client.packages?.find(p => 
+    const activeSub = client.packages?.find(p =>
       p.active && (p.packageId.toString() === serviceId || p.itemLimits?.some(il => il.serviceId.toString() === serviceId))
     );
 
@@ -402,28 +429,6 @@ export class AppointmentService {
     }
 
     const finalIsPackage = isUsingPackage || isBuyingPackage;
-
-    const conflict = await AppointmentModel.findOne({
-      employeeId,
-      date,
-      status: { $nin: ['cancelled'] },
-      $or: [
-        { startTime: { $lt: endTime, $gte: startTime } },
-        { endTime: { $gt: startTime, $lte: endTime } },
-        { startTime: { $lte: startTime }, endTime: { $gte: endTime } },
-      ],
-    });
-    if (conflict) throw new AppError('Time slot already booked', 409);
-    
-    const employee = await UserModel.findById(employeeId).select('vacations blockedDays');
-    if (!employee) throw new NotFoundError('Employee');
-
-    if (employee.blockedDays?.includes(date)) {
-      throw new AppError('Profissional indisponível: Dia bloqueado.', 400);
-    }
-    if (employee.vacations?.some(v => date >= v.start && date <= v.end)) {
-      throw new AppError('Profissional indisponível: Em período de férias.', 400);
-    }
 
     if (svc.type === 'package') {
       const alreadyHas = client.packages?.some(p => p.packageId.toString() === serviceId && p.active);
@@ -519,13 +524,15 @@ export class AppointmentService {
       let isPackageUse = !!appt.usedPackageId;
       const isPackageSale = !isPackageUse && svcDoc?.type === 'package';
 
+      // Pre-load client once — used by auto-link, skipBilling, and doService blocks
+      const clientDoc = appt.clientId ? await ClientModel.findById(appt.clientId) : null;
+
       // ── Auto-link to active package on billing ──
       // If this is a regular service and the client has an active package covering it,
       // link the appointment now so the session is consumed and the counter updates.
       if (!isPackageUse && !isPackageSale && appt.clientId && appt.serviceId) {
-        const clientForPkg = await ClientModel.findById(appt.clientId);
-        if (clientForPkg) {
-          const { packageId } = await this.calculateProratedPrice(clientForPkg, appt.serviceId.toString());
+        if (clientDoc) {
+          const { packageId } = await this.calculateProratedPrice(clientDoc, appt.serviceId.toString());
           if (packageId) {
             appt.usedPackageId = packageId;
             await appt.save();
@@ -542,7 +549,7 @@ export class AppointmentService {
       if (skipBilling) {
         // Decrement session counter only
         if (appt.clientId && appt.usedPackageId && appt.serviceId) {
-          const client = await ClientModel.findById(appt.clientId);
+          const client = clientDoc;
           if (client) {
             const sub = client.packages?.find(
               p => p.packageId.toString() === appt.usedPackageId!.toString()
@@ -609,7 +616,7 @@ export class AppointmentService {
 
         // ── When a package SALE is billed, activate the subscription and decrement one session ──
         if (isPackageSale && appt.clientId && svcDoc) {
-          const client = await ClientModel.findById(appt.clientId);
+          const client = clientDoc;
           if (client) {
             if (!client.packages) client.packages = [];
 
@@ -660,7 +667,7 @@ export class AppointmentService {
 
         // ── When a package USE is billed, increment the used session counter ──
         if (isPackageUse && appt.clientId && appt.usedPackageId && appt.serviceId) {
-          const client = await ClientModel.findById(appt.clientId);
+          const client = clientDoc;
           if (client) {
             const sub = client.packages?.find(
               p => p.packageId.toString() === appt.usedPackageId!.toString()

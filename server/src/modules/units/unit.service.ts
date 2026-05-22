@@ -29,9 +29,9 @@ export class UnitService {
     const cached = sharedCache.get<IUnit>(cacheKey);
     if (cached) return cached;
 
-    const unit = await UnitModel.findById(id);
+    const unit = await UnitModel.findById(id).lean() as unknown as IUnit | null;
     if (!unit) throw new NotFoundError('Unit');
-    
+
     sharedCache.set(cacheKey, unit, 60);
     return unit;
   }

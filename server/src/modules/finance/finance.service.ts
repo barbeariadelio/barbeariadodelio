@@ -4,6 +4,7 @@ import { UnitModel } from '../units/unit.model';
 import { AppointmentModel } from '../appointments/appointment.model';
 import { UserModel, IUser } from '../auth/auth.model';
 import type { FinanceSummary, TransactionCategory } from '@barber/types';
+import { sharedCache } from '../../shared/utils/cache';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import { toDate } from 'date-fns-tz';
 import { escapeRegex } from '../../shared/utils/regex';
@@ -20,29 +21,35 @@ export class FinanceService {
     const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
     const { startDate, endDate } = this.resolvePeriod(period);
 
-    const transactions = await TransactionModel.find({
-      unitId: { $in: unitIds },
-      date: { $gte: startDate, $lte: endDate },
-    }).populate('unitId', 'name').populate('employeeId', 'name');
+    const cacheKey = `finance:summary:${unitIds.sort().join(',')}:${period}:${startDate}`;
+    const cached = sharedCache.get<FinanceSummary>(cacheKey);
+    if (cached) return cached;
 
-    const appointments = await AppointmentModel.find({
-      unitId: { $in: unitIds },
-      date: { $gte: startDate, $lte: endDate },
-      status: { $in: ['pending', 'confirmed', 'completed'] },
-    })
-      .populate('serviceId', 'name price')
-      .populate('employeeId', 'name commissionRate')
-      .populate('unitId', 'name');
+    const [transactions, appointments, unitsInfo, allEmployees] = await Promise.all([
+      TransactionModel.find({
+        unitId: { $in: unitIds },
+        date: { $gte: startDate, $lte: endDate },
+      }).populate('unitId', 'name').populate('employeeId', 'name').lean(),
+      AppointmentModel.find({
+        unitId: { $in: unitIds },
+        date: { $gte: startDate, $lte: endDate },
+        status: { $in: ['pending', 'confirmed', 'completed'] },
+      })
+        .populate('serviceId', 'name price')
+        .populate('employeeId', 'name commissionRate')
+        .populate('unitId', 'name')
+        .lean(),
+      UnitModel.find({ _id: { $in: unitIds } }).select('name').lean(),
+      UserModel.find({
+        unitId: { $in: unitIds },
+        role: 'employee',
+        isActive: true,
+      }).select('_id name unitId commissionRate').lean(),
+    ]);
 
-    const unitsInfo = await UnitModel.find({ _id: { $in: unitIds } }).select('name');
-
-    const allEmployees = await UserModel.find({
-      unitId: { $in: unitIds },
-      role: 'employee',
-      isActive: true,
-    }).select('_id name unitId commissionRate');
-
-    return this.buildSummary(transactions, appointments as any, unitsInfo, allEmployees);
+    const summary = this.buildSummary(transactions, appointments, unitsInfo, allEmployees as unknown as IUser[]);
+    sharedCache.set(cacheKey, summary, 45);
+    return summary;
   }
 
   async getTransactions(userId: string, role: string, unitId: string, page: number, limit: number, filters?: { employeeId?: string; category?: string }, appScope?: string, jwtUnitId?: string): Promise<{ data: ITransaction[]; total: number }> {
@@ -57,7 +64,8 @@ export class FinanceService {
         .sort({ date: -1, createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
-        .populate('unitId', 'name'),
+        .populate('unitId', 'name')
+        .lean() as unknown as ITransaction[],
       TransactionModel.countDocuments(query),
     ]);
     return { data, total };
@@ -75,40 +83,44 @@ export class FinanceService {
     const empOid = new mongoose.Types.ObjectId(employeeId);
 
     // Backfill: create commission transactions for completed/billed appointments that don't have one yet.
-    // This handles appointments completed before commissionRate was set on the employee.
+    // Uses bulk queries (no N+1) — fetches all appointments and existing txs in 2 queries, then insertMany.
     const employee = await UserModel.findById(employeeId).select('commissionRate');
     const commissionRate = employee?.commissionRate ?? 0;
 
     if (commissionRate > 0) {
-      const completedAppts = await AppointmentModel.find({
-        unitId: { $in: unitIds },
-        employeeId: empOid,
-        status: 'completed',
-        isBilled: true,
-        billingSkipped: { $ne: true },
-      }).populate('serviceId', 'name').lean();
-
-      for (const appt of completedAppts) {
-        const exists = await TransactionModel.findOne({
-          appointmentId: appt._id,
-          type: 'commission',
+      const [completedAppts, existingTxs] = await Promise.all([
+        AppointmentModel.find({
+          unitId: { $in: unitIds },
           employeeId: empOid,
-        });
-        if (!exists) {
-          const amount = Math.round((appt.price ?? 0) * commissionRate / 100 * 100) / 100;
-          await TransactionModel.create({
+          status: 'completed',
+          isBilled: true,
+          billingSkipped: { $ne: true },
+        }).populate('serviceId', 'name').select('_id price date unitId serviceId').lean(),
+        TransactionModel.find({
+          employeeId: empOid,
+          type: 'commission',
+        }).select('appointmentId').lean(),
+      ]);
+
+      const coveredApptIds = new Set(existingTxs.map(tx => tx.appointmentId?.toString()).filter(Boolean));
+      const missing = completedAppts.filter(a => !coveredApptIds.has(a._id.toString()));
+
+      if (missing.length > 0) {
+        await TransactionModel.insertMany(
+          missing.map(appt => ({
             unitId: appt.unitId,
             appointmentId: appt._id,
             employeeId: empOid,
             type: 'commission',
             category: 'commission',
-            amount,
+            amount: Math.round((appt.price ?? 0) * commissionRate / 100 * 100) / 100,
             description: `Comissão: ${(appt as any).serviceId?.name || 'Serviço'} (${commissionRate}%)`,
             date: appt.date,
             createdBy: empOid,
             isPaid: false,
-          });
-        }
+          })),
+          { ordered: false },
+        );
       }
     }
 

@@ -8,7 +8,7 @@ import styles from './Book.module.scss';
 
 interface Unit { _id: string; name: string; apiUrl?: string; workingDays?: number[]; }
 interface Service { _id: string; name: string; description?: string; price: number; durationMinutes: number; isActive?: boolean; image?: string; showPrice?: boolean; showPricePrefix?: boolean; }
-interface Employee { _id: string; name: string; avatar?: string; serviceIds?: string[]; daySchedules?: { day: number; slots: { start: string; end: string }[] }[]; workSchedule?: { workDays?: number[] }; }
+interface Employee { _id: string; name: string; hasAvatar?: boolean; serviceIds?: string[]; daySchedules?: { day: number; slots: { start: string; end: string }[] }[]; workSchedule?: { workDays?: number[] }; }
 
 type Step = 'barber' | 'service' | 'datetime' | 'confirm';
 const STEPS: Step[] = ['barber', 'service', 'datetime', 'confirm'];
@@ -170,14 +170,16 @@ export default function Book() {
     queryKey: ['unit-public', unitId],
     queryFn: async () => { const { data } = await api.get(`/units/public/${unitId}`); return data; },
     enabled: !!unitId,
+    staleTime: 5 * 60 * 1000,
   });
 
+  const avatarBaseUrl = useMemo(() => resolveApiBaseUrl(unit?.apiUrl), [unit?.apiUrl]);
+
   const unitApi = useMemo(() => {
-    const base = resolveApiBaseUrl(unit?.apiUrl);
-    const instance = axios.create({ baseURL: base, withCredentials: true });
+    const instance = axios.create({ baseURL: avatarBaseUrl, withCredentials: true });
     setupInterceptors(instance);
     return instance;
-  }, [unit?.apiUrl]);
+  }, [avatarBaseUrl]);
 
   const [step, setStep] = useState<Step>('barber');
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -204,15 +206,17 @@ export default function Book() {
   const stepIdx = STEPS.indexOf(step);
 
   const { data: services = [], isLoading: svcLoading } = useQuery<Service[]>({
-    queryKey: ['services', unitId, unit?.apiUrl],
-    queryFn: async () => { const { data } = await unitApi.get(`/services?unitId=${unitId}&online=true`); return Array.isArray(data) ? data : data.services ?? []; },
-    enabled: !!unitId && !!unit,
+    queryKey: ['services', unitId],
+    queryFn: async () => { const { data } = await api.get(`/services?unitId=${unitId}&online=true`); return Array.isArray(data) ? data : data.services ?? []; },
+    enabled: !!unitId,
+    staleTime: 5 * 60 * 1000,
   });
 
   const { data: employees = [], isLoading: empLoading } = useQuery<Employee[]>({
-    queryKey: ['employees', unitId, unit?.apiUrl],
-    queryFn: async () => { const { data } = await unitApi.get(`/employees/public?unitId=${unitId}`); return Array.isArray(data) ? data : data.employees ?? []; },
-    enabled: !!unitId && !!unit,
+    queryKey: ['employees', unitId],
+    queryFn: async () => { const { data } = await api.get(`/employees/public?unitId=${unitId}`); return Array.isArray(data) ? data : data.employees ?? []; },
+    enabled: !!unitId,
+    staleTime: 5 * 60 * 1000,
   });
 
   const visibleServices = selectedEmployee?.serviceIds?.length
@@ -225,7 +229,8 @@ export default function Book() {
       const { data } = await unitApi.get(`/appointments/slots?unitId=${unitId}&employeeId=${selectedEmployee!._id}&date=${selectedDate}&durationMinutes=${selectedService!.durationMinutes}`);
       return Array.isArray(data) ? data : [];
     },
-    enabled: !!unitId && !!unit && !!selectedEmployee && !!selectedDate && !!selectedService && step === 'datetime',
+    enabled: !!unitId && !!selectedEmployee && !!selectedDate && !!selectedService && step === 'datetime',
+    staleTime: 60 * 1000,
   });
 
   // Fetch appointment if editing
@@ -434,8 +439,8 @@ export default function Book() {
                   >
                     <div className={styles.empAvatarWrap}>
                       <div className={styles.empAvatar}>
-                        {emp.avatar ? (
-                          <img src={emp.avatar} alt={emp.name} className={styles.avatarImg} />
+                        {emp.hasAvatar ? (
+                          <img src={`${avatarBaseUrl}/employees/public/${emp._id}/avatar`} alt={emp.name} className={styles.avatarImg} />
                         ) : (
                           initials(emp.name)
                         )}

@@ -3,9 +3,8 @@ import axios from 'axios';
 export const apiBaseUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001' : '');
 
 export function resolveApiBaseUrl(unitApiUrl?: string): string {
-  if (unitApiUrl && !(import.meta.env.PROD && unitApiUrl.includes('localhost'))) {
-    return unitApiUrl;
-  }
+  if (!import.meta.env.PROD) return apiBaseUrl;
+  if (unitApiUrl && !unitApiUrl.includes('localhost')) return unitApiUrl;
   return apiBaseUrl;
 }
 

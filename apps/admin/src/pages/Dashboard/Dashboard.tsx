@@ -63,7 +63,7 @@ export default function Dashboard() {
       api.get(`/appointments?start=${monthStart}&end=${monthEnd}&limit=1000`)
          .then(r => Array.isArray(r.data) ? r.data : r.data?.appointments ?? []),
     enabled: !!user,
-    refetchInterval: 15000, // Auto refresh every 15s
+    staleTime: 30 * 1000, // SSE (useServerEvents in Layout) handles real-time updates
   });
 
   const monthAppointments = useMemo(() => {
@@ -83,7 +83,7 @@ export default function Dashboard() {
       api.get(`/appointments?date=${dayISO}&limit=1000`)
          .then(r => Array.isArray(r.data) ? r.data : r.data?.appointments ?? []),
     enabled: view === 'schedule' && !!user,
-    refetchInterval: 15000, // Auto refresh every 15s
+    staleTime: 30 * 1000,
   });
 
   const dayAppointments = useMemo(() => {
@@ -100,6 +100,7 @@ export default function Dashboard() {
       api.get(`/employees${unitId ? `?unitId=${unitId}` : ''}`)
          .then(r => Array.isArray(r.data) ? r.data : r.data?.employees ?? []),
     enabled: !!user,
+    staleTime: 5 * 60 * 1000,
   });
 
   const employees = useMemo(() => {
@@ -114,8 +115,7 @@ export default function Dashboard() {
     queryKey: ['unit-config', unitId],
     queryFn: () => api.get(`/units/${unitId}`).then(r => r.data as UnitConfig),
     enabled: !!unitId,
-    staleTime: 0,
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000,
   });
 
   function handleDayClick(day: Date) {

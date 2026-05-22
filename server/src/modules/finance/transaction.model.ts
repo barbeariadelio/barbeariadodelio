@@ -33,5 +33,8 @@ const transactionSchema = new Schema<ITransaction>(
 );
 
 transactionSchema.index({ unitId: 1, date: 1 });
+transactionSchema.index({ appointmentId: 1, type: 1 });
+transactionSchema.index({ employeeId: 1, type: 1, isPaid: 1 });
+transactionSchema.index({ unitId: 1, type: 1, category: 1 });
 
 export const TransactionModel = mongoose.model<ITransaction>('Transaction', transactionSchema);

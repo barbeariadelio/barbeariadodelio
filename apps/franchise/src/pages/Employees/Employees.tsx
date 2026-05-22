@@ -333,15 +333,6 @@ export default function Employees() {
     enabled: !!user && !!unitId,
   });
 
-  const { data: detailFull } = useQuery<Employee>({
-    queryKey: ['employee-detail', detailTarget?._id],
-    queryFn: async () => {
-      const { data } = await api.get(`/employees/${detailTarget!._id}`);
-      return data;
-    },
-    enabled: !!detailTarget,
-  });
-
   useEffect(() => {
     const id = searchParams.get('id');
     if (id && employees.length > 0) {
@@ -453,7 +444,7 @@ export default function Employees() {
 
       {detailTarget && (
         <EmployeeDetail
-          emp={detailFull ?? detailTarget}
+          emp={detailTarget}
           onClose={() => setDetailTarget(null)}
           onEdit={() => setFormTarget(detailTarget)}
           onToggle={() => detailTarget.isActive ? setConfirmDeactivate(detailTarget) : toggleActive.mutate(detailTarget)}

@@ -11,7 +11,7 @@ export class ServiceService {
     const filter: Record<string, unknown> = { unitId, isActive: true };
     if (onlineOnly) filter.isOnline = true;
 
-    const services = await ServiceModel.find(filter).sort({ name: 1 });
+    const services = await ServiceModel.find(filter).sort({ name: 1 }).lean() as unknown as IService[];
     sharedCache.set(cacheKey, services, 60);
     return services;
   }

@@ -4,24 +4,61 @@ import { sharedCache } from '../../shared/utils/cache';
 import bcrypt from 'bcryptjs';
 
 export class EmployeeService {
+  async findByUnitPublic(unitId: string): Promise<any[]> {
+    const cacheKey = `users:public:${unitId}`;
+    const cached = sharedCache.get<any[]>(cacheKey);
+    if (cached) return cached;
+    const employees = await UserModel.find({ unitId, role: 'employee', isActive: true })
+      .select('-passwordHash -passwordPlain -email -phone -commissionRate -allowedApps -tokenVersion -theme -vacations -blockedDays')
+      .lean();
+    const sorted = (employees as any[])
+      .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'))
+      .map((e) => {
+        const { avatar, ...rest } = e as any;
+        return { ...rest, hasAvatar: !!(avatar as string | undefined) };
+      });
+    sharedCache.set(cacheKey, sorted, 60);
+    return sorted;
+  }
+
+  async getPublicAvatar(id: string): Promise<{ mimeType: string; data: Buffer } | { redirect: string } | null> {
+    const emp = await UserModel.findById(id).select('avatar').lean();
+    const avatar = (emp as any)?.avatar as string | undefined;
+    if (!avatar) return null;
+    if (avatar.startsWith('http')) return { redirect: avatar };
+    const match = avatar.match(/^data:([^;]+);base64,(.+)$/s);
+    if (!match) return null;
+    return { mimeType: match[1], data: Buffer.from(match[2], 'base64') };
+  }
+
   async findByUnit(unitId: string): Promise<any[]> {
+    const cacheKey = `users:list:franchise:${unitId}`;
+    const cached = sharedCache.get<any[]>(cacheKey);
+    if (cached) return cached;
     const employees = await UserModel.find({ unitId, role: 'employee', isActive: true })
       .select('-passwordHash -passwordPlain')
       .lean();
-    return employees.sort((a: any, b: any) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'));
+    const sorted = employees.sort((a: any, b: any) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'));
+    sharedCache.set(cacheKey, sorted, 60);
+    return sorted;
   }
 
   async findAdminByUnit(unitId: string): Promise<any[]> {
+    const cacheKey = `users:list:admin:${unitId}`;
+    const cached = sharedCache.get<any[]>(cacheKey);
+    if (cached) return cached;
     const employees = await UserModel.find({ unitId, role: 'employee', isActive: true })
       .select('-passwordHash')
       .lean();
-    return employees.sort((a: any, b: any) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'));
+    const sorted = employees.sort((a: any, b: any) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'));
+    sharedCache.set(cacheKey, sorted, 60);
+    return sorted;
   }
 
   async findById(id: string): Promise<IUser> {
-    const emp = await UserModel.findById(id).select('-passwordHash');
+    const emp = await UserModel.findById(id).select('-passwordHash').lean();
     if (!emp) throw new NotFoundError('Employee');
-    return emp;
+    return emp as unknown as IUser;
   }
 
   async create(data: any): Promise<IUser> {
@@ -59,9 +96,11 @@ export class EmployeeService {
       commissionRate: data.commissionRate ?? 0,
     });
 
-    sharedCache.delete(`users:list:${data.unitId || 'all'}`);
-    sharedCache.delete('users:list:all');
-    return UserModel.findById(emp._id).select('-passwordHash') as Promise<IUser>;
+    const uid = data.unitId || 'all';
+    sharedCache.delete(`users:list:franchise:${uid}`);
+    sharedCache.delete(`users:list:admin:${uid}`);
+    sharedCache.delete(`users:public:${uid}`);
+    return UserModel.findById(emp._id).select('-passwordHash').lean() as unknown as Promise<IUser>;
   }
 
   async update(id: string, data: any): Promise<IUser> {
@@ -94,8 +133,10 @@ export class EmployeeService {
       { new: true, runValidators: true },
     ).select('-passwordHash');
     if (!emp) throw new NotFoundError('Employee');
-    sharedCache.delete(`users:list:${emp.unitId?.toString() ?? 'all'}`);
-    sharedCache.delete('users:list:all');
+    const uid = emp.unitId?.toString() ?? 'all';
+    sharedCache.delete(`users:list:franchise:${uid}`);
+    sharedCache.delete(`users:list:admin:${uid}`);
+    sharedCache.delete(`users:public:${uid}`);
     return emp;
   }
 
@@ -112,7 +153,9 @@ export class EmployeeService {
   async hardDelete(id: string): Promise<void> {
     const emp = await UserModel.findByIdAndDelete(id);
     if (!emp) throw new NotFoundError('Employee');
-    sharedCache.delete(`users:list:${emp.unitId?.toString() ?? 'all'}`);
-    sharedCache.delete('users:list:all');
+    const uid = emp.unitId?.toString() ?? 'all';
+    sharedCache.delete(`users:list:franchise:${uid}`);
+    sharedCache.delete(`users:list:admin:${uid}`);
+    sharedCache.delete(`users:public:${uid}`);
   }
 }

@@ -1,12 +1,13 @@
 /**
  * Simple in-memory TTL cache for slot availability.
- * Keyed by "unitId:employeeId:date" — entries expire after `ttlMs`.
+ * Keyed by "unitId:employeeId:date:durationMinutes" — entries expire after `ttlMs`.
+ * On new booking, all duration variants for the same employee+date are invalidated.
  */
 const cache = new Map<string, { data: string[]; expiresAt: number }>();
-const DEFAULT_TTL_MS = 5_000; // 5 seconds
+const DEFAULT_TTL_MS = 60_000; // 60 seconds — safe since invalidateSlotCache is called on every new booking
 
-export function getSlotCache(unitId: string, employeeId: string, date: string): string[] | null {
-  const key = `${unitId}:${employeeId}:${date}`;
+export function getSlotCache(unitId: string, employeeId: string, date: string, durationMinutes: number): string[] | null {
+  const key = `${unitId}:${employeeId}:${date}:${durationMinutes}`;
   const entry = cache.get(key);
   if (!entry) return null;
   if (Date.now() > entry.expiresAt) {
@@ -16,13 +17,16 @@ export function getSlotCache(unitId: string, employeeId: string, date: string): 
   return entry.data;
 }
 
-export function setSlotCache(unitId: string, employeeId: string, date: string, slots: string[], ttlMs = DEFAULT_TTL_MS): void {
-  const key = `${unitId}:${employeeId}:${date}`;
+export function setSlotCache(unitId: string, employeeId: string, date: string, durationMinutes: number, slots: string[], ttlMs = DEFAULT_TTL_MS): void {
+  const key = `${unitId}:${employeeId}:${date}:${durationMinutes}`;
   cache.set(key, { data: slots, expiresAt: Date.now() + ttlMs });
 }
 
 export function invalidateSlotCache(unitId: string, employeeId: string, date: string): void {
-  cache.delete(`${unitId}:${employeeId}:${date}`);
+  const prefix = `${unitId}:${employeeId}:${date}:`;
+  for (const key of cache.keys()) {
+    if (key.startsWith(prefix)) cache.delete(key);
+  }
 }
 
 export function invalidateAllSlotCaches(): void {
