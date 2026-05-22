@@ -8,8 +8,8 @@ const envSchema = z.object({
   MONGODB_URI: z.string().url().or(z.string().regex(/^mongodb/)),
   JWT_SECRET: z.string().min(10),
   JWT_REFRESH_SECRET: z.string().min(10),
-  JWT_EXPIRES_IN: z.string().default('15m'),
-  JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
+  JWT_EXPIRES_IN: z.string().default('30d'),
+  JWT_REFRESH_EXPIRES_IN: z.string().default('90d'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 });
 
