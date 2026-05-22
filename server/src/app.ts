@@ -34,8 +34,23 @@ import { uploadRoutes } from './modules/upload/upload.routes';
 const app = express();
 
 // --- Security & Utility Middlewares ---
+const r2PublicHost = process.env.R2_PUBLIC_URL
+  ? new URL(process.env.R2_PUBLIC_URL).origin
+  : 'https://pub-bbbfbaa76ef94e33acb59ae1f9e6da37.r2.dev';
+
 app.use(helmet({
-  contentSecurityPolicy: env.nodeEnv === 'development' ? false : undefined,
+  contentSecurityPolicy: env.nodeEnv === 'development' ? false : {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', r2PublicHost],
+      connectSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
 }));
 app.use(cors({ origin: true, credentials: true }));
 app.use(compression());
