@@ -56,6 +56,7 @@ export class EmployeeService {
       blockedDays: data.blockedDays,
       isActive: true,
       allowedApps: data.allowedApps ?? ['admin'],
+      commissionRate: data.commissionRate ?? 0,
     });
 
     sharedCache.delete(`users:list:${data.unitId || 'all'}`);

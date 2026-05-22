@@ -5,6 +5,7 @@ import { api, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import EmployeeForm from './EmployeeForm';
 import EmployeeVales from './EmployeeVales';
+import EmployeePayment from './EmployeePayment';
 import { ConfirmModal } from '@barber/ui';
 import styles from './Employees.module.scss';
 
@@ -268,6 +269,11 @@ function EmployeeDetail({ emp, onClose, onEdit, onToggle, onToggleOnline, onDele
           </div>
 
           <EmployeeVales
+            employeeId={emp._id}
+            unitId={typeof emp.unitId === 'object' ? emp.unitId._id : emp.unitId}
+          />
+
+          <EmployeePayment
             employeeId={emp._id}
             unitId={typeof emp.unitId === 'object' ? emp.unitId._id : emp.unitId}
           />

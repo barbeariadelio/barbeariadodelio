@@ -72,12 +72,51 @@ export class FinanceService {
     jwtUnitId?: string,
   ): Promise<any[]> {
     const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
+    const empOid = new mongoose.Types.ObjectId(employeeId);
+
+    // Backfill: create commission transactions for completed/billed appointments that don't have one yet.
+    // This handles appointments completed before commissionRate was set on the employee.
+    const employee = await UserModel.findById(employeeId).select('commissionRate');
+    const commissionRate = employee?.commissionRate ?? 0;
+
+    if (commissionRate > 0) {
+      const completedAppts = await AppointmentModel.find({
+        unitId: { $in: unitIds },
+        employeeId: empOid,
+        status: 'completed',
+        isBilled: true,
+        billingSkipped: { $ne: true },
+      }).populate('serviceId', 'name').lean();
+
+      for (const appt of completedAppts) {
+        const exists = await TransactionModel.findOne({
+          appointmentId: appt._id,
+          type: 'commission',
+          employeeId: empOid,
+        });
+        if (!exists) {
+          const amount = Math.round((appt.price ?? 0) * commissionRate / 100 * 100) / 100;
+          await TransactionModel.create({
+            unitId: appt.unitId,
+            appointmentId: appt._id,
+            employeeId: empOid,
+            type: 'commission',
+            category: 'commission',
+            amount,
+            description: `Comissão: ${(appt as any).serviceId?.name || 'Serviço'} (${commissionRate}%)`,
+            date: appt.date,
+            createdBy: empOid,
+            isPaid: false,
+          });
+        }
+      }
+    }
 
     const query: any = {
       unitId: { $in: unitIds },
       type: 'commission',
       category: 'commission',
-      employeeId: new mongoose.Types.ObjectId(employeeId),
+      employeeId: empOid,
     };
 
     // Employees can only see unpaid commissions
@@ -87,7 +126,14 @@ export class FinanceService {
 
     const commissions = await TransactionModel.find(query)
       .sort({ date: -1 })
-      .populate('appointmentId', 'date startTime clientId serviceId price')
+      .populate({
+        path: 'appointmentId',
+        select: 'date startTime clientId serviceId price',
+        populate: [
+          { path: 'clientId', select: 'name' },
+          { path: 'serviceId', select: 'name' },
+        ],
+      })
       .lean();
 
     return commissions;

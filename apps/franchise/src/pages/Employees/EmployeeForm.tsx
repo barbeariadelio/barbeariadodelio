@@ -67,6 +67,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
   const [serviceIds, setServiceIds] = useState<string[]>(
     (employee as any)?.serviceIds?.map((id: any) => typeof id === 'object' ? id._id : id) ?? []
   );
+  const [commissionRate, setCommissionRate] = useState<string>((employee as any)?.commissionRate?.toString() ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const { data: fullEmployee } = useQuery<Employee>({
@@ -155,6 +156,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
       unitId: franchiseUnitId,
       allowedApps: [franchiseUnitId],
       serviceIds,
+      commissionRate: commissionRate !== '' ? parseFloat(commissionRate) : 0,
     };
     if (!isEdit || password) payload.password = password;
     
@@ -221,12 +223,29 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
 
           <div className={styles.field}>
             <label className={styles.label}>Telefone</label>
-            <input 
-              className={styles.input} 
-              value={phone} 
-              onChange={e => setPhone(maskPhone(e.target.value))} 
-              placeholder="(19) 9XXXX-XXXX" 
+            <input
+              className={styles.input}
+              value={phone}
+              onChange={e => setPhone(maskPhone(e.target.value))}
+              placeholder="(19) 9XXXX-XXXX"
             />
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>Taxa de Comissão (%)</label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              className={styles.input}
+              value={commissionRate}
+              onChange={e => setCommissionRate(e.target.value)}
+              placeholder="Ex: 40"
+            />
+            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+              Percentual sobre o valor do serviço gerado como comissão para o funcionário.
+            </p>
           </div>
 
           <div className={styles.field}>
