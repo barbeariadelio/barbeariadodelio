@@ -103,6 +103,10 @@ export default function Dashboard() {
 
   /* ── Day appointments + employees (schedule view) ── */
   const dayISO = dateISO(selectedDay);
+  const dayAppointmentsFromMonth = useMemo(
+    () => monthAppointmentsRaw.filter(a => a.date === dayISO) as unknown as ScheduleAppointment[],
+    [monthAppointmentsRaw, dayISO],
+  );
 
   const { data: dayAppointmentsRaw = [] } = useQuery<ScheduleAppointment[]>({
     queryKey: ['appointments-day', dayISO, unitId],
@@ -110,6 +114,7 @@ export default function Dashboard() {
       api.get(`/appointments?date=${dayISO}&unitId=${unitId}&limit=1000`)
          .then(r => Array.isArray(r.data) ? r.data : r.data?.appointments ?? []),
     enabled: view === 'schedule' && !!user,
+    placeholderData: dayAppointmentsFromMonth,
     staleTime: 30 * 1000,
   });
 
