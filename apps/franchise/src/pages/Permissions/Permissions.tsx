@@ -127,11 +127,10 @@ export default function Permissions() {
         delete payload.email;
         payload.phone = payload.phone.replace(/\D/g, '');
       }
-      // Explicitly set unitId from the active franchise unit so the employee is
-      // scoped to this unit even when the owner's JWT has no unitId.
+      // Scope new user to the active franchise unit.
       const activeUnitId = getSelectedUnitId() || '69fa463aa078044937f70250';
       payload.unitId = activeUnitId;
-      payload.allowedApps = [activeUnitId];
+      // allowedApps comes from the form state (newUser.allowedApps), defaulting to ['franchise']
       return api.post('/users/register', payload);
     },
     onSuccess: () => {

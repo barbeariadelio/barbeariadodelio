@@ -20,12 +20,16 @@ export class AuthService {
 
     // Restriction Logic
     if (user.role !== 'owner' && appId) {
-      // Use allowedApps if defined, otherwise fallback to role-based defaults
       const allowed = user.allowedApps && user.allowedApps.length > 0
         ? user.allowedApps
         : ['admin'];
 
-      if (!allowed.includes(appId)) {
+      // allowedApps may contain app names ('franchise', 'admin') or unitIds (legacy bug).
+      // Accept unitId match for franchise access so existing employees aren't locked out.
+      const hasAccess = allowed.includes(appId) ||
+        (appId === 'franchise' && user.unitId && allowed.includes(user.unitId.toString()));
+
+      if (!hasAccess) {
         const systemName = appId === 'admin' ? 'Administrativo' : 'Franquia';
         throw new AppError(`Acesso negado: Usuários com o papel de ${user.role} não têm permissão para acessar o sistema ${systemName}.`, 403);
       }
