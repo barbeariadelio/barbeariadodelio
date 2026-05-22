@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../../contexts/AuthContext';
-import { api, getSelectedUnitId } from '../../api/client';
+import { api, apiBaseUrl, getSelectedUnitId } from '../../api/client';
 import { 
   CalendarView, 
   StaffSchedule, 
@@ -100,10 +100,16 @@ export default function Dashboard() {
   }, [dayAppointmentsRaw, isStaff, userId]);
 
   const { data: employeesRaw = [] } = useQuery<ScheduleEmployee[]>({
-    queryKey: ['employees', unitId],
+    queryKey: ['employees', unitId, 'schedule'],
     queryFn: () =>
-      api.get(`/employees${unitId ? `?unitId=${unitId}` : ''}`)
-         .then(r => Array.isArray(r.data) ? r.data : r.data?.employees ?? []),
+      api.get(`/employees${unitId ? `?unitId=${unitId}&` : '?'}light=schedule`)
+         .then(r => {
+           const list = Array.isArray(r.data) ? r.data : r.data?.employees ?? [];
+           return list.map((emp: ScheduleEmployee & { hasAvatar?: boolean }) => ({
+             ...emp,
+             avatar: emp.avatar || (emp.hasAvatar ? `${apiBaseUrl}/employees/public/${emp._id}/avatar` : undefined),
+           }));
+         }),
     enabled: !!user,
     staleTime: 5 * 60 * 1000,
   });

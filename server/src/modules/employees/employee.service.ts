@@ -15,7 +15,8 @@ export class EmployeeService {
       .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'))
       .map((e) => {
         const { avatar, ...rest } = e as any;
-        return { ...rest, hasAvatar: !!(avatar as string | undefined) };
+        const avatarUrl = typeof avatar === 'string' && avatar.startsWith('http') ? avatar : undefined;
+        return { ...rest, avatar: avatarUrl, hasAvatar: !!(avatar as string | undefined) };
       });
     sharedCache.set(cacheKey, sorted, 60);
     return sorted;
@@ -39,6 +40,23 @@ export class EmployeeService {
       .select('-passwordHash -passwordPlain')
       .lean();
     const sorted = employees.sort((a: any, b: any) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'));
+    sharedCache.set(cacheKey, sorted, 60);
+    return sorted;
+  }
+
+  async findScheduleByUnit(unitId: string): Promise<any[]> {
+    const cacheKey = `users:schedule:${unitId}`;
+    const cached = sharedCache.get<any[]>(cacheKey);
+    if (cached) return cached;
+    const employees = await UserModel.find({ unitId, role: 'employee', isActive: true })
+      .select('name avatar workSchedule daySchedules vacations blockedDays serviceIds')
+      .lean();
+    const sorted = (employees as any[])
+      .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'))
+      .map((e) => {
+        const { avatar, ...rest } = e as any;
+        return { ...rest, hasAvatar: !!(avatar as string | undefined) };
+      });
     sharedCache.set(cacheKey, sorted, 60);
     return sorted;
   }
