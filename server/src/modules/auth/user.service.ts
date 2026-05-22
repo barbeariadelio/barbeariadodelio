@@ -11,7 +11,7 @@ export class UserService {
 
     const filter: Record<string, unknown> = unitId ? { unitId } : {};
     if (excludeClients) filter.role = { $ne: 'client' };
-    const users = await UserModel.find(filter).select('-passwordHash -passwordPlain').sort({ name: 1 }).lean();
+    const users = await UserModel.find(filter).select('-passwordHash').sort({ name: 1 }).lean();
 
     sharedCache.set(cacheKey, users as unknown as IUser[], 60);
     return users as unknown as IUser[];
@@ -23,7 +23,7 @@ export class UserService {
     if (cached) return cached;
 
     const filter = unitIds.length > 0 ? { unitId: { $in: unitIds }, role: { $ne: 'client' } } : { role: { $ne: 'client' } };
-    const users = await UserModel.find(filter).select('-passwordHash -passwordPlain').sort({ name: 1 }).lean();
+    const users = await UserModel.find(filter).select('-passwordHash').sort({ name: 1 }).lean();
 
     sharedCache.set(cacheKey, users as unknown as IUser[], 60);
     return users as unknown as IUser[];
