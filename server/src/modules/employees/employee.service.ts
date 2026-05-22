@@ -55,7 +55,26 @@ export class EmployeeService {
       .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'))
       .map((e) => {
         const { avatar, ...rest } = e as any;
-        return { ...rest, hasAvatar: !!(avatar as string | undefined) };
+        const avatarUrl = typeof avatar === 'string' && avatar.startsWith('http') ? avatar : undefined;
+        return { ...rest, avatar: avatarUrl, hasAvatar: !!(avatar as string | undefined) };
+      });
+    sharedCache.set(cacheKey, sorted, 60);
+    return sorted;
+  }
+
+  async findListByUnit(unitId: string): Promise<any[]> {
+    const cacheKey = `users:list:employees:${unitId}`;
+    const cached = sharedCache.get<any[]>(cacheKey);
+    if (cached) return cached;
+    const employees = await UserModel.find({ unitId, role: 'employee' })
+      .select('name email phone role avatar daySchedules workSchedule vacations blockedDays isActive allowOnlineBooking unitId serviceIds commissionRate')
+      .lean();
+    const sorted = (employees as any[])
+      .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'))
+      .map((e) => {
+        const { avatar, ...rest } = e as any;
+        const avatarUrl = typeof avatar === 'string' && avatar.startsWith('http') ? avatar : undefined;
+        return { ...rest, avatar: avatarUrl, hasAvatar: !!(avatar as string | undefined) };
       });
     sharedCache.set(cacheKey, sorted, 60);
     return sorted;
@@ -117,6 +136,8 @@ export class EmployeeService {
     const uid = data.unitId || 'all';
     sharedCache.delete(`users:list:franchise:${uid}`);
     sharedCache.delete(`users:list:admin:${uid}`);
+    sharedCache.delete(`users:list:employees:${uid}`);
+    sharedCache.delete(`users:schedule:${uid}`);
     sharedCache.delete(`users:public:${uid}`);
     return UserModel.findById(emp._id).select('-passwordHash').lean() as unknown as Promise<IUser>;
   }
@@ -154,6 +175,8 @@ export class EmployeeService {
     const uid = emp.unitId?.toString() ?? 'all';
     sharedCache.delete(`users:list:franchise:${uid}`);
     sharedCache.delete(`users:list:admin:${uid}`);
+    sharedCache.delete(`users:list:employees:${uid}`);
+    sharedCache.delete(`users:schedule:${uid}`);
     sharedCache.delete(`users:public:${uid}`);
     return emp;
   }
@@ -165,6 +188,12 @@ export class EmployeeService {
       { new: true, runValidators: true },
     ).select('-passwordHash');
     if (!emp) throw new NotFoundError('Employee');
+    const uid = emp.unitId?.toString() ?? 'all';
+    sharedCache.delete(`users:list:franchise:${uid}`);
+    sharedCache.delete(`users:list:admin:${uid}`);
+    sharedCache.delete(`users:list:employees:${uid}`);
+    sharedCache.delete(`users:schedule:${uid}`);
+    sharedCache.delete(`users:public:${uid}`);
     return emp;
   }
 
@@ -174,6 +203,8 @@ export class EmployeeService {
     const uid = emp.unitId?.toString() ?? 'all';
     sharedCache.delete(`users:list:franchise:${uid}`);
     sharedCache.delete(`users:list:admin:${uid}`);
+    sharedCache.delete(`users:list:employees:${uid}`);
+    sharedCache.delete(`users:schedule:${uid}`);
     sharedCache.delete(`users:public:${uid}`);
   }
 }

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { api, getSelectedUnitId } from '../../api/client';
+import { api, apiBaseUrl, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import EmployeeForm from './EmployeeForm';
 import EmployeeVales from './EmployeeVales';
@@ -147,6 +147,7 @@ interface Employee {
   phone?: string;
   role: string;
   avatar?: string;
+  hasAvatar?: boolean;
   daySchedules?: DaySchedule[];
   workSchedule?: {
     start: string;
@@ -325,12 +326,17 @@ export default function Employees() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const { data: employees = [], isLoading } = useQuery<Employee[]>({
-    queryKey: ['employees', unitId],
+    queryKey: ['employees', unitId, 'list'],
     queryFn: async () => {
-      const { data } = await api.get('/employees', { params: { unitId } });
-      return Array.isArray(data) ? data : data.employees ?? [];
+      const { data } = await api.get('/employees', { params: { unitId, light: 'list' } });
+      const list: Employee[] = Array.isArray(data) ? data : data.employees ?? [];
+      return list.map(emp => ({
+        ...emp,
+        avatar: emp.avatar || (emp.hasAvatar ? `${apiBaseUrl}/employees/public/${emp._id}/avatar` : undefined),
+      }));
     },
     enabled: !!user && !!unitId,
+    staleTime: 5 * 60 * 1000,
   });
 
   useEffect(() => {

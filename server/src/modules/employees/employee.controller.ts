@@ -35,7 +35,9 @@ export async function listEmployees(req: AuthRequest, res: Response, next: NextF
     if (!unitId) { ok(res, []); return; }
     const employees = req.query.light === 'schedule'
       ? await service.findScheduleByUnit(unitId)
-      : await service.findAdminByUnit(unitId);
+      : req.query.light === 'list'
+        ? await service.findListByUnit(unitId)
+        : await service.findAdminByUnit(unitId);
     ok(res, employees);
   } catch (e) { next(e); }
 }

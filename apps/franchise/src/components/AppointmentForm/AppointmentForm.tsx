@@ -1,7 +1,7 @@
 import { FormEvent, useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { api, resolveApiBaseUrl, getStoredAccessToken, setupInterceptors } from '../../api/client';
+import { api, resolveApiBaseUrl, getStoredAccessToken, getSelectedUnitId, setupInterceptors } from '../../api/client';
 import styles from './AppointmentForm.module.scss';
 
 function maskPhone(raw: string) {
@@ -96,7 +96,8 @@ function IconX() {
 
 export default function AppointmentForm({ onClose, onSuccess, initialDate, initialEmployeeId, initialTime, appointment }: Props) {
   const qc = useQueryClient();
-  const [unitId, setUnitId] = useState(import.meta.env.VITE_UNIT_ID || '');
+  const activeUnitId = getSelectedUnitId() || import.meta.env.VITE_UNIT_ID || '';
+  const [unitId, setUnitId] = useState(activeUnitId);
   const [clientId, setClientId] = useState('');
   const [clientSearch, setClientSearch] = useState('');
   const [showClientList, setShowClientList] = useState(false);
@@ -136,7 +137,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
   // Pre-fill if editing
   useEffect(() => {
     if (appointment) {
-      setUnitId(appointment.unitId || import.meta.env.VITE_UNIT_ID || '');
+      setUnitId(appointment.unitId || activeUnitId);
       setClientId(appointment.clientId?._id || appointment.clientId || '');
       setEmployeeId(appointment.employeeId?._id || appointment.employeeId || '');
       setServiceId(appointment.serviceId?._id || appointment.serviceId || '');
@@ -157,7 +158,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  const envUnitId = (import.meta.env.VITE_UNIT_ID as string | undefined) || '';
+  const envUnitId = activeUnitId;
 
   const { data: units = [] } = useQuery<Unit[]>({
     queryKey: ['units', envUnitId],
@@ -165,6 +166,11 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       try {
         const r = await api.get('/units');
         const list: Unit[] = Array.isArray(r.data) ? r.data : r.data?.units ?? [];
+        if (envUnitId && !list.some(u => u._id === envUnitId)) {
+          const publicRes = await api.get(`/units/public/${envUnitId}`);
+          const publicUnit = publicRes.data;
+          return publicUnit ? [publicUnit, ...list] : list;
+        }
         if (list.length > 0) return list;
       } catch { /* fallback below */ }
       // Fallback: busca a unidade pela rota pública (sem autenticação)
