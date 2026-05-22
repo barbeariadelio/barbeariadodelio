@@ -68,6 +68,7 @@ export default function Dashboard() {
   const unitId = getSelectedUnitId() || import.meta.env.VITE_UNIT_ID || user?.unitId;
   const dateLabel = format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
   const isStaff = user?.role === 'employee';
+  const isCashier = user?.role === 'cashier';
   const userId = user?._id;
 
   const [view, setView] = useState<'calendar' | 'schedule'>('calendar');
@@ -143,11 +144,11 @@ export default function Dashboard() {
   });
 
   const employees = useMemo(() => {
-    if (!isStaff || !userId) return employeesRaw;
-    return employeesRaw.filter(e => {
-      const empId = e._id;
-      return empId === userId;
-    });
+    let list = employeesRaw;
+    if (isStaff && userId) {
+      list = list.filter(e => e._id === userId);
+    }
+    return list;
   }, [employeesRaw, isStaff, userId]);
 
   const { data: unitConfig } = useQuery<UnitConfig>({
@@ -315,7 +316,7 @@ export default function Dashboard() {
           isDeleting={deleteMut.isPending}
           businessName="Barber Franchise"
           onProfileClick={!isStaff ? (clientId) => navigate(`/clients?id=${clientId}`) : undefined}
-          onEmployeeClick={(employeeId) => navigate(`/employees?id=${employeeId}`)}
+          onEmployeeClick={!isCashier ? (employeeId) => navigate(`/employees?id=${employeeId}`) : undefined}
           canManageAppointments={!isStaff}
           canBill={!isStaff}
         />
