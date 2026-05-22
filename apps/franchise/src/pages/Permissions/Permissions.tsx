@@ -68,14 +68,28 @@ export default function Permissions() {
     setTimeout(() => setCopiedField(null), 1500);
   };
 
-  const { data: users = [], isLoading } = useQuery<AppUser[]>({
+  const { data: users = [], isLoading, error: usersError } = useQuery<AppUser[]>({
     queryKey: ['users'],
-    queryFn: () => api.get('/users').then(res => {
+    queryFn: async () => {
+      const res = await api.get('/users');
       const data = res.data;
-      const allUsers = Array.isArray(data) ? data : data.users ?? [];
+      const allUsers = Array.isArray(data) ? data : (data as { users?: AppUser[] }).users ?? [];
       return allUsers.filter((u: AppUser) => u.role !== 'client');
-    }),
+    },
+    // A 409 de duplicate-key estava mantendo a query em retry. Mostrar
+    // mensagem clara ao usuário e evitar retries automáticos para não
+    // deixar a tela travada em "Carregando usuários...".
+    retry: false,
+    staleTime: 60 * 1000,
   });
+
+  useEffect(() => {
+    if (usersError) {
+      const err = usersError as { response?: { data?: { message?: string } } };
+      const message = err?.response?.data?.message || 'Erro ao carregar usuários.';
+      setToast({ message, type: 'error' });
+    }
+  }, [usersError]);
 
   useEffect(() => {
     if (toast) {

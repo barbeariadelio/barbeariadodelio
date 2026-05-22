@@ -80,6 +80,8 @@ export default function Permissions() {
       const allUsers = Array.isArray(data) ? data : data.users ?? [];
       return allUsers.filter((u: AppUser) => u.role !== 'client');
     }),
+    retry: false,
+    staleTime: 60 * 1000,
   });
 
   const { data: units = [] } = useQuery<Unit[]>({

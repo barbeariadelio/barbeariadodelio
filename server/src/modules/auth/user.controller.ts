@@ -14,7 +14,7 @@ export async function listUsers(req: AuthRequest, res: Response, next: NextFunct
     if (role === 'owner') {
       const filterUnitId = resolveUnitId(req) ?? undefined;
       if (filterUnitId) {
-        const users = await service.listAll(filterUnitId);
+        const users = await service.listAll(filterUnitId, true);
         ok(res, users);
         return;
       }
@@ -36,7 +36,7 @@ export async function listUsers(req: AuthRequest, res: Response, next: NextFunct
 
     // Non-owners: locked to their own unitId
     const filterUnitId = resolveUnitId(req) ?? undefined;
-    const users = await service.listAll(filterUnitId);
+    const users = await service.listAll(filterUnitId, true);
     ok(res, users);
   } catch (e) { next(e); }
 }

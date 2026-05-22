@@ -4,16 +4,17 @@ import { sharedCache } from '../../shared/utils/cache';
 import bcrypt from 'bcryptjs';
 
 export class UserService {
-  async listAll(unitId?: string): Promise<IUser[]> {
-    const cacheKey = `users:list:${unitId || 'all'}`;
+  async listAll(unitId?: string, excludeClients = false): Promise<IUser[]> {
+    const cacheKey = `users:list:${unitId || 'all'}:${excludeClients}`;
     const cached = sharedCache.get<IUser[]>(cacheKey);
     if (cached) return cached;
 
-    const filter = unitId ? { unitId } : {};
-    const users = await UserModel.find(filter).select('-passwordHash -passwordPlain').sort({ name: 1 });
+    const filter: Record<string, unknown> = unitId ? { unitId } : {};
+    if (excludeClients) filter.role = { $ne: 'client' };
+    const users = await UserModel.find(filter).select('-passwordHash -passwordPlain').sort({ name: 1 }).lean();
 
-    sharedCache.set(cacheKey, users, 60);
-    return users;
+    sharedCache.set(cacheKey, users as unknown as IUser[], 60);
+    return users as unknown as IUser[];
   }
 
   async listByUnitIds(unitIds: string[]): Promise<IUser[]> {
@@ -21,11 +22,11 @@ export class UserService {
     const cached = sharedCache.get<IUser[]>(cacheKey);
     if (cached) return cached;
 
-    const filter = unitIds.length > 0 ? { unitId: { $in: unitIds } } : {};
-    const users = await UserModel.find(filter).select('-passwordHash -passwordPlain').sort({ name: 1 });
+    const filter = unitIds.length > 0 ? { unitId: { $in: unitIds }, role: { $ne: 'client' } } : { role: { $ne: 'client' } };
+    const users = await UserModel.find(filter).select('-passwordHash -passwordPlain').sort({ name: 1 }).lean();
 
-    sharedCache.set(cacheKey, users, 60);
-    return users;
+    sharedCache.set(cacheKey, users as unknown as IUser[], 60);
+    return users as unknown as IUser[];
   }
 
   async create(data: any): Promise<IUser> {
@@ -37,9 +38,7 @@ export class UserService {
       isActive: true,
     });
     
-    sharedCache.delete(`users:list:${data.unitId || 'all'}`);
-    sharedCache.delete('users:list:all');
-    sharedCache.keys().filter(k => k.startsWith('users:list:owner:')).forEach(k => sharedCache.delete(k));
+    sharedCache.keys().filter(k => k.startsWith('users:list:')).forEach(k => sharedCache.delete(k));
 
     return UserModel.findById(user._id).select('-passwordHash') as Promise<IUser>;
   }
