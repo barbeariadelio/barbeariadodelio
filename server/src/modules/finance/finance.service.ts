@@ -78,6 +78,8 @@ export class FinanceService {
     employeeId: string,
     appScope?: string,
     jwtUnitId?: string,
+    start?: string,
+    end?: string,
   ): Promise<any[]> {
     const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
     const empOid = new mongoose.Types.ObjectId(employeeId);
@@ -130,6 +132,12 @@ export class FinanceService {
       category: 'commission',
       employeeId: empOid,
     };
+
+    if (start || end) {
+      query.date = {};
+      if (start) query.date.$gte = start;
+      if (end) query.date.$lte = end;
+    }
 
     // Employees can only see unpaid commissions
     if (role === 'employee') {

@@ -40,6 +40,30 @@ function parseBR(s: string) {
   return parseFloat(s.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
 }
 
+function toISO(d: Date) {
+  return d.toISOString().split('T')[0];
+}
+
+function getPresetRange(preset: string): { start: string; end: string } | null {
+  const today = new Date();
+  if (preset === 'week') {
+    const day = today.getDay();
+    const mon = new Date(today);
+    mon.setDate(today.getDate() - (day === 0 ? 6 : day - 1));
+    return { start: toISO(mon), end: toISO(today) };
+  }
+  if (preset === 'month') {
+    const first = new Date(today.getFullYear(), today.getMonth(), 1);
+    return { start: toISO(first), end: toISO(today) };
+  }
+  if (preset === 'fortnight') {
+    const day = today.getDate();
+    const first = new Date(today.getFullYear(), today.getMonth(), day <= 15 ? 1 : 16);
+    return { start: toISO(first), end: toISO(today) };
+  }
+  return null;
+}
+
 export default function EmployeePayment({ employeeId, unitId }: Props) {
   const { user } = useAuth();
   const isEmployee = (user as any)?.role === 'employee';
@@ -51,11 +75,28 @@ export default function EmployeePayment({ employeeId, unitId }: Props) {
   const [payDate, setPayDate] = useState(new Date().toISOString().split('T')[0]);
   const [payDesc, setPayDesc] = useState('');
 
+  const [preset, setPreset] = useState<'all' | 'week' | 'month' | 'fortnight' | 'custom'>('all');
+  const [filterStart, setFilterStart] = useState('');
+  const [filterEnd, setFilterEnd] = useState('');
+
+  function applyPreset(p: 'all' | 'week' | 'month' | 'fortnight' | 'custom') {
+    setPreset(p);
+    setSelected(new Set());
+    if (p === 'all' || p === 'custom') {
+      if (p === 'all') { setFilterStart(''); setFilterEnd(''); }
+      return;
+    }
+    const range = getPresetRange(p);
+    if (range) { setFilterStart(range.start); setFilterEnd(range.end); }
+  }
+
   const qs = new URLSearchParams({ employeeId });
   if (unitId) qs.set('unitId', unitId);
+  if (filterStart) qs.set('start', filterStart);
+  if (filterEnd) qs.set('end', filterEnd);
 
   const { data: commissions = [], isLoading } = useQuery<Commission[]>({
-    queryKey: ['employee-commissions', employeeId],
+    queryKey: ['employee-commissions', employeeId, filterStart, filterEnd],
     queryFn: async () => {
       const { data } = await api.get(`/finance/remunerations?${qs}`);
       return Array.isArray(data) ? data : [];
@@ -118,6 +159,14 @@ export default function EmployeePayment({ employeeId, unitId }: Props) {
     });
   }
 
+  const PRESETS = [
+    { key: 'all', label: 'Tudo' },
+    { key: 'fortnight', label: 'Quinzena' },
+    { key: 'week', label: 'Esta semana' },
+    { key: 'month', label: 'Este mês' },
+    { key: 'custom', label: 'Personalizado' },
+  ] as const;
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -126,6 +175,38 @@ export default function EmployeePayment({ employeeId, unitId }: Props) {
           <button className={styles.payBtn} onClick={openPayForm}>
             Registrar Pagamento
           </button>
+        )}
+      </div>
+
+      {/* ── Date filter ── */}
+      <div className={styles.filterBar}>
+        <div className={styles.presets}>
+          {PRESETS.map(p => (
+            <button
+              key={p.key}
+              className={`${styles.presetBtn} ${preset === p.key ? styles.presetActive : ''}`}
+              onClick={() => applyPreset(p.key)}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+        {preset === 'custom' && (
+          <div className={styles.dateRange}>
+            <input
+              type="date"
+              className={styles.dateInput}
+              value={filterStart}
+              onChange={e => { setFilterStart(e.target.value); setSelected(new Set()); }}
+            />
+            <span className={styles.dateSep}>até</span>
+            <input
+              type="date"
+              className={styles.dateInput}
+              value={filterEnd}
+              onChange={e => { setFilterEnd(e.target.value); setSelected(new Set()); }}
+            />
+          </div>
         )}
       </div>
 
@@ -184,7 +265,7 @@ export default function EmployeePayment({ employeeId, unitId }: Props) {
       {isLoading ? (
         <p className={styles.empty}>Carregando...</p>
       ) : unpaid.length === 0 && paid.length === 0 ? (
-        <p className={styles.empty}>Nenhuma comissão registrada.</p>
+        <p className={styles.empty}>Nenhuma comissão no período selecionado.</p>
       ) : (
         <>
           {unpaid.length > 0 && (

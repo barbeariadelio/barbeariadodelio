@@ -33,6 +33,61 @@
   &:hover { background: #15803d; box-shadow: 0 3px 10px rgba(22,163,74,0.3); }
 }
 
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.presets {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.presetBtn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  padding: 0.3rem 0.7rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  &:hover { border-color: var(--gold); color: var(--gold); }
+}
+
+.presetActive {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #fff;
+  &:hover { color: #fff; }
+}
+
+.dateRange {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.dateInput {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  &:focus { outline: none; border-color: var(--gold); }
+}
+
+.dateSep {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
 .selectBar {
   display: flex;
   align-items: center;

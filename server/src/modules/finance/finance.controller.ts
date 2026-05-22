@@ -49,9 +49,11 @@ export async function listRemunerations(req: AuthRequest, res: Response, next: N
     const unitId = rawQueryUnitId || (req.user!.unitId as string) || 'all';
     const employeeId = (role === 'employee') ? req.user!.id : (req.query.employeeId as string);
     if (!employeeId) { ok(res, []); return; }
+    const start = req.query.start as string | undefined;
+    const end = req.query.end as string | undefined;
     const appScope = req.headers['x-app-scope'] as string | undefined;
     const jwtUnitId = req.user!.unitId;
-    const result = await service.listRemunerations(req.user!.id, role, unitId, employeeId, appScope, jwtUnitId);
+    const result = await service.listRemunerations(req.user!.id, role, unitId, employeeId, appScope, jwtUnitId, start, end);
     ok(res, result);
   } catch (e) { next(e); }
 }
