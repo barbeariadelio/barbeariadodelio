@@ -12,13 +12,19 @@ export async function listUsers(req: AuthRequest, res: Response, next: NextFunct
     const { role, id: ownerId } = req.user!;
 
     if (role === 'owner') {
+      const filterUnitId = resolveUnitId(req) ?? undefined;
+      if (filterUnitId) {
+        const users = await service.listAll(filterUnitId);
+        ok(res, users);
+        return;
+      }
+
       const { UnitService } = await import('../units/unit.service');
       const { FranchiseModel } = await import('../franchise/franchise.model');
-      const mongoose = await import('mongoose');
 
       const unitSvc = new UnitService();
       const ownUnits = await unitSvc.findByOwner(ownerId);
-      const franchise = await FranchiseModel.findOne({ franchisors: new mongoose.Types.ObjectId(ownerId) });
+      const franchise = await FranchiseModel.findOne({ franchisors: ownerId });
 
       const allUnitIds = new Set(ownUnits.map(u => u._id.toString()));
       (franchise?.units ?? []).forEach(u => allUnitIds.add(u.toString()));

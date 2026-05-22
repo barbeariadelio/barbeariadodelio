@@ -10,7 +10,7 @@ export class UserService {
     if (cached) return cached;
 
     const filter = unitId ? { unitId } : {};
-    const users = await UserModel.find(filter).select('-passwordHash').sort({ name: 1 });
+    const users = await UserModel.find(filter).select('-passwordHash -passwordPlain').sort({ name: 1 });
 
     sharedCache.set(cacheKey, users, 60);
     return users;
@@ -22,7 +22,7 @@ export class UserService {
     if (cached) return cached;
 
     const filter = unitIds.length > 0 ? { unitId: { $in: unitIds } } : {};
-    const users = await UserModel.find(filter).select('-passwordHash').sort({ name: 1 });
+    const users = await UserModel.find(filter).select('-passwordHash -passwordPlain').sort({ name: 1 });
 
     sharedCache.set(cacheKey, users, 60);
     return users;
