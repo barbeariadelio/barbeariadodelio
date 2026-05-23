@@ -226,7 +226,7 @@ export default function Book() {
   const { data: slots = [], isFetching: slotsLoading } = useQuery<string[]>({
     queryKey: ['slots', unitId, selectedEmployee?._id, selectedDate, selectedService?.durationMinutes, unit?.apiUrl],
     queryFn: async () => {
-      const { data } = await unitApi.get(`/appointments/slots?unitId=${unitId}&employeeId=${selectedEmployee!._id}&date=${selectedDate}&durationMinutes=${selectedService!.durationMinutes}`);
+      const { data } = await unitApi.get(`/appointments/slots?unitId=${unitId}&employeeId=${selectedEmployee!._id}&date=${selectedDate}&durationMinutes=${selectedService!.durationMinutes}&source=guest`);
       return Array.isArray(data) ? data : [];
     },
     enabled: !!unitId && !!selectedEmployee && !!selectedDate && !!selectedService && step === 'datetime',
@@ -484,10 +484,10 @@ export default function Book() {
                       {slots.filter(s => {
                         if (selectedDate !== todayISO()) return true;
                         const [sh, sm] = s.split(':').map(Number);
+                        const slotMins = sh * 60 + sm;
                         const now = new Date();
-                        const nh = now.getHours();
-                        const nm = now.getMinutes();
-                        return sh > nh || (sh === nh && sm > nm);
+                        const nowMins = now.getHours() * 60 + now.getMinutes();
+                        return slotMins >= nowMins + 30;
                       }).map(s => (
                         <button
                           key={s}

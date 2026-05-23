@@ -61,13 +61,14 @@ export async function getAppointment(req: AuthRequest, res: Response, next: Next
 
 export async function getSlots(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { unitId, employeeId, date, durationMinutes } = req.query as Record<string, string>;
+    const { unitId, employeeId, date, durationMinutes, source } = req.query as Record<string, string>;
     if (!unitId || !employeeId || !date) {
       ok(res, []);
       return;
     }
     const duration = Number(durationMinutes) || 30;
-    const slots = await service.getAvailableSlots(unitId, employeeId, date, duration);
+    const bufferMins = source === 'guest' ? 30 : 0;
+    const slots = await service.getAvailableSlots(unitId, employeeId, date, duration, bufferMins);
     ok(res, slots);
   } catch (e) { next(e); }
 }

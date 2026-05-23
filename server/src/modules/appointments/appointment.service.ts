@@ -91,8 +91,9 @@ export class AppointmentService {
     employeeId: string,
     date: string,
     durationMinutes: number,
+    bufferMins = 0,
   ): Promise<string[]> {
-    const cached = getSlotCache(unitId, employeeId, date, durationMinutes);
+    const cached = getSlotCache(unitId, employeeId, date, durationMinutes, bufferMins);
     if (cached) return cached;
 
     const [employee, unit] = await Promise.all([
@@ -154,7 +155,7 @@ export class AppointmentService {
       const slotStart = sh * 60 + sm;
       const slotEnd = slotStart + Number(durationMinutes);
 
-      if (date === todayISO && slotStart < nowMins) return false;
+      if (date === todayISO && slotStart < nowMins + bufferMins) return false;
       if (date < todayISO) return false;
 
       // Slot must fit entirely within at least one time range
@@ -179,7 +180,7 @@ export class AppointmentService {
       });
     });
 
-    setSlotCache(unitId, employeeId, date, durationMinutes, result);
+    setSlotCache(unitId, employeeId, date, durationMinutes, result, bufferMins);
     return result;
   }
 
@@ -337,9 +338,11 @@ export class AppointmentService {
 
     const nowBR = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
     const todayISO = `${nowBR.getFullYear()}-${String(nowBR.getMonth() + 1).padStart(2, '0')}-${String(nowBR.getDate()).padStart(2, '0')}`;
-    const nowTime = `${String(nowBR.getHours()).padStart(2, '0')}:${String(nowBR.getMinutes()).padStart(2, '0')}`;
-    if (date < todayISO || (date === todayISO && startTime < nowTime)) {
-      throw new AppError('Não é possível agendar em uma data ou hora retroativa.', 400);
+    const nowMinsTotal = nowBR.getHours() * 60 + nowBR.getMinutes();
+    const minAllowedMins = nowMinsTotal + 30;
+    const minAllowedTime = `${String(Math.floor(minAllowedMins / 60)).padStart(2, '0')}:${String(minAllowedMins % 60).padStart(2, '0')}`;
+    if (date < todayISO || (date === todayISO && startTime < minAllowedTime)) {
+      throw new AppError('Agendamentos online devem ser feitos com pelo menos 30 minutos de antecedência.', 400);
     }
 
     const cleanPhone = guestPhone.replace(/\D/g, '');

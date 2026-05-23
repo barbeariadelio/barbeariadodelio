@@ -6,8 +6,8 @@
 const cache = new Map<string, { data: string[]; expiresAt: number }>();
 const DEFAULT_TTL_MS = 60_000; // 60 seconds — safe since invalidateSlotCache is called on every new booking
 
-export function getSlotCache(unitId: string, employeeId: string, date: string, durationMinutes: number): string[] | null {
-  const key = `${unitId}:${employeeId}:${date}:${durationMinutes}`;
+export function getSlotCache(unitId: string, employeeId: string, date: string, durationMinutes: number, bufferMins = 0): string[] | null {
+  const key = `${unitId}:${employeeId}:${date}:${durationMinutes}:${bufferMins}`;
   const entry = cache.get(key);
   if (!entry) return null;
   if (Date.now() > entry.expiresAt) {
@@ -17,8 +17,8 @@ export function getSlotCache(unitId: string, employeeId: string, date: string, d
   return entry.data;
 }
 
-export function setSlotCache(unitId: string, employeeId: string, date: string, durationMinutes: number, slots: string[], ttlMs = DEFAULT_TTL_MS): void {
-  const key = `${unitId}:${employeeId}:${date}:${durationMinutes}`;
+export function setSlotCache(unitId: string, employeeId: string, date: string, durationMinutes: number, slots: string[], bufferMins = 0, ttlMs = DEFAULT_TTL_MS): void {
+  const key = `${unitId}:${employeeId}:${date}:${durationMinutes}:${bufferMins}`;
   cache.set(key, { data: slots, expiresAt: Date.now() + ttlMs });
 }
 
