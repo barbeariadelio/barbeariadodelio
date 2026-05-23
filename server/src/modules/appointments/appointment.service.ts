@@ -213,9 +213,9 @@ export class AppointmentService {
         }
       }
 
-      const today = new Date();
-      const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-      const nowTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
+      const nowBR = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+      const todayISO = `${nowBR.getFullYear()}-${String(nowBR.getMonth() + 1).padStart(2, '0')}-${String(nowBR.getDate()).padStart(2, '0')}`;
+      const nowTime = `${String(nowBR.getHours()).padStart(2, '0')}:${String(nowBR.getMinutes()).padStart(2, '0')}`;
       const canBackfillToday = data.source === 'admin';
       if (data.date! < todayISO || (!canBackfillToday && data.date === todayISO && data.startTime! < nowTime)) {
         throw new AppError('Não é possível agendar em uma data ou hora retroativa.', 400);
@@ -335,9 +335,9 @@ export class AppointmentService {
   }): Promise<GuestBookResult> {
     const { unitId, serviceId, employeeId, date, startTime, price, guestName, guestPhone, notes } = payload;
 
-    const today = new Date();
-    const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const nowTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
+    const nowBR = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const todayISO = `${nowBR.getFullYear()}-${String(nowBR.getMonth() + 1).padStart(2, '0')}-${String(nowBR.getDate()).padStart(2, '0')}`;
+    const nowTime = `${String(nowBR.getHours()).padStart(2, '0')}:${String(nowBR.getMinutes()).padStart(2, '0')}`;
     if (date < todayISO || (date === todayISO && startTime < nowTime)) {
       throw new AppError('Não é possível agendar em uma data ou hora retroativa.', 400);
     }
