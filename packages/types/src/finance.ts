@@ -13,6 +13,7 @@ export interface Transaction {
   description: string;
   date: string;
   paymentMethod?: PaymentMethod;
+  isPaid?: boolean;
   createdBy: string;
   createdAt: string;
 }

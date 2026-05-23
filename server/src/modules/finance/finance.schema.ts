@@ -20,5 +20,6 @@ export const updateTransactionSchema = z.object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
     employeeId: z.string().optional(),
     type: z.enum(['income', 'expense', 'royalty']).optional(),
+    isPaid: z.boolean().optional(),
   }).strict(),
 });

@@ -1,7 +1,5 @@
 .container {
-  margin-top: 2rem;
-  padding-top: 2rem;
-  border-top: 1px solid var(--border-subtle);
+  padding-top: 0;
 }
 
 .header {
@@ -96,7 +94,8 @@
 
 .summary {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 0.5rem;
   padding: 1rem 1.25rem;
   background: rgba(245, 158, 11, 0.03);
   border: 1px dashed rgba(245, 158, 11, 0.2);
@@ -107,8 +106,20 @@
   color: var(--text-secondary);
 }
 
+.summaryRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .totalValue {
-  color: #1565C0;
+  color: #ef4444;
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.discountedValue {
+  color: #22c55e;
   font-weight: 800;
   font-size: 1rem;
 }
@@ -131,10 +142,22 @@
   &:hover { border-color: var(--border-default); transform: translateX(2px); }
 }
 
+.valeRowDiscounted {
+  opacity: 0.65;
+  background: rgba(34, 197, 94, 0.04);
+  border-color: rgba(34, 197, 94, 0.2) !important;
+}
+
 .valeInfo {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.valeDescRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .valeDesc {
@@ -142,6 +165,18 @@
   font-weight: 700;
   color: var(--text-primary);
   text-transform: capitalize;
+}
+
+.discountedBadge {
+  font-size: 0.625rem;
+  font-weight: 700;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 4px;
+  padding: 1px 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .valeDate {
@@ -153,13 +188,33 @@
 .valeRight {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: 0.75rem;
 }
 
 .valeAmount {
   font-size: 0.9375rem;
   font-weight: 800;
   color: #ef4444;
+}
+
+.valeAmountDiscounted {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.discountBtn {
+  background: none;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #22c55e;
+  cursor: pointer;
+  padding: 3px 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 4px;
+  white-space: nowrap;
+  transition: all 0.2s;
+  &:hover { background: rgba(34, 197, 94, 0.1); border-color: #22c55e; }
+  &:disabled { opacity: 0.5; }
 }
 
 .deleteBtn {
@@ -178,4 +233,91 @@
   color: var(--text-muted);
   font-size: 0.8125rem;
   font-style: italic;
+}
+
+/* ── Confirm modal ── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeOverlay 0.15s ease;
+}
+
+@keyframes fadeOverlay {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 1.5rem 1.75rem;
+  width: 320px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  animation: slideModal 0.15s ease;
+}
+
+@keyframes slideModal {
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modalText {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin: 0 0 1.25rem;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.modalCancel {
+  background: none;
+  border: 1px solid var(--border-default);
+  padding: 0.45rem 1rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+  &:hover { border-color: var(--border-strong); color: var(--text-primary); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.modalConfirmGreen {
+  background: #16a34a;
+  color: #fff;
+  border: none;
+  padding: 0.45rem 1.1rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  &:hover { background: #15803d; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.modalConfirmRed {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  padding: 0.45rem 1.1rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  &:hover { background: #b91c1c; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
 }

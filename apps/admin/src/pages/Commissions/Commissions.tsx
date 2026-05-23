@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
+import EmployeeVales from '../Employees/EmployeeVales';
 import styles from './Commissions.module.scss';
 
 interface EmployeeSummary {
@@ -245,7 +246,6 @@ export default function Commissions() {
       const { data } = await api.get(`/finance/remunerations/summary?${summaryQs}`);
       return Array.isArray(data) ? data : [];
     },
-    enabled: !detailEmpId,
   });
 
   const detailQs = useMemo(() => {
@@ -270,13 +270,15 @@ export default function Commissions() {
   const paid   = commissions.filter(c => c.isPaid);
   const selectedTotal = unpaid.filter(c => selected.has(c._id)).reduce((s, c) => s + c.amount, 0);
   const totalPending  = unpaid.reduce((s, c) => s + c.amount, 0);
+  const currentEmpSummary = summary.find(s => s.employeeId === detailEmpId);
+  const aPagar = currentEmpSummary?.pendingAmount ?? totalPending;
 
   function toggleSelect(id: string) {
     setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
   function openPayForm() {
-    setPayAmount(formatBR(selectedTotal));
+    setPayAmount(formatBR(Math.max(0, aPagar)));
     setPayDesc(`Pagamento de comissões (${selected.size} atend.)`);
     setShowPayForm(true);
   }
@@ -319,9 +321,9 @@ export default function Commissions() {
             {!detailEmpId && <p className={styles.pageSubtitle}>Resumo por profissional</p>}
           </div>
         </div>
-        {detailEmpId && !isEmployee && selected.size > 0 && !showPayForm && (
+        {detailEmpId && !isEmployee && selected.size > 0 && !showPayForm && aPagar > 0 && (
           <button className={styles.payBtn} onClick={openPayForm}>
-            Registrar Pagamento · {formatCurrency(selectedTotal)}
+            Registrar Pagamento · {formatCurrency(aPagar)}
           </button>
         )}
       </div>
@@ -530,7 +532,7 @@ export default function Commissions() {
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
-                <span className={styles.summaryVal} style={{ color: '#16a34a' }}>{formatCurrency(totalPending)}</span>
+                <span className={styles.summaryVal} style={{ color: '#16a34a' }}>{formatCurrency(aPagar)}</span>
                 <span className={styles.summaryLbl}>a pagar</span>
               </div>
               {selected.size > 0 && (
@@ -580,71 +582,79 @@ export default function Commissions() {
             </form>
           )}
 
-          {detailLoading ? (
-            <p className={styles.empty}>Carregando...</p>
-          ) : unpaid.length === 0 && paid.length === 0 ? (
-            <p className={styles.empty}>Nenhuma comissão no período selecionado.</p>
-          ) : (
-            <div className={styles.lists}>
-              {unpaid.length > 0 && (
-                <section>
-                  <div className={styles.sectionLabel}>Pendentes ({unpaid.length})</div>
-                  <div className={styles.list}>
-                    {unpaid.map(c => {
-                      const isSelected = selected.has(c._id);
-                      const appt = c.appointmentId;
-                      const label = appt?.serviceId?.name || c.description;
-                      const dateStr = appt?.date ? formatDate(appt.date) : formatDate(c.date);
-                      const clientName = appt?.clientId?.name;
-                      return (
-                        <div key={c._id}
-                          className={`${styles.commRow} ${isSelected ? styles.commRowSelected : ''} ${!isEmployee ? styles.commRowClickable : ''}`}
-                          onClick={() => !isEmployee && toggleSelect(c._id)}
-                        >
-                          {!isEmployee && (
-                            <input type="checkbox" className={styles.checkbox} checked={isSelected}
-                              onChange={() => toggleSelect(c._id)} onClick={e => e.stopPropagation()} />
-                          )}
-                          <div className={styles.commInfo}>
-                            <span className={styles.commDesc}>{label}</span>
-                            {clientName && <span className={styles.commClient}>{clientName}</span>}
-                            <span className={styles.commDate}>{dateStr}{appt?.startTime ? ` · ${appt.startTime}` : ''}</span>
-                          </div>
-                          <span className={styles.commAmount}>{formatCurrency(c.amount)}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              )}
-              {!isEmployee && paid.length > 0 && (
-                <section style={{ marginTop: '1.5rem' }}>
-                  <div className={styles.sectionLabel}>Pagos ({paid.length})</div>
-                  <div className={styles.list}>
-                    {paid.map(c => {
-                      const appt = c.appointmentId;
-                      const label = appt?.serviceId?.name || c.description;
-                      const dateStr = appt?.date ? formatDate(appt.date) : formatDate(c.date);
-                      const clientName = appt?.clientId?.name;
-                      return (
-                        <div key={c._id} className={`${styles.commRow} ${styles.commRowPaid}`}>
-                          <div className={styles.commInfo}>
-                            <span className={styles.commDesc}>{label}</span>
-                            {clientName && <span className={styles.commClient}>{clientName}</span>}
-                            <span className={styles.commDate}>{dateStr}{appt?.startTime ? ` · ${appt.startTime}` : ''}</span>
-                          </div>
-                          <div className={styles.commRight}>
-                            <span className={styles.commAmount}>{formatCurrency(c.amount)}</span>
-                            <span className={styles.paidBadge}>Pago</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
+          <div className={styles.detailColumns}>
+            <div>
+              {detailLoading ? (
+                <p className={styles.empty}>Carregando...</p>
+              ) : unpaid.length === 0 && paid.length === 0 ? (
+                <p className={styles.empty}>Nenhuma comissão no período selecionado.</p>
+              ) : (
+                <div className={styles.lists}>
+                  {unpaid.length > 0 && (
+                    <section>
+                      <div className={styles.sectionLabel}>Pendentes ({unpaid.length})</div>
+                      <div className={styles.list}>
+                        {unpaid.map(c => {
+                          const isSelected = selected.has(c._id);
+                          const appt = c.appointmentId;
+                          const label = appt?.serviceId?.name || c.description;
+                          const dateStr = appt?.date ? formatDate(appt.date) : formatDate(c.date);
+                          const clientName = appt?.clientId?.name;
+                          return (
+                            <div key={c._id}
+                              className={`${styles.commRow} ${isSelected ? styles.commRowSelected : ''} ${!isEmployee ? styles.commRowClickable : ''}`}
+                              onClick={() => !isEmployee && toggleSelect(c._id)}
+                            >
+                              {!isEmployee && (
+                                <input type="checkbox" className={styles.checkbox} checked={isSelected}
+                                  onChange={() => toggleSelect(c._id)} onClick={e => e.stopPropagation()} />
+                              )}
+                              <div className={styles.commInfo}>
+                                <span className={styles.commDesc}>{label}</span>
+                                {clientName && <span className={styles.commClient}>{clientName}</span>}
+                                <span className={styles.commDate}>{dateStr}{appt?.startTime ? ` · ${appt.startTime}` : ''}</span>
+                              </div>
+                              <span className={styles.commAmount}>{formatCurrency(c.amount)}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  )}
+                  {!isEmployee && paid.length > 0 && (
+                    <section style={{ marginTop: '1.5rem' }}>
+                      <div className={styles.sectionLabel}>Pagos ({paid.length})</div>
+                      <div className={styles.list}>
+                        {paid.map(c => {
+                          const appt = c.appointmentId;
+                          const label = appt?.serviceId?.name || c.description;
+                          const dateStr = appt?.date ? formatDate(appt.date) : formatDate(c.date);
+                          const clientName = appt?.clientId?.name;
+                          return (
+                            <div key={c._id} className={`${styles.commRow} ${styles.commRowPaid}`}>
+                              <div className={styles.commInfo}>
+                                <span className={styles.commDesc}>{label}</span>
+                                {clientName && <span className={styles.commClient}>{clientName}</span>}
+                                <span className={styles.commDate}>{dateStr}{appt?.startTime ? ` · ${appt.startTime}` : ''}</span>
+                              </div>
+                              <div className={styles.commRight}>
+                                <span className={styles.commAmount}>{formatCurrency(c.amount)}</span>
+                                <span className={styles.paidBadge}>Pago</span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+                  )}
+                </div>
               )}
             </div>
-          )}
+
+            {!isEmployee && (
+              <EmployeeVales employeeId={detailEmpId} unitId={unitId} />
+            )}
+          </div>
         </>
       )}
     </div>

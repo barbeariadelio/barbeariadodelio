@@ -25,6 +25,7 @@ interface RemunSummaryItem {
   paidAmount: number;
   pendingAmount: number;
   valesAmount: number;
+  valesDiscountedAmount: number;
 }
 
 interface PopulatedUnit    { _id: mongoose.Types.ObjectId; name?: string }
@@ -238,7 +239,7 @@ export class FinanceService {
     }
 
     type ApptRow = { _id: mongoose.Types.ObjectId; price?: number; employeeId?: mongoose.Types.ObjectId; isBilled?: boolean; billingSkipped?: boolean };
-    type TxRow   = { employeeId?: mongoose.Types.ObjectId; amount: number };
+    type TxRow   = { employeeId?: mongoose.Types.ObjectId; amount: number; isPaid?: boolean };
 
     const allAppts = await AppointmentModel.find(apptQuery)
       .select('_id price date employeeId isBilled billingSkipped')
@@ -269,11 +270,11 @@ export class FinanceService {
       valesQuery['date'] = { ...(start ? { $gte: start } : {}), ...(end ? { $lte: end } : {}) };
     }
 
-    const valesTxs = await TransactionModel.find(valesQuery).select('employeeId amount').lean() as TxRow[];
+    const valesTxs = await TransactionModel.find(valesQuery).select('employeeId amount isPaid').lean() as TxRow[];
 
     // Build map seeded with all employees (guarantees every employee appears)
-    const empMap = new Map<string, { name: string; avatar?: string; total: number; paid: number; vales: number }>(
-      employees.map(e => [e._id.toString(), { name: e.name, avatar: e.avatar, total: 0, paid: 0, vales: 0 }]),
+    const empMap = new Map<string, { name: string; avatar?: string; total: number; paid: number; vales: number; valesDiscounted: number }>(
+      employees.map(e => [e._id.toString(), { name: e.name, avatar: e.avatar, total: 0, paid: 0, vales: 0, valesDiscounted: 0 }]),
     );
 
     // Total = appointments × commission rate (matches Finance exactly)
@@ -296,12 +297,14 @@ export class FinanceService {
       if (entry) entry.paid += tx.amount;
     }
 
-    // Vales = sum of voucher expense transactions per employee
+    // Vales: split into pending (not discounted) and discounted (manually marked isPaid=true)
     for (const tx of valesTxs) {
       const empId = tx.employeeId?.toString();
       if (!empId) continue;
       const entry = empMap.get(empId);
-      if (entry) entry.vales += tx.amount;
+      if (!entry) continue;
+      if (tx.isPaid) entry.valesDiscounted += tx.amount;
+      else entry.vales += tx.amount;
     }
 
     return Array.from(empMap.entries()).map(([id, d]) => ({
@@ -310,8 +313,9 @@ export class FinanceService {
       avatar: d.avatar,
       totalAmount: d.total,
       paidAmount: d.paid,
-      pendingAmount: Math.max(0, d.total - d.paid),
+      pendingAmount: Math.max(0, d.total - d.paid - d.valesDiscounted),
       valesAmount: d.vales,
+      valesDiscountedAmount: d.valesDiscounted,
     }));
   }
 

@@ -573,8 +573,20 @@
   &:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
+/* ── Detail two-column layout ── */
+.detailColumns {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 2rem;
+  align-items: start;
+
+  @media (max-width: 900px) {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── Commission list (detail) ── */
-.lists { display: flex; flex-direction: column; max-width: 760px; }
+.lists { display: flex; flex-direction: column; }
 
 .sectionLabel {
   font-size: 0.72rem;

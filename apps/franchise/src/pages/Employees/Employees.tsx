@@ -4,7 +4,6 @@ import { useSearchParams } from 'react-router-dom';
 import { api, apiBaseUrl, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import EmployeeForm from './EmployeeForm';
-import EmployeeVales from './EmployeeVales';
 import { ConfirmModal } from '@barber/ui';
 import styles from './Employees.module.scss';
 
@@ -267,11 +266,6 @@ function EmployeeDetail({ emp, onClose, onEdit, onToggle, onToggleOnline, onDele
               </div>
             )}
           </div>
-
-          <EmployeeVales
-            employeeId={emp._id}
-            unitId={typeof emp.unitId === 'object' ? emp.unitId._id : emp.unitId}
-          />
 
           <EmployeeHistory
             employeeId={emp._id}

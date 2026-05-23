@@ -10,12 +10,18 @@ interface Transaction {
   amount: number;
   description: string;
   date: string;
+  isPaid?: boolean;
 }
 
 interface Props {
   employeeId: string;
   unitId?: string;
   onClose?: () => void;
+}
+
+interface ConfirmState {
+  type: 'discount' | 'delete';
+  vale: Transaction;
 }
 
 function formatCurrency(v: number) {
@@ -38,6 +44,7 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
   const [description, setDescription] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [showAdd, setShowAdd] = useState(false);
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const qc = useQueryClient();
 
   const { data: vales = [], isLoading } = useQuery<Transaction[]>({
@@ -64,13 +71,23 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['employee-vales', employeeId] });
       qc.invalidateQueries({ queryKey: ['finance-summary'] });
+      setConfirm(null);
+    },
+  });
+
+  const discountVale = useMutation({
+    mutationFn: (id: string) => api.patch(`/finance/transactions/${id}`, { isPaid: true }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employee-vales', employeeId] });
+      qc.invalidateQueries({ queryKey: ['remuneration-summary'] });
+      qc.invalidateQueries({ queryKey: ['commissions-summary'] });
+      setConfirm(null);
     },
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || !description) return;
-
     createVale.mutate({
       type: 'expense',
       category: 'voucher',
@@ -82,10 +99,44 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
     });
   };
 
-  const total = vales.reduce((sum, v) => sum + v.amount, 0);
+  function handleConfirm() {
+    if (!confirm) return;
+    if (confirm.type === 'discount') discountVale.mutate(confirm.vale._id);
+    else deleteVale.mutate(confirm.vale._id);
+  }
+
+  const totalPending = vales.filter(v => !v.isPaid).reduce((sum, v) => sum + v.amount, 0);
+  const totalDiscounted = vales.filter(v => v.isPaid).reduce((sum, v) => sum + v.amount, 0);
+  const isPending = discountVale.isPending || deleteVale.isPending;
 
   return (
     <div className={styles.container}>
+      {/* Confirm modal */}
+      {confirm && (
+        <div className={styles.modalOverlay} onClick={() => !isPending && setConfirm(null)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <p className={styles.modalText}>
+              {confirm.type === 'discount'
+                ? <>Descontar <strong>{formatCurrency(confirm.vale.amount)}</strong> da comissão do funcionário?</>
+                : <>Excluir o vale de <strong>{formatCurrency(confirm.vale.amount)}</strong>? Esta ação não pode ser desfeita.</>
+              }
+            </p>
+            <div className={styles.modalActions}>
+              <button className={styles.modalCancel} onClick={() => setConfirm(null)} disabled={isPending}>
+                Cancelar
+              </button>
+              <button
+                className={confirm.type === 'discount' ? styles.modalConfirmGreen : styles.modalConfirmRed}
+                onClick={handleConfirm}
+                disabled={isPending}
+              >
+                {isPending ? 'Aguarde...' : confirm.type === 'discount' ? 'Descontar' : 'Excluir'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={styles.header}>
         <h3 className={styles.title}>Vales / Adiantamentos</h3>
         <button className={styles.addBtn} onClick={() => setShowAdd(!showAdd)}>
@@ -98,14 +149,14 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
           <div className={styles.row}>
             <div className={styles.field}>
               <label>Valor (R$)</label>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 inputMode="decimal"
-                placeholder="0,00" 
-                value={amount} 
+                placeholder="0,00"
+                value={amount}
                 onChange={e => setAmount(e.target.value.replace(/[^0-9,]/g, ''))}
                 onBlur={() => { const n = parseBR(amount); if (n > 0) setAmount(formatBR(n)); }}
-                required 
+                required
               />
             </div>
             <div className={styles.field}>
@@ -115,12 +166,12 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
           </div>
           <div className={styles.field}>
             <label>Descrição / Motivo</label>
-            <input 
-              type="text" 
-              placeholder="Ex: Adiantamento de salário" 
-              value={description} 
+            <input
+              type="text"
+              placeholder="Ex: Adiantamento de salário"
+              value={description}
               onChange={e => setDescription(e.target.value)}
-              required 
+              required
             />
           </div>
           <button className={styles.submitBtn} disabled={createVale.isPending}>
@@ -130,28 +181,50 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
       )}
 
       <div className={styles.summary}>
-        <span>Total em vales:</span>
-        <span className={styles.totalValue}>{formatCurrency(total)}</span>
+        <div className={styles.summaryRow}>
+          <span>Pendente:</span>
+          <span className={styles.totalValue}>{formatCurrency(totalPending)}</span>
+        </div>
+        {totalDiscounted > 0 && (
+          <div className={styles.summaryRow}>
+            <span>Descontado da comissão:</span>
+            <span className={styles.discountedValue}>{formatCurrency(totalDiscounted)}</span>
+          </div>
+        )}
       </div>
 
       <div className={styles.list}>
         {isLoading && <p className={styles.empty}>Carregando vales...</p>}
         {!isLoading && vales.length === 0 && <p className={styles.empty}>Nenhum vale registrado para este funcionário.</p>}
         {vales.map(v => (
-          <div key={v._id} className={styles.valeRow}>
+          <div key={v._id} className={`${styles.valeRow} ${v.isPaid ? styles.valeRowDiscounted : ''}`}>
             <div className={styles.valeInfo}>
-              <span className={styles.valeDesc}>{v.description.replace('Vale: ', '')}</span>
+              <div className={styles.valeDescRow}>
+                <span className={styles.valeDesc}>{v.description.replace('Vale: ', '')}</span>
+                {v.isPaid && <span className={styles.discountedBadge}>Descontado</span>}
+              </div>
               <span className={styles.valeDate}>{formatDate(v.date)}</span>
             </div>
             <div className={styles.valeRight}>
-              <span className={styles.valeAmount}>{formatCurrency(v.amount)}</span>
-              <button 
-                className={styles.deleteBtn} 
-                onClick={() => confirm('Excluir este vale?') && deleteVale.mutate(v._id)}
-                title="Excluir vale"
-              >
-                ✕
-              </button>
+              <span className={`${styles.valeAmount} ${v.isPaid ? styles.valeAmountDiscounted : ''}`}>{formatCurrency(v.amount)}</span>
+              {!v.isPaid && (
+                <button
+                  className={styles.discountBtn}
+                  onClick={() => setConfirm({ type: 'discount', vale: v })}
+                  title="Descontar da comissão"
+                >
+                  − Descontar
+                </button>
+              )}
+              {!v.isPaid && (
+                <button
+                  className={styles.deleteBtn}
+                  onClick={() => setConfirm({ type: 'delete', vale: v })}
+                  title="Excluir vale"
+                >
+                  ✕
+                </button>
+              )}
             </div>
           </div>
         ))}
