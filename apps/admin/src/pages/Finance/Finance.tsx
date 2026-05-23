@@ -776,7 +776,7 @@ export default function Finance() {
                             )}
                             <span className={`${styles.commissionCell} ${styles.blue}`}>{formatCurrency(emp.grossRevenue * (rate / 100))}</span>
                             <span className={`${styles.commissionCell} ${styles.red}`}>{formatCurrency(emp.totalVouchers || 0)}</span>
-                            <span className={`${styles.commissionCell} ${styles.green}`} style={{ fontWeight: 800 }}>{formatCurrency((emp.grossRevenue * (rate / 100)) - (emp.totalVouchers || 0))}</span>
+                            <span className={`${styles.commissionCell} ${styles.green}`} style={{ fontWeight: 800 }}>{formatCurrency(Math.max(0, (emp.grossRevenue * (rate / 100)) - (emp.totalVouchers || 0) - (isStaff ? (remunerationSummary?.find(r => r.employeeId === emp.id)?.paidAmount ?? 0) : 0)))}</span>
                             {isStaff && <span className={styles.commissionCell} style={{ color: '#6B7280', fontWeight: 600 }}>{formatCurrency(remunerationSummary?.find(r => r.employeeId === emp.id)?.paidAmount ?? 0)}</span>}
                             {!isStaff && <span className={styles.commissionCell}>{formatCurrency(emp.grossRevenue - (emp.grossRevenue * (rate / 100)))}</span>}
                           </div>
