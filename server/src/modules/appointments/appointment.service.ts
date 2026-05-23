@@ -144,9 +144,10 @@ export class AppointmentService {
     }
     const allSlots = [...new Set(rawSlots)].sort();
 
-    const today = new Date();
-    const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    const nowMins = today.getHours() * 60 + today.getMinutes();
+    // Use Brazil timezone so past-slot filtering isn't skewed by UTC offset
+    const nowBR = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const todayISO = `${nowBR.getFullYear()}-${String(nowBR.getMonth() + 1).padStart(2, '0')}-${String(nowBR.getDate()).padStart(2, '0')}`;
+    const nowMins = nowBR.getHours() * 60 + nowBR.getMinutes();
 
     const result = allSlots.filter(slot => {
       const [sh, sm] = slot.split(':').map(Number);
