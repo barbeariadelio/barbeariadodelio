@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose, { FilterQuery } from 'mongoose';
 import { TransactionModel, ITransaction } from './transaction.model';
 import { UnitModel } from '../units/unit.model';
 import { AppointmentModel } from '../appointments/appointment.model';
@@ -8,6 +8,53 @@ import { sharedCache } from '../../shared/utils/cache';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import { toDate } from 'date-fns-tz';
 import { escapeRegex } from '../../shared/utils/regex';
+
+interface EmployeeLean {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+  avatar?: string;
+  commissionRate?: number;
+  unitId?: mongoose.Types.ObjectId;
+}
+
+interface RemunSummaryItem {
+  employeeId: string;
+  name: string;
+  avatar?: string;
+  totalAmount: number;
+  paidAmount: number;
+  pendingAmount: number;
+}
+
+interface PopulatedUnit    { _id: mongoose.Types.ObjectId; name?: string }
+interface PopulatedEmp     { _id: mongoose.Types.ObjectId; name?: string; commissionRate?: number }
+interface PopulatedService { _id: mongoose.Types.ObjectId; name?: string; price?: number }
+
+interface TxLean {
+  unitId: PopulatedUnit;
+  employeeId?: PopulatedEmp;
+  type: string;
+  category: TransactionCategory;
+  amount: number;
+  description?: string;
+  date: string;
+  paymentMethod?: string;
+}
+
+interface ApptLean {
+  unitId: PopulatedUnit;
+  employeeId?: PopulatedEmp;
+  serviceId?: PopulatedService;
+  price?: number;
+  status: string;
+  isBilled?: boolean;
+  billingSkipped?: boolean;
+}
+
+interface UnitLean {
+  _id: mongoose.Types.ObjectId;
+  name: string;
+}
 
 export class FinanceService {
   async getSummary(
@@ -47,17 +94,19 @@ export class FinanceService {
       }).select('_id name unitId commissionRate').lean(),
     ]);
 
-    const summary = this.buildSummary(transactions, appointments, unitsInfo, allEmployees as unknown as IUser[]);
+    const summary = this.buildSummary(transactions as unknown as TxLean[], appointments as unknown as ApptLean[], unitsInfo as UnitLean[], allEmployees as unknown as IUser[]);
     sharedCache.set(cacheKey, summary, 45);
     return summary;
   }
 
   async getTransactions(userId: string, role: string, unitId: string, page: number, limit: number, filters?: { employeeId?: string; category?: string }, appScope?: string, jwtUnitId?: string): Promise<{ data: ITransaction[]; total: number }> {
     const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
-    
-    const query: any = { unitId: { $in: unitIds } };
-    if (filters?.employeeId) query.employeeId = filters.employeeId;
-    if (filters?.category) query.category = filters.category;
+
+    const query: FilterQuery<ITransaction> = {
+      unitId: { $in: unitIds },
+      ...(filters?.employeeId ? { employeeId: new mongoose.Types.ObjectId(filters.employeeId) } : {}),
+      ...(filters?.category ? { category: filters.category as TransactionCategory } : {}),
+    };
 
     const [data, total] = await Promise.all([
       TransactionModel.find(query)
@@ -80,7 +129,7 @@ export class FinanceService {
     jwtUnitId?: string,
     start?: string,
     end?: string,
-  ): Promise<any[]> {
+  ): Promise<unknown[]> {
     const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
     const empOid = new mongoose.Types.ObjectId(employeeId);
 
@@ -94,7 +143,6 @@ export class FinanceService {
         AppointmentModel.find({
           unitId: { $in: unitIds },
           employeeId: empOid,
-          status: 'completed',
           isBilled: true,
           billingSkipped: { $ne: true },
         }).populate('serviceId', 'name').select('_id price date unitId serviceId').lean(),
@@ -116,7 +164,7 @@ export class FinanceService {
             type: 'commission',
             category: 'commission',
             amount: Math.round((appt.price ?? 0) * commissionRate / 100 * 100) / 100,
-            description: `Comissão: ${(appt as any).serviceId?.name || 'Serviço'} (${commissionRate}%)`,
+            description: `Comissão: ${(appt.serviceId as PopulatedService | undefined)?.name || 'Serviço'} (${commissionRate}%)`,
             date: appt.date,
             createdBy: empOid,
             isPaid: false,
@@ -126,23 +174,18 @@ export class FinanceService {
       }
     }
 
-    const query: any = {
+    const dateFilter = start || end
+      ? { date: { ...(start ? { $gte: start } : {}), ...(end ? { $lte: end } : {}) } }
+      : {};
+
+    const query: FilterQuery<ITransaction> = {
       unitId: { $in: unitIds },
       type: 'commission',
       category: 'commission',
       employeeId: empOid,
+      ...dateFilter,
+      ...(role === 'employee' ? { isPaid: { $ne: true } } : {}),
     };
-
-    if (start || end) {
-      query.date = {};
-      if (start) query.date.$gte = start;
-      if (end) query.date.$lte = end;
-    }
-
-    // Employees can only see unpaid commissions
-    if (role === 'employee') {
-      query.isPaid = { $ne: true };
-    }
 
     const commissions = await TransactionModel.find(query)
       .sort({ date: -1 })
@@ -167,59 +210,76 @@ export class FinanceService {
     jwtUnitId?: string,
     start?: string,
     end?: string,
-  ): Promise<any[]> {
+  ): Promise<RemunSummaryItem[]> {
     const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
 
-    const query: any = {
+    // Get employees (same filter as Finance)
+    const employees = await (
+      role !== 'employee'
+        ? UserModel.find({ unitId: { $in: unitIds }, role: 'employee', isActive: true })
+            .select('_id name avatar commissionRate').lean()
+        : UserModel.findById(userId).select('_id name avatar commissionRate').lean().then(u => u ? [u] : [])
+    ) as EmployeeLean[];
+
+    const commRateMap = new Map<string, number>(
+      employees.map(e => [e._id.toString(), e.commissionRate ?? 0]),
+    );
+
+    // Step 1: compute total commission directly from appointments (same logic as Finance).
+    // Do NOT filter by unitId here — appointments may be stored under a different unit than
+    // the employee's current User.unitId (e.g. after unit migrations). Finance queries
+    // across all units; we match that behaviour by scoping only on employeeId.
+    const apptQuery: Record<string, unknown> = {
+      employeeId: { $in: employees.map(e => e._id) },
+    };
+    if (start || end) {
+      apptQuery['date'] = { ...(start ? { $gte: start } : {}), ...(end ? { $lte: end } : {}) };
+    }
+
+    type ApptRow = { _id: mongoose.Types.ObjectId; price?: number; employeeId?: mongoose.Types.ObjectId; isBilled?: boolean; billingSkipped?: boolean };
+    type TxRow   = { employeeId?: mongoose.Types.ObjectId; amount: number };
+
+    const allAppts = await AppointmentModel.find(apptQuery)
+      .select('_id price date employeeId isBilled billingSkipped')
+      .lean() as ApptRow[];
+
+    // Step 2: get paid amounts from commission transactions (tracks actual payments)
+    const txQuery: Record<string, unknown> = {
       unitId: { $in: unitIds },
       type: 'commission',
       category: 'commission',
+      isPaid: true,
     };
-
+    if (role === 'employee') txQuery['employeeId'] = new mongoose.Types.ObjectId(userId);
     if (start || end) {
-      query.date = {};
-      if (start) query.date.$gte = start;
-      if (end) query.date.$lte = end;
+      txQuery['date'] = { ...(start ? { $gte: start } : {}), ...(end ? { $lte: end } : {}) };
     }
 
-    if (role === 'employee') {
-      query.employeeId = new mongoose.Types.ObjectId(userId);
-    }
+    const paidTxs = await TransactionModel.find(txQuery).select('employeeId amount').lean() as TxRow[];
 
-    const [commissions, employees] = await Promise.all([
-      TransactionModel.find(query)
-        .populate('employeeId', 'name avatar')
-        .lean(),
-      role !== 'employee'
-        ? UserModel.find({ unitId: { $in: unitIds }, role: 'employee', isActive: true })
-            .select('_id name avatar')
-            .lean()
-        : UserModel.findById(userId).select('_id name avatar').lean().then(u => u ? [u] : []),
-    ]);
+    // Build map seeded with all employees (guarantees every employee appears)
+    const empMap = new Map<string, { name: string; avatar?: string; total: number; paid: number }>(
+      employees.map(e => [e._id.toString(), { name: e.name, avatar: e.avatar, total: 0, paid: 0 }]),
+    );
 
-    const empMap = new Map<string, { name: string; avatar?: string; total: number; paid: number; pending: number }>();
-
-    for (const emp of employees as any[]) {
-      const id = emp._id.toString();
-      empMap.set(id, { name: emp.name, avatar: emp.avatar, total: 0, paid: 0, pending: 0 });
-    }
-
-    for (const c of commissions as any[]) {
-      const empId = c.employeeId?._id?.toString() || c.employeeId?.toString();
+    // Total = appointments × commission rate (matches Finance exactly)
+    for (const appt of allAppts) {
+      if (!appt.isBilled || appt.billingSkipped) continue;
+      const empId = appt.employeeId?.toString();
       if (!empId) continue;
+      const rate = commRateMap.get(empId) ?? 0;
+      if (rate <= 0) continue;
+      const amount = Math.round((appt.price ?? 0) * rate / 100 * 100) / 100;
+      const entry = empMap.get(empId);
+      if (entry) entry.total += amount;
+    }
 
-      if (!empMap.has(empId)) {
-        empMap.set(empId, {
-          name: c.employeeId?.name || 'Funcionário',
-          avatar: c.employeeId?.avatar,
-          total: 0, paid: 0, pending: 0,
-        });
-      }
-
-      const entry = empMap.get(empId)!;
-      entry.total += c.amount;
-      if (c.isPaid) entry.paid += c.amount;
-      else entry.pending += c.amount;
+    // Paid = sum of paid commission transactions
+    for (const tx of paidTxs) {
+      const empId = tx.employeeId?.toString();
+      if (!empId) continue;
+      const entry = empMap.get(empId);
+      if (entry) entry.paid += tx.amount;
     }
 
     return Array.from(empMap.entries()).map(([id, d]) => ({
@@ -228,7 +288,7 @@ export class FinanceService {
       avatar: d.avatar,
       totalAmount: d.total,
       paidAmount: d.paid,
-      pendingAmount: d.pending,
+      pendingAmount: Math.max(0, d.total - d.paid),
     }));
   }
 
@@ -360,7 +420,7 @@ export class FinanceService {
     return allowedIds;
   }
 
-  private async getAllowedUnitIds(userId: string, role: string, appScope?: string): Promise<string[]> {
+  private async getAllowedUnitIds(userId: string, role: string, _appScope?: string): Promise<string[]> {
     if (role === 'owner') {
       // Note: owner case is fully handled in resolveUnitIds above.
       return [];
@@ -430,7 +490,7 @@ export class FinanceService {
     return { startDate: fmt(start), endDate: fmt(end) };
   }
 
-  private buildSummary(transactions: any[], appointments: any[], unitsInfo: any[] = [], allEmployees: IUser[] = []): FinanceSummary {
+  private buildSummary(transactions: TxLean[], appointments: ApptLean[], unitsInfo: UnitLean[] = [], allEmployees: IUser[] = []): FinanceSummary {
     let totalIncome = 0;
     let totalExpense = 0;
     let realizedIncome = 0;   // completed only
@@ -512,16 +572,16 @@ export class FinanceService {
 
       // Track vouchers per employee
       if (t.category === 'voucher' && t.employeeId) {
-        const empId = (t.employeeId as any)._id?.toString() || t.employeeId.toString();
+        const empId = t.employeeId._id.toString();
         if (!byEmployeeMap.has(empId)) {
-          byEmployeeMap.set(empId, { 
-            id: empId, 
-            name: (t.employeeId as any).name || 'Funcionário', 
-            unitId: t.unitId?._id?.toString() || t.unitId?.toString() || '',
-            unitName: t.unitId?.name || '',
-            appointments: 0, 
+          byEmployeeMap.set(empId, {
+            id: empId,
+            name: t.employeeId.name || 'Funcionário',
+            unitId: t.unitId._id.toString(),
+            unitName: t.unitId.name || '',
+            appointments: 0,
             grossRevenue: 0,
-            totalVouchers: 0 
+            totalVouchers: 0,
           });
         }
         byEmployeeMap.get(empId)!.totalVouchers += t.amount;
@@ -536,7 +596,7 @@ export class FinanceService {
       const svcName = appt.serviceId?.name || 'Outro';
       const unitId = appt.unitId?._id?.toString() || appt.unitId?.toString() || '';
       const unitName = appt.unitId?.name || '';
-      const status = (appt as any).status;
+      const status = appt.status;
 
       // Separate realized (completed) from projected (confirmed)
       if (status === 'completed') {
@@ -578,7 +638,7 @@ export class FinanceService {
 
       // Only count billed appointments for commission/attendance metrics.
       // Exclude billingSkipped (package sessions marked done without a financial transaction).
-      if ((appt as any).isBilled && !(appt as any).billingSkipped) {
+      if (appt.isBilled && !appt.billingSkipped) {
         empEntry.appointments += 1;
         empEntry.grossRevenue += price;
       }
@@ -598,7 +658,7 @@ export class FinanceService {
     }
 
     // 3. Ensure all active employees appear (zero-value rows for new employees with no appointments)
-    const unitNameMap = new Map(unitsInfo.map(u => [u._id.toString(), (u as any).name as string]));
+    const unitNameMap = new Map(unitsInfo.map(u => [u._id.toString(), u.name]));
     for (const emp of allEmployees) {
       const empId = emp._id.toString();
       if (!byEmployeeMap.has(empId)) {
