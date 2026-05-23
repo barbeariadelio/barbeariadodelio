@@ -1,6 +1,7 @@
 import { UserModel, IUser } from '../auth/auth.model';
 import { NotFoundError } from '../../shared/errors/AppError';
 import { sharedCache } from '../../shared/utils/cache';
+import { invalidateEmployeeSlotCache } from '../../shared/cache/slotCache';
 import bcrypt from 'bcryptjs';
 
 export class EmployeeService {
@@ -178,6 +179,7 @@ export class EmployeeService {
     sharedCache.delete(`users:list:employees:${uid}`);
     sharedCache.delete(`users:schedule:${uid}`);
     sharedCache.delete(`users:public:${uid}`);
+    invalidateEmployeeSlotCache(id);
     return emp;
   }
 

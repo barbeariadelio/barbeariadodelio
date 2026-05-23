@@ -29,6 +29,12 @@ export function invalidateSlotCache(unitId: string, employeeId: string, date: st
   }
 }
 
+export function invalidateEmployeeSlotCache(employeeId: string): void {
+  for (const key of cache.keys()) {
+    if (key.includes(`:${employeeId}:`)) cache.delete(key);
+  }
+}
+
 export function invalidateAllSlotCaches(): void {
   cache.clear();
 }
