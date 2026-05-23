@@ -36,7 +36,7 @@ const NAV_ITEMS = [
   { path: '/sales',       label: 'Vendas',         icon: <IconShoppingCart />, roles: ['owner', 'cashier'] },
   { path: '/clients',     label: 'Clientes',        icon: <IconUsers />, roles: ['owner', 'cashier'] },
   { path: '/employees',   label: 'Funcionários',    icon: <IconScissors />, roles: ['owner'] },
-  { path: '/commissions',  label: 'Comissões',       icon: <IconPercent />, roles: ['owner', 'employee'] },
+  { path: '/commissions',  label: 'Comissões',       icon: <IconPercent />, roles: ['owner'] },
   { path: '/services',    label: 'Serviços',        icon: <IconStar />, roles: ['owner'] },
   { path: '/finance',      label: 'Financeiro',      icon: <IconDollarSign />, roles: ['owner', 'employee'] },
   { path: '/permissions',  label: 'Permissões',      icon: <IconShield />, roles: ['owner'] },
