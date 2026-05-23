@@ -24,8 +24,9 @@ class NotificationService {
     return notification;
   }
 
-  async list(unitId: string, limit = 20) {
-    return NotificationModel.find({ unitId })
+  async list(unitId: string, options: { role?: string; userId?: string; limit?: number } = {}) {
+    const { role, userId, limit = 20 } = options;
+    const docs = await NotificationModel.find({ unitId })
       .populate({
         path: 'appointmentId',
         populate: [
@@ -35,7 +36,20 @@ class NotificationService {
         ],
       })
       .sort({ createdAt: -1 })
-      .limit(limit);
+      .limit(role === 'employee' ? 200 : limit);
+
+    if (role === 'employee' && userId) {
+      return docs
+        .filter(n => {
+          const appt = n.appointmentId as any;
+          if (!appt) return false;
+          const empId = appt.employeeId?._id?.toString() ?? appt.employeeId?.toString();
+          return empId === userId;
+        })
+        .slice(0, limit);
+    }
+
+    return docs;
   }
 
   async markAsRead(id: string, userId: string) {

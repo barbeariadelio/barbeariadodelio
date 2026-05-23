@@ -7,7 +7,7 @@ export async function listNotifications(req: AuthRequest, res: Response, next: N
   try {
     const unitId = req.user?.unitId;
     if (!unitId) return ok(res, []);
-    const notifications = await service.list(unitId);
+    const notifications = await service.list(unitId, { role: req.user?.role, userId: req.user?.id });
     ok(res, notifications);
   } catch (e) { next(e); }
 }
