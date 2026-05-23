@@ -33,6 +33,14 @@ interface Service {
   packageItems?: { serviceId: string; quantity: number }[];
 }
 
+interface Product {
+  _id: string;
+  name: string;
+  price: number;
+  stockQuantity: number;
+  isActive?: boolean;
+}
+
 interface Props {
   onClose: () => void;
   onSuccess: () => void;
@@ -114,6 +122,11 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
   const [selectedPackageId, setSelectedPackageId] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  // Products (cart) for appointment
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [productQty, setProductQty] = useState(1);
+  const [cart, setCart] = useState<Array<{ productId: string; name: string; quantity: number; unitPrice: number }>>([]);
+
   // Repeat
   const [repeatEnabled, setRepeatEnabled] = useState(false);
   const [repeatInterval, setRepeatInterval] = useState(7);
@@ -145,6 +158,15 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       setStartTime(appointment.startTime);
       setNotes(appointment.notes || '');
       setUsePackage(!!appointment.isPackage);
+      // Prefill products cart when editing
+      if (appointment.products && Array.isArray(appointment.products)) {
+        setCart(appointment.products.map((p: any) => ({
+          productId: p.productId?._id ? String(p.productId._id) : String(p.productId),
+          name: p.name || p.product?.name || '',
+          quantity: p.quantity || 1,
+          unitPrice: p.unitPrice ?? (p.product?.price || 0),
+        })));
+      }
     }
   }, [appointment]);
 
@@ -225,6 +247,12 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     enabled: !!unitId,
   });
 
+  const { data: products = [] } = useQuery<Product[]>({
+    queryKey: ['products', unitId],
+    queryFn: () => unitApi.get(`/products${unitId ? `?unitId=${unitId}` : ''}`).then(r => Array.isArray(r.data) ? r.data : r.data?.products ?? []),
+    enabled: !!unitId,
+  });
+
   const selectedEmployee = employees.find(e => e._id === employeeId);
   const visibleServices = selectedEmployee?.serviceIds?.length
     ? services.filter(s => s.type === 'package' || selectedEmployee.serviceIds!.includes(s._id))
@@ -249,6 +277,21 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     setClientSearch('');
     setUsePackage(false);
     setSelectedPackageId('');
+  }
+
+  function addToCart(product: Product, qty = 1) {
+    setCart(prev => {
+      const existing = prev.find(i => i.productId === product._id);
+      if (existing) {
+        const newQty = Math.min(product.stockQuantity, existing.quantity + qty);
+        return prev.map(i => i.productId === product._id ? { ...i, quantity: newQty } : i);
+      }
+      return [...prev, { productId: product._id, name: product.name, quantity: Math.max(1, qty), unitPrice: product.price }];
+    });
+  }
+
+  function changeQty(productId: string, delta: number) {
+    setCart(prev => prev.map(i => i.productId === productId ? { ...i, quantity: i.quantity + delta } : i).filter(i => i.quantity > 0));
   }
 
   const handleQuickRegister = useCallback(async () => {
@@ -300,6 +343,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       date: apptDate, startTime, notes,
       price: finalIsPackage ? 0 : (service?.price ?? 0),
       isPackage: finalIsPackage,
+      products: cart && cart.length > 0 ? cart.map(i => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice })) : undefined,
       ...(seriesId ? { seriesId } : {}),
     });
 
@@ -582,6 +626,64 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
 
             return null;
           })()}
+
+          {/* Produtos — seguir padrão do app admin */}
+          {unitId && (
+            <div className={styles.field} style={{ opacity: unitId ? 1 : 0.5, pointerEvents: unitId ? 'auto' : 'none' }}>
+              <label className={styles.label}>Produtos (opcional)</label>
+              {products && products.length > 0 && (
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: cart.length > 0 ? '0.5rem' : 0 }}>
+                  <select
+                    className={styles.select}
+                    value={selectedProductId}
+                    onChange={e => setSelectedProductId(e.target.value)}
+                    style={{ flex: 1 }}
+                  >
+                    <option value="">Selecionar produto</option>
+                    {products.filter((p: any) => p.isActive !== false && p.stockQuantity > 0).map((p: any) => (
+                      <option key={p._id} value={p._id}>{p.name} — R$ {p.price.toFixed(2).replace('.', ',')} (estoque: {p.stockQuantity})</option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min={1}
+                    value={productQty}
+                    onChange={e => setProductQty(Math.max(1, Number(e.target.value) || 1))}
+                    className={styles.input}
+                    style={{ width: '64px' }}
+                  />
+                  <button
+                    type="button"
+                    className={styles.submitBtn}
+                    style={{ padding: '0 0.75rem', whiteSpace: 'nowrap' }}
+                    disabled={!selectedProductId}
+                    onClick={() => {
+                      const prod = (products || []).find((p: any) => p._id === selectedProductId);
+                      if (!prod) return;
+                      addToCart(prod, productQty);
+                      setSelectedProductId('');
+                      setProductQty(1);
+                    }}
+                  >
+                    Adicionar
+                  </button>
+                </div>
+              )}
+
+              {cart.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  {cart.map(c => (
+                    <div key={c.productId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '0.45rem 0.65rem', fontSize: '0.875rem' }}>
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{c.name}</span>
+                      <span style={{ color: 'var(--text-secondary)' }}>x{c.quantity} · R$ {(c.quantity * c.unitPrice).toFixed(2).replace('.', ',')}</span>
+                      <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: '0 0.25rem' }} onClick={() => setCart(prev => prev.filter(x => x.productId !== c.productId))}>✕</button>
+                    </div>
+                  ))}
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', textAlign: 'right', paddingRight: '0.25rem' }}>Sem comissão para o barbeiro</div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className={styles.row}>
             <div className={styles.field}>
