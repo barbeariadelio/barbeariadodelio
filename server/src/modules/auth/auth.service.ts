@@ -25,9 +25,9 @@ export class AuthService {
         : ['admin'];
 
       // allowedApps may contain app names ('franchise', 'admin') or unitIds (legacy bug).
-      // Accept unitId match for franchise access so existing employees aren't locked out.
+      // Accept unitId match for both apps so existing employees aren't locked out.
       const hasAccess = allowed.includes(appId) ||
-        (appId === 'franchise' && user.unitId && allowed.includes(user.unitId.toString()));
+        (user.unitId && allowed.includes(user.unitId.toString()));
 
       if (!hasAccess) {
         const systemName = appId === 'admin' ? 'Administrativo' : 'Franquia';

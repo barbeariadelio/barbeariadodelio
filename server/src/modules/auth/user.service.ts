@@ -65,9 +65,7 @@ export class UserService {
     const user = await UserModel.findByIdAndUpdate(id, update, { new: true, runValidators: true }).select('-passwordHash');
     if (!user) throw new NotFoundError('User');
 
-    sharedCache.delete(`users:list:${user.unitId || 'all'}`);
-    sharedCache.delete('users:list:all');
-    sharedCache.keys().filter(k => k.startsWith('users:list:owner:')).forEach(k => sharedCache.delete(k));
+    sharedCache.keys().filter(k => k.startsWith('users:list:')).forEach(k => sharedCache.delete(k));
 
     return user;
   }
@@ -76,8 +74,6 @@ export class UserService {
     const user = await UserModel.findByIdAndDelete(id);
     if (!user) throw new NotFoundError('User');
 
-    sharedCache.delete(`users:list:${user.unitId || 'all'}`);
-    sharedCache.delete('users:list:all');
-    sharedCache.keys().filter(k => k.startsWith('users:list:owner:')).forEach(k => sharedCache.delete(k));
+    sharedCache.keys().filter(k => k.startsWith('users:list:')).forEach(k => sharedCache.delete(k));
   }
 }

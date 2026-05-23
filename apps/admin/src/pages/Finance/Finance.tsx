@@ -181,6 +181,33 @@ export default function Finance() {
     staleTime: 30 * 1000,
   });
 
+  const remunerationDateRange = useMemo(() => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    if (period === 'day') { const t = iso(now); return { start: t, end: t }; }
+    if (period === 'week') {
+      const day = now.getDay();
+      const mon = new Date(now); mon.setDate(now.getDate() - ((day + 6) % 7));
+      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+      return { start: iso(mon), end: iso(sun) };
+    }
+    if (period === 'year') return { start: `${now.getFullYear()}-01-01`, end: `${now.getFullYear()}-12-31` };
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    const last  = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { start: iso(first), end: iso(last) };
+  }, [period]);
+
+  const { data: remunerationSummary } = useQuery<{ employeeId: string; paidAmount: number; pendingAmount: number }[]>({
+    queryKey: ['remuneration-summary', unitId, remunerationDateRange],
+    queryFn: async () => {
+      const { data } = await api.get('/finance/remunerations/summary', { params: { unitId, ...remunerationDateRange } });
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: isStaff,
+    staleTime: 60 * 1000,
+  });
+
   // Derived from all transactions (not period-filtered) — stays consistent with Lançamentos tab
   const paymentPieData = useMemo(() => {
     const map = new Map<string, { method: string; amount: number; count: number }>();
@@ -706,7 +733,7 @@ export default function Finance() {
                     <div className={styles.commissionTable}>
                       <div
                         className={styles.commissionHeader}
-                        style={isStaff ? { gridTemplateColumns: '2.5fr 80px 1.2fr 1fr 1.2fr', minWidth: 0 } : undefined}
+                        style={isStaff ? { gridTemplateColumns: '2.5fr 80px 1.2fr 1fr 1.2fr 1.2fr' } : undefined}
                       >
                         <span>Profissional</span>
                         <span>Atend.</span>
@@ -715,6 +742,7 @@ export default function Finance() {
                         <span>Comissão</span>
                         <span>Vales</span>
                         <span>A Pagar</span>
+                        {isStaff && <span>Pago</span>}
                         {!isStaff && <span>Parte Loja</span>}
                       </div>
                       {employees.map(emp => {
@@ -725,7 +753,7 @@ export default function Finance() {
                           <div
                             key={emp.id}
                             className={styles.commissionRow}
-                            style={isStaff ? { gridTemplateColumns: '2.5fr 80px 1.2fr 1fr 1.2fr', minWidth: 0 } : undefined}
+                            style={isStaff ? { gridTemplateColumns: '2.5fr 80px 1.2fr 1fr 1.2fr 1.2fr' } : undefined}
                           >
                             <div className={styles.empName}>
                               <div className={styles.empAvatar}>{emp.name.charAt(0).toUpperCase()}</div>
@@ -749,6 +777,7 @@ export default function Finance() {
                             <span className={`${styles.commissionCell} ${styles.blue}`}>{formatCurrency(emp.grossRevenue * (rate / 100))}</span>
                             <span className={`${styles.commissionCell} ${styles.red}`}>{formatCurrency(emp.totalVouchers || 0)}</span>
                             <span className={`${styles.commissionCell} ${styles.green}`} style={{ fontWeight: 800 }}>{formatCurrency((emp.grossRevenue * (rate / 100)) - (emp.totalVouchers || 0))}</span>
+                            {isStaff && <span className={styles.commissionCell} style={{ color: '#6B7280', fontWeight: 600 }}>{formatCurrency(remunerationSummary?.find(r => r.employeeId === emp.id)?.paidAmount ?? 0)}</span>}
                             {!isStaff && <span className={styles.commissionCell}>{formatCurrency(emp.grossRevenue - (emp.grossRevenue * (rate / 100)))}</span>}
                           </div>
                         );

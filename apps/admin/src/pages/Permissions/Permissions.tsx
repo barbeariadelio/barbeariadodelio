@@ -303,7 +303,7 @@ export default function Permissions() {
                 const isExpanded = expandedRow === u._id;
                 const currentUnitId = typeof u.unitId === 'object' ? u.unitId?._id : u.unitId;
                 const hasChanges = pendingRole !== role ||
-                                 JSON.stringify(u.allowedApps || []) !== JSON.stringify(pendingAllowedApps) ||
+                                 JSON.stringify([...(u.allowedApps || [])].sort()) !== JSON.stringify([...pendingAllowedApps].sort()) ||
                                  (pendingLoginType === 'email' ? pendingEmail !== (u.email || '') : pendingPhone !== (u.phone || '')) ||
                                  (u.email && pendingLoginType === 'phone') || (u.phone && pendingLoginType === 'email') ||
                                  pendingPassword.length > 0 ||

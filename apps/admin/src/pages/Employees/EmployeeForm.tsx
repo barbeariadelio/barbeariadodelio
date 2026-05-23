@@ -153,7 +153,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
       blockedDays: finalBlockedDays.sort(),
       allowOnlineBooking,
       unitId: '69fa463aa078044937f7024e',
-      allowedApps: ['69fa463aa078044937f7024e'],
+      allowedApps: ['admin'],
       serviceIds,
       commissionRate: commissionRate !== '' ? parseFloat(commissionRate) : 0,
     };

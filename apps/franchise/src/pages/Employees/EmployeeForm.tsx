@@ -154,7 +154,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
       blockedDays: finalBlockedDays.sort(),
       allowOnlineBooking,
       unitId: franchiseUnitId,
-      allowedApps: [franchiseUnitId],
+      allowedApps: ['franchise'],
       serviceIds,
       commissionRate: commissionRate !== '' ? parseFloat(commissionRate) : 0,
     };
