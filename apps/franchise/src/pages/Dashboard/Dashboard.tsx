@@ -29,6 +29,7 @@ function getGreeting(name?: string | null) {
 }
 
 interface UnitConfig {
+  name?: string;
   workingDays?: number[];
   workingHours?: { start: string; end: string; lunchStart?: string; lunchEnd?: string };
   slotInterval?: number;
@@ -278,6 +279,7 @@ export default function Dashboard() {
             canEdit={!isStaff}
             canDelete={!isStaff}
             canBill={!isStaff}
+            businessName="Barbearia do Délio"
           />
         </div>
       )}
@@ -314,7 +316,7 @@ export default function Dashboard() {
           onUpdateAppt={async (id, data) => { await updateApptMut.mutateAsync({ id, data }); }}
           isProcessing={statusMut.isPending || blockMut.isPending || updateApptMut.isPending}
           isDeleting={deleteMut.isPending}
-          businessName="Barber Franchise"
+          businessName="Barbearia do Délio"
           onProfileClick={!isStaff ? (clientId) => navigate(`/clients?id=${clientId}`) : undefined}
           onEmployeeClick={!isCashier ? (employeeId) => navigate(`/employees?id=${employeeId}`) : undefined}
           canManageAppointments={!isStaff}

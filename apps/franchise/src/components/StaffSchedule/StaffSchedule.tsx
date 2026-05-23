@@ -185,9 +185,10 @@ interface ModalProps {
   isPending: boolean;
   isDeleting: boolean;
   onUpdateAppt?: (id: string, data: any) => void;
+  readOnly?: boolean;
 }
 
-function ApptModal({ appt, palette, onClose, onStatusChange, onDelete, isPending, isDeleting, onEdit, onUpdateAppt }: ModalProps & { onEdit?: (a: ScheduleAppointment) => void }) {
+function ApptModal({ appt, palette, onClose, onStatusChange, onDelete, isPending, isDeleting, onEdit, onUpdateAppt, readOnly }: ModalProps & { onEdit?: (a: ScheduleAppointment) => void }) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [isBilling, setIsBilling] = useState(false);
@@ -217,10 +218,10 @@ function ApptModal({ appt, palette, onClose, onStatusChange, onDelete, isPending
           <>
         <div className={styles.panelHead}>
           <div className={styles.panelActions}>
-             <button className={styles.actionIcon} title="Enviar WhatsApp" onClick={() => setShowWhatsApp(true)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
-             <button className={styles.actionIcon} title="Editar" onClick={() => onEdit?.(appt)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-             <button className={styles.actionIcon} title="Excluir" onClick={() => setConfirmDelete(true)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
-             <button className={styles.actionIcon} title="Perfil do Cliente" onClick={() => appt.clientId?._id && navigate(`/clients?id=${appt.clientId._id}`)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>
+             {!readOnly && <button className={styles.actionIcon} title="Enviar WhatsApp" onClick={() => setShowWhatsApp(true)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polyline points="22 2 15 22 11 13 2 9 22 2"/></svg></button>}
+             {!readOnly && <button className={styles.actionIcon} title="Editar" onClick={() => onEdit?.(appt)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>}
+             {!readOnly && <button className={styles.actionIcon} title="Excluir" onClick={() => setConfirmDelete(true)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>}
+             {!readOnly && <button className={styles.actionIcon} title="Perfil do Cliente" onClick={() => appt.clientId?._id && navigate(`/clients?id=${appt.clientId._id}`)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></button>}
           </div>
           <button className={styles.closeBtn} onClick={onClose}><XIcon /></button>
         </div>
@@ -284,16 +285,18 @@ function ApptModal({ appt, palette, onClose, onStatusChange, onDelete, isPending
           </div>
         </div>
 
-        <div className={styles.panelBottom}>
-          <button 
-            className={styles.faturarBtn}
-            onClick={() => setIsBilling(true)}
-          >
-            FATURAR
-          </button>
-        </div>
+        {!readOnly && (
+          <div className={styles.panelBottom}>
+            <button
+              className={styles.faturarBtn}
+              onClick={() => setIsBilling(true)}
+            >
+              FATURAR
+            </button>
+          </div>
+        )}
 
-        {appt.status !== 'blocked' && (
+        {!readOnly && appt.status !== 'blocked' && (
           <div className={styles.panelFooter}>
             <span className={styles.footerLabel}>Alterar status</span>
             <div className={styles.footerBtns}>
@@ -483,9 +486,10 @@ interface Props {
   unitId?: string;
   workingDays?: number[];   // 0=Sun … 6=Sat
   workingHours?: { start: string; end: string; lunchStart?: string; lunchEnd?: string };
+  readOnly?: boolean;
 }
 
-export default function StaffSchedule({ appointments, employees, selectedDate, onDateChange, onUpdate, onNewAppt, onBack, onEdit, unitId, workingDays, workingHours }: Props) {
+export default function StaffSchedule({ appointments, employees, selectedDate, onDateChange, onUpdate, onNewAppt, onBack, onEdit, unitId, workingDays, workingHours, readOnly }: Props) {
   // ── Dynamic grid based on unit working hours ──
   const startHour = workingHours?.start ? parseInt(workingHours.start.split(':')[0], 10) : 8;
   const endHour   = workingHours?.end   ? parseInt(workingHours.end.split(':')[0], 10) + (parseInt(workingHours.end.split(':')[1], 10) > 0 ? 1 : 0) : 21;
@@ -604,13 +608,13 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
             <span className={styles.showMobile}>{shortDateLabel}</span>
           </span>
         </div>
-        <button className={styles.newBtn} onClick={onNewAppt}>
+        {!readOnly && <button className={styles.newBtn} onClick={onNewAppt}>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
           </svg>
           <span className={styles.hideMobile}>Novo Agendamento</span>
           <span className={styles.showMobile}>Novo</span>
-        </button>
+        </button>}
       </div>
 
       {/* ── Schedule ── */}
@@ -678,7 +682,7 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
                       style={{ height: SLOT_H, cursor: isUnitClosedDay ? 'default' : 'pointer' }}
                       data-time={`${t} – ${endT}`}
                       onClick={() => {
-                        if (!isUnitClosedDay) {
+                        if (!isUnitClosedDay && !readOnly) {
                           setBlockPrompt({ employeeId: emp._id, employeeName: emp.name.split(' ')[0], time: t });
                         }
                       }}
@@ -809,6 +813,7 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
             setSelectedAppt(null);
             onEdit?.(a);
           }}
+          readOnly={readOnly}
         />
       )}
 

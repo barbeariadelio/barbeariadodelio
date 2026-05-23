@@ -74,6 +74,7 @@ interface Props {
   isDeleting?: boolean;
   onEdit?: (appt: CalendarAppointment) => void;
   onViewProfile?: (clientId: string) => void;
+  businessName?: string;
 }
 
 function IconChevronLeft() {
@@ -111,10 +112,11 @@ interface ModalProps {
   canBill?: boolean;
   onEdit?: (appt: CalendarAppointment) => void;
   onViewProfile?: (clientId: string) => void;
+  businessName?: string;
 }
 
-function WhatsAppModal({ appt, onClose }: { appt: CalendarAppointment, onClose: () => void }) {
-  const defaultMsg = `Olá, ${appt.clientId?.name}! Você tem um horário marcado para ${appt.date.split('-').reverse().join('/')} às ${appt.startTime}.\n\n${appt.serviceId?.name ?? 'Serviço'}\n\nPodemos confirmar o seu horário?\n\nObrigado!`;
+function WhatsAppModal({ appt, onClose, businessName = 'Barbearia' }: { appt: CalendarAppointment, onClose: () => void, businessName?: string }) {
+  const defaultMsg = `Olá, ${appt.clientId?.name}! Você tem um horário marcado para ${appt.date.split('-').reverse().join('/')} às ${appt.startTime}.\n\n${appt.serviceId?.name ?? 'Serviço'}\n\nPodemos confirmar o seu horário?\n\nObrigado,\n${businessName}`;
 
   const [message, setMessage] = useState(defaultMsg);
 
@@ -160,7 +162,7 @@ function WhatsAppModal({ appt, onClose }: { appt: CalendarAppointment, onClose: 
   );
 }
 
-function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, isDeleting, canEdit, canDelete, canBill = true, onEdit, onViewProfile }: ModalProps) {
+function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, isDeleting, canEdit, canDelete, canBill = true, onEdit, onViewProfile, businessName = 'Barbearia' }: ModalProps) {
   const c = appt.isPackage && appt.status !== 'cancelled' ? PACKAGE_COLOR : STATUS_COLORS[appt.status] || STATUS_COLORS.confirmed;
   const otherStatuses = (['confirmed', 'completed', 'cancelled'] as const)
     .filter(s => s !== appt.status)
@@ -399,7 +401,7 @@ function AppointmentModal({ appt, onClose, onStatusChange, onDelete, isPending, 
         </div>
       </div>
       {showWhatsApp && (
-        <WhatsAppModal appt={appt} onClose={() => setShowWhatsApp(false)} />
+        <WhatsAppModal appt={appt} onClose={() => setShowWhatsApp(false)} businessName={businessName} />
       )}
       {confirmDelete && (
         <ConfirmModal
@@ -474,6 +476,7 @@ export default function CalendarView({
   isDeleting = false,
   onEdit,
   onViewProfile,
+  businessName = 'Barbearia',
 }: Props) {
   const [view, setView] = useState<ViewMode>('month');
   const [internalMonth, setInternalMonth] = useState(new Date());
@@ -671,6 +674,7 @@ export default function CalendarView({
             canBill={canBill}
             onEdit={(a) => { setSelectedAppt(null); onEdit?.(a); }}
             onViewProfile={onViewProfile}
+            businessName={businessName}
           />
         )}
       </>
@@ -736,6 +740,7 @@ export default function CalendarView({
           canDelete={canDelete}
           onEdit={(a) => { setSelectedAppt(null); onEdit?.(a); }}
           onViewProfile={onViewProfile}
+          businessName={businessName}
         />
       )}
     </>
