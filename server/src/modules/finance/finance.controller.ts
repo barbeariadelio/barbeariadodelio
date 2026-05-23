@@ -58,6 +58,20 @@ export async function listRemunerations(req: AuthRequest, res: Response, next: N
   } catch (e) { next(e); }
 }
 
+export async function getRemunerationsSummary(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { role } = req.user!;
+    const rawQueryUnitId = Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string);
+    const unitId = rawQueryUnitId || (req.user!.unitId as string) || 'all';
+    const start = req.query.start as string | undefined;
+    const end = req.query.end as string | undefined;
+    const appScope = req.headers['x-app-scope'] as string | undefined;
+    const jwtUnitId = req.user!.unitId;
+    const result = await service.getRemunerationsSummary(req.user!.id, role, unitId, appScope, jwtUnitId, start, end);
+    ok(res, result);
+  } catch (e) { next(e); }
+}
+
 export async function registerPayment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const { role } = req.user!;

@@ -109,6 +109,13 @@ function IconShoppingCart() {
     </svg>
   );
 }
+function IconPercent() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>
+    </svg>
+  );
+}
 function IconCheckSquare() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -170,8 +177,9 @@ const NAV_ITEMS = [
   { path: '/sales',      label: 'Vendas',        icon: <IconShoppingCart />, roles: ['owner', 'cashier'] },
   { path: '/clients',    label: 'Clientes',       icon: <IconUsers />, roles: ['owner', 'cashier'] },
   { path: '/employees',  label: 'Funcionários',   icon: <IconScissors />, roles: ['owner'] },
+  { path: '/commissions', label: 'Comissões',      icon: <IconPercent />, roles: ['owner', 'employee'] },
   { path: '/services',   label: 'Serviços',       icon: <IconStar />, roles: ['owner'] },
-  { path: '/finance',    label: 'Financeiro',     icon: <IconDollarSign />, roles: ['owner', 'employee'] },
+  { path: '/finance',     label: 'Financeiro',     icon: <IconDollarSign />, roles: ['owner', 'employee'] },
   { path: '/permissions', label: 'Permissões',     icon: <IconShield />, roles: ['owner'] },
   { path: '/settings',   label: 'Configurações',  icon: <IconSettings />, roles: ['owner'] },
 ];

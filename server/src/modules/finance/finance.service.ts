@@ -159,6 +159,79 @@ export class FinanceService {
     return commissions;
   }
 
+  async getRemunerationsSummary(
+    userId: string,
+    role: string,
+    unitId: string,
+    appScope?: string,
+    jwtUnitId?: string,
+    start?: string,
+    end?: string,
+  ): Promise<any[]> {
+    const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
+
+    const query: any = {
+      unitId: { $in: unitIds },
+      type: 'commission',
+      category: 'commission',
+    };
+
+    if (start || end) {
+      query.date = {};
+      if (start) query.date.$gte = start;
+      if (end) query.date.$lte = end;
+    }
+
+    if (role === 'employee') {
+      query.employeeId = new mongoose.Types.ObjectId(userId);
+    }
+
+    const [commissions, employees] = await Promise.all([
+      TransactionModel.find(query)
+        .populate('employeeId', 'name avatar')
+        .lean(),
+      role !== 'employee'
+        ? UserModel.find({ unitId: { $in: unitIds }, role: 'employee', isActive: true })
+            .select('_id name avatar')
+            .lean()
+        : UserModel.findById(userId).select('_id name avatar').lean().then(u => u ? [u] : []),
+    ]);
+
+    const empMap = new Map<string, { name: string; avatar?: string; total: number; paid: number; pending: number }>();
+
+    for (const emp of employees as any[]) {
+      const id = emp._id.toString();
+      empMap.set(id, { name: emp.name, avatar: emp.avatar, total: 0, paid: 0, pending: 0 });
+    }
+
+    for (const c of commissions as any[]) {
+      const empId = c.employeeId?._id?.toString() || c.employeeId?.toString();
+      if (!empId) continue;
+
+      if (!empMap.has(empId)) {
+        empMap.set(empId, {
+          name: c.employeeId?.name || 'Funcionário',
+          avatar: c.employeeId?.avatar,
+          total: 0, paid: 0, pending: 0,
+        });
+      }
+
+      const entry = empMap.get(empId)!;
+      entry.total += c.amount;
+      if (c.isPaid) entry.paid += c.amount;
+      else entry.pending += c.amount;
+    }
+
+    return Array.from(empMap.entries()).map(([id, d]) => ({
+      employeeId: id,
+      name: d.name,
+      avatar: d.avatar,
+      totalAmount: d.total,
+      paidAmount: d.paid,
+      pendingAmount: d.pending,
+    }));
+  }
+
   async registerPayment(
     userId: string,
     role: string,

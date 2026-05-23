@@ -13,6 +13,7 @@ const Settings = lazy(() => import('./pages/Settings/Settings'));
 const Inventory = lazy(() => import('./pages/Inventory/Inventory'));
 const Permissions = lazy(() => import('./pages/Permissions/Permissions'));
 const Sales = lazy(() => import('./pages/Sales/Sales'));
+const Commissions = lazy(() => import('./pages/Commissions/Commissions'));
 
 function Loader() {
   return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh', color: '#A3A3A3', fontFamily: 'Inter, sans-serif' }}>Carregando...</div>;
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/clients" element={<Clients />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/sales" element={<Sales />} />
+          <Route path="/commissions" element={<Commissions />} />
           <Route path="/employees" element={<ProtectedRoute roles={['owner']}><Employees /></ProtectedRoute>} />
           <Route path="/services" element={<ProtectedRoute roles={['owner']}><Services /></ProtectedRoute>} />
           <Route path="/permissions" element={<ProtectedRoute roles={['owner']}><Permissions /></ProtectedRoute>} />
