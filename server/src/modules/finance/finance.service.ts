@@ -24,6 +24,7 @@ interface RemunSummaryItem {
   totalAmount: number;
   paidAmount: number;
   pendingAmount: number;
+  valesAmount: number;
 }
 
 interface PopulatedUnit    { _id: mongoose.Types.ObjectId; name?: string }
@@ -257,9 +258,22 @@ export class FinanceService {
 
     const paidTxs = await TransactionModel.find(txQuery).select('employeeId amount').lean() as TxRow[];
 
+    // Step 3: get voucher (vale) amounts per employee
+    const valesQuery: Record<string, unknown> = {
+      unitId: { $in: unitIds },
+      type: 'expense',
+      category: 'voucher',
+      employeeId: { $in: employees.map(e => e._id) },
+    };
+    if (start || end) {
+      valesQuery['date'] = { ...(start ? { $gte: start } : {}), ...(end ? { $lte: end } : {}) };
+    }
+
+    const valesTxs = await TransactionModel.find(valesQuery).select('employeeId amount').lean() as TxRow[];
+
     // Build map seeded with all employees (guarantees every employee appears)
-    const empMap = new Map<string, { name: string; avatar?: string; total: number; paid: number }>(
-      employees.map(e => [e._id.toString(), { name: e.name, avatar: e.avatar, total: 0, paid: 0 }]),
+    const empMap = new Map<string, { name: string; avatar?: string; total: number; paid: number; vales: number }>(
+      employees.map(e => [e._id.toString(), { name: e.name, avatar: e.avatar, total: 0, paid: 0, vales: 0 }]),
     );
 
     // Total = appointments × commission rate (matches Finance exactly)
@@ -282,6 +296,14 @@ export class FinanceService {
       if (entry) entry.paid += tx.amount;
     }
 
+    // Vales = sum of voucher expense transactions per employee
+    for (const tx of valesTxs) {
+      const empId = tx.employeeId?.toString();
+      if (!empId) continue;
+      const entry = empMap.get(empId);
+      if (entry) entry.vales += tx.amount;
+    }
+
     return Array.from(empMap.entries()).map(([id, d]) => ({
       employeeId: id,
       name: d.name,
@@ -289,6 +311,7 @@ export class FinanceService {
       totalAmount: d.total,
       paidAmount: d.paid,
       pendingAmount: Math.max(0, d.total - d.paid),
+      valesAmount: d.vales,
     }));
   }
 
