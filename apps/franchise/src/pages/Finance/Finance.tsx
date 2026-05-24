@@ -185,6 +185,26 @@ export default function Finance() {
     staleTime: 60 * 1000,
   });
 
+  const billedProductSales = useMemo(
+    () => (summary?.byProduct ?? []).reduce((sum, product) => sum + product.amount, 0),
+    [summary?.byProduct],
+  );
+
+  const productItemsTotal = useMemo(
+    () => (summary?.byProduct ?? []).reduce((sum, product) => sum + product.quantity, 0),
+    [summary?.byProduct],
+  );
+
+  const expenseCategoryTotal = useMemo(
+    () => (summary?.byCategory ?? []).reduce((sum, category) => sum + category.amount, 0),
+    [summary?.byCategory],
+  );
+
+  const employeeRevenueTotal = useMemo(
+    () => (summary?.byEmployee ?? []).reduce((sum, employee) => sum + employee.grossRevenue, 0),
+    [summary?.byEmployee],
+  );
+
   const remunerationDateRange = useMemo(() => {
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -226,29 +246,18 @@ export default function Finance() {
   });
 
   const paymentPieData = useMemo(() => {
-    const map = new Map<string, { method: string; amount: number; count: number }>();
-    for (const tx of transactions) {
-      if (tx.type !== 'income') continue;
-      const pm = (tx.paymentMethod as string) || 'other';
-      if (pm === 'package') continue;
-      const prev = map.get(pm) ?? { method: pm, amount: 0, count: 0 };
-      map.set(pm, { method: pm, amount: prev.amount + tx.amount, count: prev.count + 1 });
-    }
-    return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
-  }, [transactions]);
+    return [...(summary?.byPaymentMethod ?? [])].sort((a, b) => b.amount - a.amount);
+  }, [summary?.byPaymentMethod]);
 
-  const productTableData = useMemo(() => {
-    const map = new Map<string, { name: string; amount: number; quantity: number; count: number }>();
-    for (const tx of transactions) {
-      if (tx.type !== 'income' || tx.category !== 'product') continue;
-      const match = tx.description?.match(/^Produto:\s*(.+?)\s*\(x(\d+)\)/);
-      const name = match ? match[1] : (tx.description || 'Produto');
-      const qty  = match ? parseInt(match[2], 10) : 1;
-      const prev = map.get(name) ?? { name, amount: 0, quantity: 0, count: 0 };
-      map.set(name, { name, amount: prev.amount + tx.amount, quantity: prev.quantity + qty, count: prev.count + 1 });
-    }
-    return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
-  }, [transactions]);
+  const paymentTotal = useMemo(
+    () => paymentPieData.reduce((sum, payment) => sum + payment.amount, 0),
+    [paymentPieData],
+  );
+
+  const productTableData = useMemo(
+    () => [...(summary?.byProduct ?? [])].sort((a, b) => b.amount - a.amount),
+    [summary?.byProduct],
+  );
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/finance/transactions/${id}`),
@@ -399,15 +408,8 @@ export default function Finance() {
               </div>
               <div className={styles.summaryDivider} />
               <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Lucro Líquido</span>
-                <span className={`${styles.summaryValue} ${styles.blue}`}>{formatCurrency(summary?.netProfit ?? 0)}</span>
-              </div>
-              <div className={styles.summaryDivider} />
-              <div className={styles.summaryItem}>
-                <span className={styles.summaryLabel}>Margem</span>
-                <span className={`${styles.summaryValue} ${styles.amber}`}>
-                  {summary?.totalIncome ? ((summary.netProfit / summary.totalIncome) * 100).toFixed(1) : '0'}%
-                </span>
+                <span className={styles.summaryLabel}>Venda de Produto Faturado</span>
+                <span className={`${styles.summaryValue} ${styles.blue}`}>{formatCurrency(billedProductSales)}</span>
               </div>
             </div>
           )}
@@ -444,6 +446,12 @@ export default function Finance() {
                     <Area type="monotone" dataKey="expense" name="Despesa" stroke="#f87171" strokeWidth={2} fill="url(#colorExp)" />
                   </AreaChart>
                 </ResponsiveContainer>
+              </div>
+              <div className={styles.cardTotalFooter}>
+                <span>Receita total</span>
+                <strong>{formatCurrency(summary?.totalIncome ?? 0)}</strong>
+                <span>Despesa total</span>
+                <strong>{formatCurrency(summary?.totalExpense ?? 0)}</strong>
               </div>
             </div>
           )}
@@ -483,8 +491,7 @@ export default function Finance() {
                     </ResponsiveContainer>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.75rem' }}>
                       {paymentPieData.map(p => {
-                        const total = paymentPieData.reduce((s, x) => s + x.amount, 0);
-                        const pct = total > 0 ? ((p.amount / total) * 100).toFixed(1) : '0';
+                        const pct = paymentTotal > 0 ? ((p.amount / paymentTotal) * 100).toFixed(1) : '0';
                         return (
                           <div key={p.method} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <div style={{ width: 10, height: 10, borderRadius: '50%', background: PAYMENT_COLORS[p.method] ?? '#9CA3AF', flexShrink: 0 }} />
@@ -501,6 +508,10 @@ export default function Finance() {
                           </div>
                         );
                       })}
+                    </div>
+                    <div className={styles.cardTotalFooter}>
+                      <span>Total faturado</span>
+                      <strong>{formatCurrency(paymentTotal)}</strong>
                     </div>
                   </>
                 )}
@@ -529,6 +540,10 @@ export default function Finance() {
                     <Legend verticalAlign="bottom" height={36} iconType="circle" formatter={(v) => <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>{CATEGORY_LABELS[v] || v}</span>} />
                   </PieChart>
                 </ResponsiveContainer>
+                <div className={styles.cardTotalFooter}>
+                  <span>Total distribuído</span>
+                  <strong>{formatCurrency(expenseCategoryTotal)}</strong>
+                </div>
               </div>
 
               <div className={styles.chartCard}>
@@ -546,6 +561,10 @@ export default function Finance() {
                     <Bar dataKey="grossRevenue" fill="#F59E0B" radius={[4, 4, 0, 0]} barSize={30} />
                   </BarChart>
                 </ResponsiveContainer>
+                <div className={styles.cardTotalFooter}>
+                  <span>Total por profissionais</span>
+                  <strong>{formatCurrency(employeeRevenueTotal)}</strong>
+                </div>
               </div>
             </div>
           )}
@@ -626,7 +645,7 @@ export default function Finance() {
                     <div className={styles.summaryItem} style={{ flex: 1, minWidth: 140 }}>
                       <span className={styles.summaryLabel}>Itens Vendidos</span>
                       <span className={`${styles.summaryValue} ${styles.blue}`}>
-                        {productTableData.reduce((s, p) => s + p.quantity, 0)}
+                        {productItemsTotal}
                       </span>
                     </div>
                     <div className={styles.summaryItem} style={{ flex: 1, minWidth: 140 }}>
@@ -666,8 +685,7 @@ export default function Finance() {
 
                   <div className={styles.serviceGrid}>
                     {productTableData.map(p => {
-                      const total = productTableData.reduce((s, x) => s + x.amount, 0);
-                      const pct = total > 0 ? (p.amount / total) * 100 : 0;
+                      const pct = billedProductSales > 0 ? (p.amount / billedProductSales) * 100 : 0;
                       return (
                         <div key={p.name} className={styles.serviceCard}>
                           <div className={styles.svcHead}>
@@ -684,6 +702,12 @@ export default function Finance() {
                         </div>
                       );
                     })}
+                  </div>
+                  <div className={styles.cardTotalFooter}>
+                    <span>Total de produtos faturados</span>
+                    <strong>{formatCurrency(billedProductSales)}</strong>
+                    <span>Itens vendidos</span>
+                    <strong>{productItemsTotal}</strong>
                   </div>
                 </>
               )}

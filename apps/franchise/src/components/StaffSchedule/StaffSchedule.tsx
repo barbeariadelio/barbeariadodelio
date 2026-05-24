@@ -550,6 +550,7 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
 
   /* ── Current time indicator ── */
   const scrollRef = useRef<HTMLDivElement>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
@@ -587,11 +588,19 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
       {/* ── Toolbar ── */}
       <div className={styles.toolbar}>
         <div className={styles.toolbarLeft}>
-          {onBack && (
-            <button className={styles.backBtn} onClick={onBack}>
-              <ChevL /><span className={styles.hideMobile}>Calendário</span>
-            </button>
-          )}
+          <button className={styles.datePickerBtn} onClick={() => dateInputRef.current?.showPicker()} title="Escolher data">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            <input
+              ref={dateInputRef}
+              className={styles.dateInput}
+              type="date"
+              value={format(selectedDate, 'yyyy-MM-dd')}
+              onChange={e => e.target.value && onDateChange(new Date(`${e.target.value}T12:00:00`))}
+              tabIndex={-1}
+            />
+          </button>
           <button
             className={`${styles.todayBtn} ${isT ? styles.todayActive : ''}`}
             onClick={() => onDateChange(new Date())}

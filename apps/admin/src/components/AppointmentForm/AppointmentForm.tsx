@@ -74,6 +74,20 @@ function todayISO() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function addMinutesToTime(startTime: string, durationMinutes: number): string {
+  const [h, m] = startTime.split(':').map(Number);
+  const total = h * 60 + m + Math.max(1, durationMinutes);
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+function diffMinutes(startTime?: string, endTime?: string): number | null {
+  if (!startTime || !endTime) return null;
+  const [sh, sm] = startTime.split(':').map(Number);
+  const [eh, em] = endTime.split(':').map(Number);
+  const diff = (eh * 60 + em) - (sh * 60 + sm);
+  return diff > 0 ? diff : null;
+}
+
 function IconSearch() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -98,6 +112,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
 
   const [unitId, setUnitId] = useState(getSelectedUnitId() || import.meta.env.VITE_UNIT_ID || '');
   const [clientId, setClientId] = useState('');
+  const [quickSelectedClient, setQuickSelectedClient] = useState<Client | null>(null);
   const [clientSearch, setClientSearch] = useState('');
   const [showClientList, setShowClientList] = useState(false);
   const [showQuickRegister, setShowQuickRegister] = useState(false);
@@ -106,6 +121,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
   const [quickSaving, setQuickSaving] = useState(false);
   const [employeeId, setEmployeeId] = useState(initialEmployeeId ?? '');
   const [serviceId, setServiceId] = useState('');
+  const [customDurationMinutes, setCustomDurationMinutes] = useState('');
   const [date, setDate] = useState(initialDate ?? todayISO());
   const [startTime, setStartTime] = useState(initialTime ?? '09:00');
   const [notes, setNotes] = useState('');
@@ -138,6 +154,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       setServiceId(appointment.serviceId?._id || appointment.serviceId || '');
       setDate(appointment.date);
       setStartTime(appointment.startTime);
+      setCustomDurationMinutes(String(diffMinutes(appointment.startTime, appointment.endTime) ?? appointment.serviceId?.durationMinutes ?? 30));
       setNotes(appointment.notes || '');
       setUsePackage(!!appointment.isPackage);
       if (Array.isArray(appointment.products)) setApptProducts(appointment.products);
@@ -173,8 +190,6 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     }
   }, [units, unitId]);
 
-  const selectedUnit = units.find(u => u._id === unitId);
-
   const { data: employees = [] } = useQuery<Employee[]>({
     queryKey: ['employees', unitId],
     queryFn: () => api.get(`/employees?unitId=${unitId}`).then(r => Array.isArray(r.data) ? r.data : r.data?.employees ?? []),
@@ -204,9 +219,27 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     ? clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase().trim()))
     : clients;
 
-  const selectedClient = clients.find(c => c._id === clientId);
+  const selectedClient = clients.find(c => c._id === clientId) ?? (quickSelectedClient?._id === clientId ? quickSelectedClient : undefined);
+  const selectedService = services.find(s => s._id === serviceId);
+
+  useEffect(() => {
+    if (!serviceId) {
+      setCustomDurationMinutes('');
+      return;
+    }
+    if (!customDurationMinutes && selectedService) {
+      setCustomDurationMinutes(String(selectedService.durationMinutes > 0 ? selectedService.durationMinutes : 30));
+    }
+  }, [serviceId, selectedService, customDurationMinutes]);
+
+  function handleServiceChange(nextServiceId: string) {
+    setServiceId(nextServiceId);
+    const svc = services.find(s => s._id === nextServiceId);
+    setCustomDurationMinutes(svc ? String(svc.durationMinutes > 0 ? svc.durationMinutes : 30) : '');
+  }
 
   function selectClient(c: Client) {
+    setQuickSelectedClient(c);
     setClientId(c._id);
     setClientSearch('');
     setShowClientList(false);
@@ -215,6 +248,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
   }
 
   function clearClient() {
+    setQuickSelectedClient(null);
     setClientId('');
     setClientSearch('');
     setUsePackage(false);
@@ -227,8 +261,12 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     try {
       const res = await api.post('/clients', { name: quickName.trim(), phone: quickPhone.replace(/\D/g, '') || undefined, unitId: unitId || undefined });
       const newClient: Client = res.data;
-      await qc.invalidateQueries({ queryKey: ['clients', unitId] });
+      qc.setQueryData<Client[]>(['clients', unitId], current => {
+        const list = Array.isArray(current) ? current : [];
+        return list.some(client => client._id === newClient._id) ? list : [newClient, ...list];
+      });
       selectClient(newClient);
+      await qc.invalidateQueries({ queryKey: ['clients', unitId] });
       setShowQuickRegister(false);
       setQuickName('');
       setQuickPhone('');
@@ -263,19 +301,12 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       return;
     }
     const service = services.find(s => s._id === serviceId);
+    const durationMinutes = Math.max(1, Number(customDurationMinutes) || service?.durationMinutes || 30);
 
     if (date < todayISO()) {
       setError('Não é possível agendar em uma data que já passou.');
       return;
     }
-    if (selectedUnit?.workingDays && selectedUnit.workingDays.length > 0) {
-      const dayOfWeek = new Date(date + 'T12:00:00').getDay();
-      if (!selectedUnit.workingDays.includes(dayOfWeek)) {
-        setError('A barbearia não funciona no dia selecionado.');
-        return;
-      }
-    }
-
     const buildPayload = (apptDate: string, finalIsPackage: boolean, seriesId?: string) => {
       const payload: Record<string, unknown> = {
         unitId,
@@ -284,6 +315,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
         serviceId,
         date: apptDate,
         startTime,
+        endTime: addMinutesToTime(startTime, durationMinutes),
         notes,
         isPackage: finalIsPackage,
         products: apptProducts.length > 0 ? apptProducts : undefined,
@@ -323,13 +355,30 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
           const seriesId = Date.now().toString(36) + Math.random().toString(36).slice(2);
 
           setRepeatProgress({ current: 0, total });
-          let created = 0;
           const skipped: string[] = [];
+
+          const createRemaining = async (startIndex: number) => {
+            for (let i = startIndex; i < dates.length; i++) {
+              try {
+                await createOne(dates[i], finalIsPackage, seriesId);
+                onSuccess();
+              } catch (err: any) {
+                const status = err?.response?.status;
+                if (status === 409 || status === 400) {
+                  skipped.push(dates[i]);
+                } else {
+                  console.error('Erro ao criar agendamento repetido.', err);
+                }
+              }
+            }
+          };
 
           for (let i = 0; i < dates.length; i++) {
             try {
               await createOne(dates[i], finalIsPackage, seriesId);
-              created++;
+              onSuccess();
+              void createRemaining(i + 1);
+              return;
             } catch (err: any) {
               // Skip conflicts (409) and non-working-day errors (400); abort on unexpected errors
               const status = err?.response?.status;
@@ -343,19 +392,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
           }
 
           setRepeatProgress(null);
-
-          if (created === 0) {
-            setError('Nenhum agendamento foi criado. Verifique conflitos de horário.');
-            return;
-          }
-
-          if (skipped.length > 0) {
-            setError(`${created} agendamento(s) criado(s). ${skipped.length} data(s) pulada(s) por conflito: ${skipped.join(', ')}`);
-            // Still refresh the calendar but don't close — let the user see the partial result
-            return;
-          }
-
-          onSuccess();
+          setError('Nenhum agendamento foi criado. Verifique conflitos de horário.');
         }
       } catch (err: any) {
         setRepeatProgress(null);
@@ -399,7 +436,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
             <label className={styles.label}>Unidade *</label>
             <select className={styles.select} value={unitId} onChange={e => {
               setUnitId(e.target.value);
-              setClientId(''); setEmployeeId(''); setServiceId('');
+              setClientId(''); setEmployeeId(''); setServiceId(''); setCustomDurationMinutes('');
             }} required>
               <option value="">Selecione uma unidade</option>
               {units.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
@@ -534,7 +571,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
 
           <div className={styles.field} style={{ opacity: unitId ? 1 : 0.5, pointerEvents: unitId ? 'auto' : 'none' }}>
             <label className={styles.label}>Serviço *</label>
-            <select className={styles.select} value={serviceId} onChange={e => setServiceId(e.target.value)} required>
+            <select className={styles.select} value={serviceId} onChange={e => handleServiceChange(e.target.value)} required>
               <option value="">Selecione um serviço</option>
               {services.map(s => (
                 <option key={s._id} value={s._id}>
@@ -542,6 +579,19 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
                 </option>
               ))}
             </select>
+          </div>
+
+          <div className={styles.field} style={{ opacity: serviceId ? 1 : 0.5, pointerEvents: serviceId ? 'auto' : 'none' }}>
+            <label className={styles.label}>Duração do agendamento (min)</label>
+            <input
+              type="number"
+              min={1}
+              step={5}
+              className={styles.input}
+              value={customDurationMinutes}
+              onChange={e => setCustomDurationMinutes(e.target.value)}
+              placeholder={selectedService?.durationMinutes ? String(selectedService.durationMinutes) : '30'}
+            />
           </div>
 
           {selectedClient && serviceId && (() => {

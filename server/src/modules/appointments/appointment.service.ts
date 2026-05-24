@@ -170,8 +170,8 @@ export class AppointmentService {
         const [bsh, bsm] = b.startTime.split(':').map(Number);
         const [beh, bem] = b.endTime.split(':').map(Number);
         const bookedStart = bsh * 60 + bsm;
-        const bookedEndWithBuffer = (beh * 60 + bem) + slotInterval;
-        const slotEndWithBuffer = slotEnd + slotInterval;
+        const bookedEndWithBuffer = beh * 60 + bem;
+        const slotEndWithBuffer = slotEnd;
         return (
           (slotStart >= bookedStart && slotStart < bookedEndWithBuffer) ||
           (slotEnd > bookedStart && slotEnd <= bookedEndWithBuffer) ||
@@ -205,7 +205,9 @@ export class AppointmentService {
       if (svc) data.endTime = calcEndTime(data.startTime, svc.durationMinutes);
     }
 
-    if (data.status !== 'blocked') {
+    const internalOverride = data.source === 'admin';
+
+    if (data.status !== 'blocked' && !internalOverride) {
       const unit = await UnitModel.findById(data.unitId).select('workingDays');
       if (unit?.workingDays && unit.workingDays.length > 0) {
         const dayOfWeek = new Date(data.date! + 'T12:00:00').getDay();
@@ -226,10 +228,10 @@ export class AppointmentService {
     const employee = await UserModel.findById(data.employeeId).select('vacations blockedDays');
     if (!employee) throw new NotFoundError('Employee');
 
-    if (employee.blockedDays?.includes(data.date!)) {
+    if (!internalOverride && employee.blockedDays?.includes(data.date!)) {
       throw new AppError('Profissional indisponível: Dia bloqueado.', 400);
     }
-    if (employee.vacations?.some(v => data.date! >= v.start && data.date! <= v.end)) {
+    if (!internalOverride && employee.vacations?.some(v => data.date! >= v.start && data.date! <= v.end)) {
       throw new AppError('Profissional indisponível: Em período de férias.', 400);
     }
 
@@ -832,6 +834,7 @@ export class AppointmentService {
   async update(id: string, data: Partial<IAppointment>): Promise<IAppointment> {
     const appt = await AppointmentModel.findById(id);
     if (!appt) throw new NotFoundError('Appointment');
+    const internalOverride = data.source === 'admin';
 
     if (data.startTime && !data.endTime && (data.serviceId || appt.serviceId)) {
       const svcId = data.serviceId || appt.serviceId;
@@ -846,7 +849,7 @@ export class AppointmentService {
 
       // Validate working days
       const unit = await UnitModel.findById(appt.unitId).select('workingDays');
-      if (unit?.workingDays && unit.workingDays.length > 0) {
+      if (!internalOverride && unit?.workingDays && unit.workingDays.length > 0) {
         const dayOfWeek = new Date(checkDate + 'T12:00:00').getDay();
         if (!unit.workingDays.includes(dayOfWeek)) {
           throw new AppError('A barbearia não funciona no dia selecionado.', 400);

@@ -130,6 +130,7 @@ export default function Clients() {
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(searchParams.get('id'));
   const [showForm, setShowForm] = useState(false);
+  const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [showApptForm, setShowApptForm] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -558,7 +559,7 @@ export default function Clients() {
       )}
       <div className={styles.pageHeader}>
         <h1 className={styles.pageTitle}>CLIENTES</h1>
-        <button className={styles.newBtn} onClick={() => setShowForm(true)}>+ Novo Cliente</button>
+        <button className={styles.newBtn} onClick={() => { setEditingClient(null); setShowForm(true); }}>+ Novo Cliente</button>
       </div>
 
       <div className={styles.layout}>
@@ -615,6 +616,10 @@ export default function Clients() {
 
               {/* Action buttons */}
               <div style={{ display: 'flex', gap: '0.5rem', alignSelf: 'flex-start', flexShrink: 0 }}>
+                <button className={styles.mergeBtn} onClick={() => { setEditingClient(selectedClient); setShowForm(true); }} title="Editar cadastro">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4Z"/></svg>
+                  Editar
+                </button>
                 <button className={styles.mergeBtn} onClick={openMerge} title="Mesclar com outro cliente">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3"/><polyline points="15 3 12 6 9 3"/><line x1="12" y1="3" x2="12" y2="13"/></svg>
                   Mesclar
@@ -1215,10 +1220,13 @@ export default function Clients() {
 
       {showForm && (
         <ClientForm
-          onClose={() => setShowForm(false)}
+          client={editingClient}
+          onClose={() => { setShowForm(false); setEditingClient(null); }}
           onSuccess={() => {
             setShowForm(false);
+            setEditingClient(null);
             qc.invalidateQueries({ queryKey: ['clients'] });
+            qc.invalidateQueries({ queryKey: ['client-detail', selectedId] });
           }}
         />
       )}

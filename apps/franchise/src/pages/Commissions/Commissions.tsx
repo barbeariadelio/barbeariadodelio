@@ -36,6 +36,13 @@ interface Commission {
   };
 }
 
+interface PaymentHistoryItem {
+  _id: string;
+  amount: number;
+  description?: string;
+  date: string;
+}
+
 function formatCurrency(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 }
@@ -272,6 +279,26 @@ export default function Commissions() {
     enabled: !!detailEmpId,
   });
 
+  const paymentHistoryQs = useMemo(() => {
+    const p = new URLSearchParams();
+    if (detailEmpId) p.set('employeeId', detailEmpId);
+    if (unitId) p.set('unitId', unitId);
+    p.set('category', 'salary');
+    p.set('limit', '20');
+    return p.toString();
+  }, [detailEmpId, unitId]);
+
+  const { data: paymentHistory = [], isLoading: paymentHistoryLoading } = useQuery<PaymentHistoryItem[]>({
+    queryKey: ['commission-payments', detailEmpId, unitId],
+    queryFn: async () => {
+      const { data } = await api.get(`/finance/transactions?${paymentHistoryQs}`);
+      return Array.isArray(data?.data) ? data.data : [];
+    },
+    enabled: !!detailEmpId,
+  });
+
+  const totalPaymentHistory = paymentHistory.reduce((sum, item) => sum + item.amount, 0);
+
   const unpaid = commissions.filter(c => !c.isPaid);
   const paid   = commissions.filter(c => c.isPaid);
   const getPayableAmount = (commission: Commission) => commission.payableAmount ?? commission.amount;
@@ -295,6 +322,7 @@ export default function Commissions() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['commissions-detail'] });
       qc.invalidateQueries({ queryKey: ['commissions-summary'] });
+      qc.invalidateQueries({ queryKey: ['commission-payments'] });
       qc.invalidateQueries({ queryKey: ['finance-summary'] });
       setShowPayForm(false); setSelected(new Set());
     },
@@ -672,9 +700,38 @@ export default function Commissions() {
               )}
             </div>
 
-            {!isEmployee && (
-              <EmployeeVales employeeId={detailEmpId} unitId={unitId} availableCommissions={unpaid} />
-            )}
+            <div className={styles.sideStack}>
+              <section className={styles.paymentHistory}>
+                <div className={styles.paymentHistoryHeader}>
+                  <div>
+                    <h2 className={styles.paymentHistoryTitle}>Historico de pagamentos</h2>
+                    <p className={styles.paymentHistorySubtitle}>Valores pagos ao barbeiro</p>
+                  </div>
+                  <span className={styles.paymentHistoryTotal}>{formatCurrency(totalPaymentHistory)}</span>
+                </div>
+                {paymentHistoryLoading ? (
+                  <p className={styles.paymentHistoryEmpty}>Carregando pagamentos...</p>
+                ) : paymentHistory.length === 0 ? (
+                  <p className={styles.paymentHistoryEmpty}>Nenhum pagamento registrado.</p>
+                ) : (
+                  <div className={styles.paymentHistoryList}>
+                    {paymentHistory.map(payment => (
+                      <div key={payment._id} className={styles.paymentHistoryItem}>
+                        <div>
+                          <span className={styles.paymentHistoryDesc}>{payment.description || 'Pagamento de comissoes'}</span>
+                          <span className={styles.paymentHistoryDate}>{formatDate(payment.date)}</span>
+                        </div>
+                        <strong>{formatCurrency(payment.amount)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {!isEmployee && (
+                <EmployeeVales employeeId={detailEmpId} unitId={unitId} availableCommissions={unpaid} />
+              )}
+            </div>
           </div>
         </>
       )}

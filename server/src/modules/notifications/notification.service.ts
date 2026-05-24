@@ -59,6 +59,23 @@ class NotificationService {
       { new: true },
     );
   }
+
+  async markAllAsRead(unitId: string, userId: string, options: { role?: string } = {}) {
+    if (options.role === 'employee') {
+      const notifications = await this.list(unitId, { role: options.role, userId, limit: 200 });
+      const ids = notifications.map(n => n._id);
+      await NotificationModel.updateMany(
+        { _id: { $in: ids } },
+        { $addToSet: { readBy: userId } },
+      );
+      return { modifiedCount: ids.length };
+    }
+
+    return NotificationModel.updateMany(
+      { unitId, readBy: { $ne: userId } },
+      { $addToSet: { readBy: userId } },
+    );
+  }
 }
 
 export const notificationService = new NotificationService();

@@ -687,6 +687,103 @@
   }
 }
 
+.sideStack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.paymentHistory {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 1rem;
+}
+
+.paymentHistoryHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.875rem;
+}
+
+.paymentHistoryTitle {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.paymentHistorySubtitle {
+  margin: 0.25rem 0 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.paymentHistoryTotal {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #16a34a;
+  white-space: nowrap;
+}
+
+.paymentHistoryList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.paymentHistoryItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--bg-elevated);
+
+  > div {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  strong {
+    color: #16a34a;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+}
+
+.paymentHistoryDesc {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paymentHistoryDate,
+.paymentHistoryEmpty {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.paymentHistoryEmpty {
+  margin: 0;
+  padding: 0.75rem 0;
+  font-style: italic;
+}
+
 /* ── Commission list (detail) ── */
 .lists { display: flex; flex-direction: column; }
 

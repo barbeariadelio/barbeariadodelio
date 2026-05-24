@@ -229,6 +229,17 @@ export default function Layout() {
 
   const unreadCount = notifications.filter(n => !n.readBy?.includes(user?._id)).length;
 
+  const markAllAsReadMutation = useMutation({
+    mutationFn: () => api.patch('/notifications/read-all'),
+    onSuccess: () => refetchNotifs(),
+  });
+
+  useEffect(() => {
+    if (notifsOpen && unreadCount > 0 && !markAllAsReadMutation.isPending) {
+      markAllAsReadMutation.mutate();
+    }
+  }, [notifsOpen, unreadCount, markAllAsReadMutation]);
+
   function handleLogout() {
     logout();
     navigate('/login');

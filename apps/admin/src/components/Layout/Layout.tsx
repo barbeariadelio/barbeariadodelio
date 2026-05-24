@@ -95,6 +95,17 @@ export default function Layout() {
 
   const unreadCount = notifications.filter(n => !n.readBy?.includes(user?._id)).length;
 
+  const markAllAsReadMutation = useMutation({
+    mutationFn: () => api.patch('/notifications/read-all'),
+    onSuccess: () => refetchNotifs(),
+  });
+
+  useEffect(() => {
+    if (notifsOpen && unreadCount > 0 && !markAllAsReadMutation.isPending) {
+      markAllAsReadMutation.mutate();
+    }
+  }, [notifsOpen, unreadCount, markAllAsReadMutation]);
+
   useEffect(() => {
     if (user && user.theme && !lastUserId.current) {
       updateTheme(user.theme as any);

@@ -6,6 +6,12 @@ import styles from './ClientForm.module.scss';
 interface Props {
   onClose: () => void;
   onSuccess: () => void;
+  client?: {
+    _id: string;
+    name: string;
+    phone?: string;
+    notes?: string;
+  } | null;
 }
 
 function maskPhone(val: string): string {
@@ -16,32 +22,32 @@ function maskPhone(val: string): string {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
-export default function ClientForm({ onClose, onSuccess }: Props) {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [notes, setNotes] = useState('');
+export default function ClientForm({ onClose, onSuccess, client }: Props) {
+  const isEditing = !!client;
+  const [name, setName] = useState(client?.name ?? '');
+  const [phone, setPhone] = useState(client?.phone ? maskPhone(client.phone) : '');
+  const [notes, setNotes] = useState(client?.notes ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const mutation = useMutation({
-    mutationFn: (payload: object) => api.post('/clients', payload),
+    mutationFn: (payload: object) => client?._id ? api.patch(`/clients/${client._id}`, payload) : api.post('/clients', payload),
     onSuccess,
     onError: (err: unknown) => {
-      setError(err instanceof Error ? err.message : 'Erro ao criar cliente.');
+      setError(err instanceof Error ? err.message : `Erro ao ${isEditing ? 'salvar' : 'criar'} cliente.`);
     },
   });
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
-    mutation.mutate({ name, email, phone: phone.replace(/\D/g, ''), notes });
+    mutation.mutate({ name, phone: phone.replace(/\D/g, ''), notes });
   }
 
   return (
     <div className={styles.overlay} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className={styles.modal}>
         <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Novo Cliente</h2>
+          <h2 className={styles.modalTitle}>{isEditing ? 'Editar Cliente' : 'Novo Cliente'}</h2>
           <button className={styles.closeBtn} onClick={onClose}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -53,11 +59,6 @@ export default function ClientForm({ onClose, onSuccess }: Props) {
           <div className={styles.field}>
             <label className={styles.label}>Nome *</label>
             <input className={styles.input} value={name} onChange={e => setName(e.target.value)} required placeholder="Nome completo" />
-          </div>
-
-          <div className={styles.field}>
-            <label className={styles.label}>E-mail</label>
-            <input type="email" className={styles.input} value={email} onChange={e => setEmail(e.target.value)} placeholder="cliente@email.com" />
           </div>
 
           <div className={styles.field}>
@@ -82,7 +83,7 @@ export default function ClientForm({ onClose, onSuccess }: Props) {
           <div className={styles.actions}>
             <button type="button" className={styles.cancelBtn} onClick={onClose}>Cancelar</button>
             <button type="submit" className={styles.submitBtn} disabled={mutation.isPending}>
-              {mutation.isPending ? 'Salvando...' : 'Criar Cliente'}
+              {mutation.isPending ? 'Salvando...' : isEditing ? 'Salvar Alterações' : 'Criar Cliente'}
             </button>
           </div>
         </form>

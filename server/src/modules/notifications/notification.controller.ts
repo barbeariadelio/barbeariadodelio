@@ -19,3 +19,12 @@ export async function markRead(req: AuthRequest, res: Response, next: NextFuncti
     ok(res, notif);
   } catch (e) { next(e); }
 }
+
+export async function markAllRead(req: AuthRequest, res: Response, next: NextFunction) {
+  try {
+    const unitId = req.user?.unitId;
+    if (!unitId) return ok(res, { modifiedCount: 0 });
+    const result = await service.markAllAsRead(unitId, req.user!.id, { role: req.user?.role });
+    ok(res, result);
+  } catch (e) { next(e); }
+}

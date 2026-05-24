@@ -291,6 +291,7 @@ export async function updateAppointment(req: AuthRequest, res: Response, next: N
       }
     }
 
+    req.body.source = req.user!.role === 'client' ? 'client' : 'admin';
     const updated = await service.update(id, req.body);
 
     // Create notification for edit
