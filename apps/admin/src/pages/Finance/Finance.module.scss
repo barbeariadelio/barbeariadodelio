@@ -237,6 +237,37 @@
   text-transform: uppercase;
 }
 
+.collapsibleSectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+
+  .sectionTitle {
+    margin-bottom: 0;
+  }
+}
+
+.collapseBtn {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  min-height: 42px;
+  padding: 0.65rem 1rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+
+  &:hover {
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+    background: var(--bg-elevated);
+  }
+}
+
 .mainChart {
   height: 320px;
 }
@@ -325,8 +356,59 @@
 }
 
 .serviceUnitGroup {
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  overflow: hidden;
+
   &:last-child { margin-bottom: 0; }
+
+  .serviceGrid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .serviceCard {
+    background: transparent;
+    border: 0;
+    border-top: 1px solid var(--border-subtle);
+    border-radius: 0;
+    padding: 0.75rem 1rem;
+    display: grid;
+    grid-template-columns: minmax(180px, 1.5fr) minmax(130px, 0.8fr) minmax(160px, 1fr);
+    align-items: center;
+    gap: 1rem;
+    transition: background 0.15s;
+
+    &:hover {
+      transform: none;
+      border-color: var(--border-subtle);
+      background: var(--bg-elevated);
+    }
+
+    @media (max-width: 720px) {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+  }
+
+  .svcHead {
+    min-width: 0;
+  }
+
+  .svcBody {
+    align-items: flex-end;
+
+    @media (max-width: 720px) {
+      align-items: flex-start;
+    }
+  }
+
+  .svcTrack {
+    min-width: 120px;
+  }
 }
 
 .serviceUnitHeader {
@@ -338,9 +420,10 @@
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  padding: 0 0 1rem;
-  border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: 1.25rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 0;
+  margin-bottom: 0;
+  background: var(--bg-elevated);
   svg { color: var(--gold); flex-shrink: 0; }
 }
 
@@ -925,12 +1008,14 @@
   margin-top: 1.5rem;
   padding: 1rem 1.5rem;
   background: var(--bg-elevated);
-  border: 1px solid var(--gold-dim);
+  border: 1px solid var(--gold);
   border-radius: 10px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 0.75rem;
+  justify-content: space-between;
   animation: slideUp 0.3s ease-out;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
 
   @media (max-width: 640px) {
     flex-direction: column;
@@ -979,4 +1064,44 @@
   cursor: pointer;
   padding: 0;
   &:hover { color: var(--text-primary); text-decoration: underline; }
+}
+
+// Apply-to-all rate button
+.applyRateBtn {
+  background: var(--gold);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, opacity 0.15s;
+  &:hover:not(:disabled) { background: var(--gold-light); }
+  &:disabled { opacity: 0.4; cursor: not-allowed; }
+}
+
+// Dirty (unsaved) rate row indicator
+.miniRateWrapDirty {
+  border-color: var(--gold) !important;
+  background: var(--gold-dim) !important;
+  position: relative;
+}
+
+.rateDirtyDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+// SaveBar icon
+.saveBarIcon {
+  color: var(--gold);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }

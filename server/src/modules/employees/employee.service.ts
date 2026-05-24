@@ -179,6 +179,7 @@ export class EmployeeService {
     sharedCache.delete(`users:list:employees:${uid}`);
     sharedCache.delete(`users:schedule:${uid}`);
     sharedCache.delete(`users:public:${uid}`);
+    sharedCache.keys().filter(k => k.startsWith('finance:summary:')).forEach(k => sharedCache.delete(k));
     invalidateEmployeeSlotCache(id);
     return emp;
   }

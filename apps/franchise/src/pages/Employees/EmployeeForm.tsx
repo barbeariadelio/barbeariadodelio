@@ -8,6 +8,17 @@ interface ServiceOption { _id: string; name: string; type?: string; }
 
 type DaySlot = { start: string; end: string };
 type DaySchedule = { day: number; slots: DaySlot[] };
+type ServiceRef = string | { _id: string };
+type EmployeeSaveResponse = {
+  data?: {
+    _id?: string;
+    unitId?: string;
+    employee?: {
+      _id?: string;
+      unitId?: string;
+    };
+  };
+};
 
 const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const DAY_NAMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
@@ -26,6 +37,7 @@ interface Employee {
   isActive: boolean;
   allowOnlineBooking?: boolean;
   unitId?: string | { _id: string; name: string };
+  serviceIds?: ServiceRef[];
 }
 
 function maskPhone(raw: string) {
@@ -65,9 +77,8 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
   const [newBlockedDay, setNewBlockedDay] = useState('');
   const [initialVale, setInitialVale] = useState('');
   const [serviceIds, setServiceIds] = useState<string[]>(
-    (employee as any)?.serviceIds?.map((id: any) => typeof id === 'object' ? id._id : id) ?? []
+    employee?.serviceIds?.map(id => typeof id === 'object' ? id._id : id) ?? []
   );
-  const [commissionRate, setCommissionRate] = useState<string>((employee as any)?.commissionRate?.toString() ?? '');
   const [error, setError] = useState<string | null>(null);
 
   const { data: fullEmployee } = useQuery<Employee>({
@@ -80,8 +91,8 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
   });
 
   useEffect(() => {
-    if (fullEmployee?.avatar && !avatar) setAvatar(fullEmployee.avatar);
-  }, [fullEmployee]);
+    if (fullEmployee?.avatar) setAvatar(prev => prev || fullEmployee.avatar || '');
+  }, [fullEmployee?.avatar]);
 
   const mutation = useMutation({
     mutationFn: (payload: object) =>
@@ -156,12 +167,11 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
       unitId: franchiseUnitId,
       allowedApps: ['franchise'],
       serviceIds,
-      commissionRate: commissionRate !== '' ? parseFloat(commissionRate) : 0,
     };
     if (!isEdit || password) payload.password = password;
     
     mutation.mutate(payload, {
-      onSuccess: async (res: any) => {
+      onSuccess: async (res: EmployeeSaveResponse) => {
         const empId = res.data?._id || res.data?.employee?._id;
         if (!isEdit && initialVale && empId) {
           try {
@@ -172,7 +182,7 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
               description: `Vale Inicial (na criação)`,
               date: new Date().toISOString().split('T')[0],
               employeeId: empId,
-              unitId: res.data?.unitId || res.data?.employee?.unitId || getSelectedUnitId() || (user as any)?.unitId
+              unitId: res.data?.unitId || res.data?.employee?.unitId || getSelectedUnitId() || user?.unitId
             });
           } catch (e) {
             console.error('Falha ao registrar vale inicial:', e);
@@ -229,23 +239,6 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
               onChange={e => setPhone(maskPhone(e.target.value))}
               placeholder="(19) 9XXXX-XXXX"
             />
-          </div>
-
-          <div className={styles.field}>
-            <label className={styles.label}>Taxa de Comissão (%)</label>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="0.1"
-              className={styles.input}
-              value={commissionRate}
-              onChange={e => setCommissionRate(e.target.value)}
-              placeholder="Ex: 40"
-            />
-            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              Percentual sobre o valor do serviço gerado como comissão para o funcionário.
-            </p>
           </div>
 
           <div className={styles.field}>

@@ -1,3 +1,94 @@
+/* ── Toast de sucesso ── */
+.successToast {
+  position: fixed;
+  top: 1.25rem;
+  right: 1.25rem;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+  padding: 0.7rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  animation: slideInRight 0.2s ease;
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Loading ── */
+.loadingWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 2rem;
+  justify-content: center;
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--border-default);
+  border-top-color: var(--gold);
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loadingText {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+/* ── Select bar ── */
+.selectBarIcon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.selectBarHint {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+/* ── Pay form extras ── */
+.payFormSummary {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+
+.payFormError {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+}
+
 .page {
   padding: 2rem;
   display: flex;
@@ -58,7 +149,14 @@
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.2s;
-  &:hover { background: #15803d; box-shadow: 0 4px 12px rgba(22,163,74,0.3); }
+  &:hover:not(:disabled) { background: #15803d; box-shadow: 0 4px 12px rgba(22,163,74,0.3); }
+  &:disabled {
+    background: var(--bg-elevated);
+    color: var(--text-muted);
+    border: 1px solid var(--border-default);
+    cursor: not-allowed;
+    box-shadow: none;
+  }
 }
 
 /* ── Filter bar ── */
@@ -489,6 +587,10 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
 }
 
 .selectAllBtn, .clearBtn {
@@ -633,6 +735,17 @@
 .commRight { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
 
 .commAmount { font-size: 0.875rem; font-weight: 800; color: #16a34a; flex-shrink: 0; }
+
+.valeDeduction {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
 
 .paidBadge {
   font-size: 0.65rem;

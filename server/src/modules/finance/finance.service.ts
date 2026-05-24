@@ -21,11 +21,13 @@ interface RemunSummaryItem {
   employeeId: string;
   name: string;
   avatar?: string;
+  grossRevenue: number;
   totalAmount: number;
   paidAmount: number;
   pendingAmount: number;
   valesAmount: number;
   valesDiscountedAmount: number;
+  commissionRate?: number;
 }
 
 interface PopulatedUnit    { _id: mongoose.Types.ObjectId; name?: string }
@@ -201,7 +203,67 @@ export class FinanceService {
       })
       .lean();
 
-    return commissions;
+    const appointmentIds = commissions
+      .map(tx => {
+        const appointment = tx.appointmentId as unknown as { _id?: mongoose.Types.ObjectId } | mongoose.Types.ObjectId | undefined;
+        if (!appointment) return null;
+        if (appointment instanceof mongoose.Types.ObjectId) return appointment.toString();
+        return appointment._id?.toString() ?? null;
+      })
+      .filter((id): id is string => Boolean(id));
+
+    const discountedVales = await TransactionModel.find({
+      unitId: { $in: unitIds },
+      type: 'expense',
+      category: 'voucher',
+      employeeId: empOid,
+      isPaid: true,
+      ...dateFilter,
+      ...(appointmentIds.length > 0
+        ? {
+            $or: [
+              { appointmentId: { $in: appointmentIds.map(id => new mongoose.Types.ObjectId(id)) } },
+              { appointmentId: { $exists: false } },
+              { appointmentId: null },
+            ],
+          }
+        : {
+            $or: [
+              { appointmentId: { $exists: false } },
+              { appointmentId: null },
+            ],
+          }),
+    }).select('appointmentId amount date').lean() as Array<{ appointmentId?: mongoose.Types.ObjectId; amount: number; date?: string }>;
+
+    const valesByAppointment = new Map<string, number>();
+    const unlinkedValesByDate = new Map<string, number>();
+    for (const vale of discountedVales) {
+      const appointmentId = vale.appointmentId?.toString();
+      if (appointmentId) {
+        valesByAppointment.set(appointmentId, (valesByAppointment.get(appointmentId) ?? 0) + vale.amount);
+        continue;
+      }
+      if (!vale.date) continue;
+      unlinkedValesByDate.set(vale.date, (unlinkedValesByDate.get(vale.date) ?? 0) + vale.amount);
+    }
+
+    return commissions.map(tx => {
+      const appointment = tx.appointmentId as unknown as { _id?: mongoose.Types.ObjectId } | mongoose.Types.ObjectId | undefined;
+      const appointmentId = appointment instanceof mongoose.Types.ObjectId
+        ? appointment.toString()
+        : appointment?._id?.toString();
+      const linkedVales = appointmentId ? (valesByAppointment.get(appointmentId) ?? 0) : 0;
+      const unlinkedVales = Math.min(Math.max(0, tx.amount - linkedVales), unlinkedValesByDate.get(tx.date) ?? 0);
+      if (unlinkedVales > 0) {
+        unlinkedValesByDate.set(tx.date, (unlinkedValesByDate.get(tx.date) ?? 0) - unlinkedVales);
+      }
+      const deductedVales = linkedVales + unlinkedVales;
+      return {
+        ...tx,
+        deductedVales,
+        payableAmount: Math.max(0, tx.amount - deductedVales),
+      };
+    });
   }
 
   async getRemunerationsSummary(
@@ -223,43 +285,34 @@ export class FinanceService {
         : UserModel.findById(userId).select('_id name avatar commissionRate').lean().then(u => u ? [u] : [])
     ) as EmployeeLean[];
 
-    const commRateMap = new Map<string, number>(
-      employees.map(e => [e._id.toString(), e.commissionRate ?? 0]),
-    );
-
-    // Step 1: compute total commission directly from appointments (same logic as Finance).
-    // Do NOT filter by unitId here — appointments may be stored under a different unit than
-    // the employee's current User.unitId (e.g. after unit migrations). Finance queries
-    // across all units; we match that behaviour by scoping only on employeeId.
-    const apptQuery: Record<string, unknown> = {
+    const commissionTxQuery: Record<string, unknown> = {
       employeeId: { $in: employees.map(e => e._id) },
+      type: 'commission',
+      category: 'commission',
+    };
+    if (start || end) {
+      commissionTxQuery['date'] = { ...(start ? { $gte: start } : {}), ...(end ? { $lte: end } : {}) };
+    }
+
+    type TxRow = { employeeId?: mongoose.Types.ObjectId; appointmentId?: mongoose.Types.ObjectId; amount: number; date?: string; isPaid?: boolean };
+    type ApptRevenueRow = { employeeId?: mongoose.Types.ObjectId; price?: number; isBilled?: boolean; billingSkipped?: boolean };
+
+    const commissionTxs = await TransactionModel.find(commissionTxQuery).select('employeeId appointmentId amount date isPaid').lean() as TxRow[];
+
+    const apptQuery: Record<string, unknown> = {
+      unitId: { $in: unitIds },
+      employeeId: { $in: employees.map(e => e._id) },
+      status: { $in: ['pending', 'confirmed', 'completed'] },
     };
     if (start || end) {
       apptQuery['date'] = { ...(start ? { $gte: start } : {}), ...(end ? { $lte: end } : {}) };
     }
 
-    type ApptRow = { _id: mongoose.Types.ObjectId; price?: number; employeeId?: mongoose.Types.ObjectId; isBilled?: boolean; billingSkipped?: boolean };
-    type TxRow   = { employeeId?: mongoose.Types.ObjectId; amount: number; isPaid?: boolean };
+    const appts = await AppointmentModel.find(apptQuery)
+      .select('employeeId price isBilled billingSkipped')
+      .lean() as ApptRevenueRow[];
 
-    const allAppts = await AppointmentModel.find(apptQuery)
-      .select('_id price date employeeId isBilled billingSkipped')
-      .lean() as ApptRow[];
-
-    // Step 2: get paid amounts from commission transactions (tracks actual payments)
-    const txQuery: Record<string, unknown> = {
-      unitId: { $in: unitIds },
-      type: 'commission',
-      category: 'commission',
-      isPaid: true,
-    };
-    if (role === 'employee') txQuery['employeeId'] = new mongoose.Types.ObjectId(userId);
-    if (start || end) {
-      txQuery['date'] = { ...(start ? { $gte: start } : {}), ...(end ? { $lte: end } : {}) };
-    }
-
-    const paidTxs = await TransactionModel.find(txQuery).select('employeeId amount').lean() as TxRow[];
-
-    // Step 3: get voucher (vale) amounts per employee
+    // Vouchers are split by payment state so discounted vales reduce the payable amount.
     const valesQuery: Record<string, unknown> = {
       unitId: { $in: unitIds },
       type: 'expense',
@@ -270,31 +323,66 @@ export class FinanceService {
       valesQuery['date'] = { ...(start ? { $gte: start } : {}), ...(end ? { $lte: end } : {}) };
     }
 
-    const valesTxs = await TransactionModel.find(valesQuery).select('employeeId amount isPaid').lean() as TxRow[];
+    const valesTxs = await TransactionModel.find(valesQuery).select('employeeId appointmentId amount date isPaid').lean() as TxRow[];
 
     // Build map seeded with all employees (guarantees every employee appears)
-    const empMap = new Map<string, { name: string; avatar?: string; total: number; paid: number; vales: number; valesDiscounted: number }>(
-      employees.map(e => [e._id.toString(), { name: e.name, avatar: e.avatar, total: 0, paid: 0, vales: 0, valesDiscounted: 0 }]),
+    const empMap = new Map<string, { name: string; avatar?: string; grossRevenue: number; total: number; paid: number; unpaid: number; unpaidAppointmentIds: Set<string>; vales: number; valesDiscounted: number; linkedValesDiscounted: number }>(
+      employees.map(e => [e._id.toString(), { name: e.name, avatar: e.avatar, grossRevenue: 0, total: 0, paid: 0, unpaid: 0, unpaidAppointmentIds: new Set<string>(), vales: 0, valesDiscounted: 0, linkedValesDiscounted: 0 }]),
     );
 
-    // Total = appointments × commission rate (matches Finance exactly)
-    for (const appt of allAppts) {
+    for (const appt of appts) {
       if (!appt.isBilled || appt.billingSkipped) continue;
       const empId = appt.employeeId?.toString();
       if (!empId) continue;
-      const rate = commRateMap.get(empId) ?? 0;
-      if (rate <= 0) continue;
-      const amount = Math.round((appt.price ?? 0) * rate / 100 * 100) / 100;
       const entry = empMap.get(empId);
-      if (entry) entry.total += amount;
+      if (!entry) continue;
+      entry.grossRevenue += appt.price ?? 0;
     }
 
-    // Paid = sum of paid commission transactions
-    for (const tx of paidTxs) {
+    const discountedValesByAppointment = new Map<string, number>();
+    const discountedUnlinkedValesByEmployeeDate = new Map<string, number>();
+    for (const tx of valesTxs) {
+      if (!tx.isPaid) continue;
+      const appointmentId = tx.appointmentId?.toString();
+      if (appointmentId) {
+        discountedValesByAppointment.set(
+          appointmentId,
+          (discountedValesByAppointment.get(appointmentId) ?? 0) + tx.amount,
+        );
+        continue;
+      }
+      const empId = tx.employeeId?.toString();
+      if (!empId || !tx.date) continue;
+      const key = `${empId}:${tx.date}`;
+      discountedUnlinkedValesByEmployeeDate.set(
+        key,
+        (discountedUnlinkedValesByEmployeeDate.get(key) ?? 0) + tx.amount,
+      );
+    }
+
+    // Commission totals come from recorded commission transactions to match Finance.
+    for (const tx of commissionTxs) {
       const empId = tx.employeeId?.toString();
       if (!empId) continue;
       const entry = empMap.get(empId);
-      if (entry) entry.paid += tx.amount;
+      if (!entry) continue;
+      const appointmentId = tx.appointmentId?.toString();
+      const linkedValeAmount = appointmentId ? (discountedValesByAppointment.get(appointmentId) ?? 0) : 0;
+      const unlinkedKey = tx.date ? `${empId}:${tx.date}` : '';
+      const availableUnlinkedValeAmount = unlinkedKey ? (discountedUnlinkedValesByEmployeeDate.get(unlinkedKey) ?? 0) : 0;
+      const unlinkedValeAmount = Math.min(Math.max(0, tx.amount - linkedValeAmount), availableUnlinkedValeAmount);
+      if (unlinkedKey && unlinkedValeAmount > 0) {
+        discountedUnlinkedValesByEmployeeDate.set(unlinkedKey, availableUnlinkedValeAmount - unlinkedValeAmount);
+      }
+      const deductedValeAmount = linkedValeAmount + unlinkedValeAmount;
+      const netAmount = Math.max(0, tx.amount - deductedValeAmount);
+      entry.total += tx.amount;
+      if (tx.isPaid) {
+        entry.paid += netAmount;
+      } else {
+        entry.unpaid += netAmount;
+        if (appointmentId) entry.unpaidAppointmentIds.add(appointmentId);
+      }
     }
 
     // Vales: split into pending (not discounted) and discounted (manually marked isPaid=true)
@@ -303,19 +391,28 @@ export class FinanceService {
       if (!empId) continue;
       const entry = empMap.get(empId);
       if (!entry) continue;
-      if (tx.isPaid) entry.valesDiscounted += tx.amount;
-      else entry.vales += tx.amount;
+      if (tx.isPaid) {
+        entry.valesDiscounted += tx.amount;
+        const appointmentId = tx.appointmentId?.toString();
+        if (appointmentId && entry.unpaidAppointmentIds.has(appointmentId)) {
+          entry.linkedValesDiscounted += tx.amount;
+        }
+      } else {
+        entry.vales += tx.amount;
+      }
     }
 
     return Array.from(empMap.entries()).map(([id, d]) => ({
       employeeId: id,
       name: d.name,
       avatar: d.avatar,
+      grossRevenue: d.grossRevenue,
       totalAmount: d.total,
       paidAmount: d.paid,
-      pendingAmount: Math.max(0, d.total - d.paid - d.valesDiscounted),
+      pendingAmount: Math.max(0, d.unpaid),
       valesAmount: d.vales,
       valesDiscountedAmount: d.valesDiscounted,
+      commissionRate: employees.find(e => e._id.toString() === id)?.commissionRate ?? 0,
     }));
   }
 
@@ -662,6 +759,7 @@ export class FinanceService {
       const empEntry = byEmployeeMap.get(empId)!;
       if (!empEntry.name && appt.employeeId?.name) empEntry.name = appt.employeeId.name;
       if (!empEntry.unitName && appt.unitId?.name) empEntry.unitName = appt.unitId.name;
+      if (appt.employeeId?.commissionRate !== undefined) empEntry.commissionRate = appt.employeeId.commissionRate;
 
       // Only count billed appointments for commission/attendance metrics.
       // Exclude billingSkipped (package sessions marked done without a financial transaction).
@@ -700,6 +798,13 @@ export class FinanceService {
           commissionRate: emp.commissionRate,
           totalVouchers: 0,
         });
+      } else {
+        const empEntry = byEmployeeMap.get(empId)!;
+        const empUnitId = emp.unitId?.toString() || empEntry.unitId;
+        empEntry.name = empEntry.name || emp.name;
+        empEntry.unitId = empEntry.unitId || empUnitId;
+        empEntry.unitName = empEntry.unitName || unitNameMap.get(empUnitId) || '';
+        empEntry.commissionRate = emp.commissionRate;
       }
     }
 

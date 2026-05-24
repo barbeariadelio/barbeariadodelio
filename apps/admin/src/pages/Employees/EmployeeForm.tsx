@@ -7,6 +7,7 @@ interface ServiceOption { _id: string; name: string; type?: string; }
 
 type DaySlot = { start: string; end: string };
 type DaySchedule = { day: number; slots: DaySlot[] };
+type ServiceRef = string | { _id: string };
 
 const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const DAY_NAMES = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
@@ -25,6 +26,7 @@ interface Employee {
   isActive: boolean;
   allowOnlineBooking?: boolean;
   unitId?: string;
+  serviceIds?: ServiceRef[];
 }
 
 function maskPhone(raw: string) {
@@ -48,7 +50,6 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
   const [phone, setPhone] = useState(employee?.phone ?? '');
   const [avatar, setAvatar] = useState(employee?.avatar ?? '');
   const [uploading, setUploading] = useState(false);
-  const [role, setRole] = useState(employee?.role ?? 'employee');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [daySchedules, setDaySchedules] = useState<DaySchedule[]>(() => {
@@ -64,9 +65,8 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
   const [newBlockedDay, setNewBlockedDay] = useState('');
   const [initialVale, setInitialVale] = useState('');
   const [serviceIds, setServiceIds] = useState<string[]>(
-    (employee as any)?.serviceIds?.map((id: any) => typeof id === 'object' ? id._id : id) ?? []
+    employee?.serviceIds?.map(id => typeof id === 'object' ? id._id : id) ?? []
   );
-  const [commissionRate, setCommissionRate] = useState<string>((employee as any)?.commissionRate?.toString() ?? '');
   const [error, setError] = useState<string | null>(null);
   const [createdCredentials, setCreatedCredentials] = useState<{ email: string; password: string } | null>(null);
 
@@ -80,8 +80,8 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
   });
 
   useEffect(() => {
-    if (fullEmployee?.avatar && !avatar) setAvatar(fullEmployee.avatar);
-  }, [fullEmployee]);
+    if (fullEmployee?.avatar) setAvatar(prev => prev || fullEmployee.avatar || '');
+  }, [fullEmployee?.avatar]);
 
   const mutation = useMutation({
     mutationFn: (payload: object) =>
@@ -152,10 +152,9 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
       vacations,
       blockedDays: finalBlockedDays.sort(),
       allowOnlineBooking,
-      unitId: '69fa463aa078044937f7024e',
+      unitId: adminUnitId,
       allowedApps: ['admin'],
       serviceIds,
-      commissionRate: commissionRate !== '' ? parseFloat(commissionRate) : 0,
     };
     if (password) payload.password = password;
 
@@ -264,23 +263,6 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
               onChange={e => setPhone(maskPhone(e.target.value))}
               placeholder="(19) 9XXXX-XXXX"
             />
-          </div>
-
-          <div className={styles.field}>
-            <label className={styles.label}>Taxa de Comissão (%)</label>
-            <input
-              type="number"
-              min="0"
-              max="100"
-              step="0.1"
-              className={styles.input}
-              value={commissionRate}
-              onChange={e => setCommissionRate(e.target.value)}
-              placeholder="Ex: 40"
-            />
-            <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-              Percentual sobre o valor do serviço gerado como comissão para o funcionário.
-            </p>
           </div>
 
           <div className={styles.field}>

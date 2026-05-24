@@ -9,19 +9,25 @@ interface EmployeeSummary {
   employeeId: string;
   name: string;
   avatar?: string;
+  grossRevenue: number;
   totalAmount: number;
   paidAmount: number;
   pendingAmount: number;
   valesAmount: number;
+  valesDiscountedAmount: number;
+  commissionRate?: number;
 }
 
 interface Commission {
   _id: string;
   amount: number;
+  payableAmount?: number;
+  deductedVales?: number;
   description: string;
   date: string;
   isPaid?: boolean;
   appointmentId?: {
+    _id?: string;
     date?: string;
     startTime?: string;
     clientId?: { name: string } | null;
@@ -126,6 +132,8 @@ export default function Commissions() {
   const [payAmount, setPayAmount] = useState('');
   const [payDate, setPayDate] = useState(toISO(new Date()));
   const [payDesc, setPayDesc] = useState('');
+  const [payError, setPayError] = useState<string | null>(null);
+  const [paySuccess, setPaySuccess] = useState<string | null>(null);
 
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [customFrom, setCustomFrom] = useState('');
@@ -266,10 +274,11 @@ export default function Commissions() {
     enabled: !!detailEmpId,
   });
 
-  const unpaid = commissions.filter(c => !c.isPaid);
+const unpaid = commissions.filter(c => !c.isPaid);
   const paid   = commissions.filter(c => c.isPaid);
-  const selectedTotal = unpaid.filter(c => selected.has(c._id)).reduce((s, c) => s + c.amount, 0);
-  const totalPending  = unpaid.reduce((s, c) => s + c.amount, 0);
+  const getPayableAmount = (commission: Commission) => commission.payableAmount ?? commission.amount;
+  const selectedTotal = unpaid.filter(c => selected.has(c._id)).reduce((s, c) => s + getPayableAmount(c), 0);
+  const totalPending  = unpaid.reduce((s, c) => s + getPayableAmount(c), 0);
   const currentEmpSummary = summary.find(s => s.employeeId === detailEmpId);
   const aPagar = currentEmpSummary?.pendingAmount ?? totalPending;
 
@@ -278,8 +287,10 @@ export default function Commissions() {
   }
 
   function openPayForm() {
-    setPayAmount(formatBR(Math.max(0, aPagar)));
-    setPayDesc(`Pagamento de comissões (${selected.size} atend.)`);
+    const amount = selectedTotal > 0 ? selectedTotal : Math.max(0, aPagar);
+    setPayAmount(formatBR(amount));
+    setPayDesc(`Pagamento de ${selected.size} comissão${selected.size !== 1 ? 'ões' : ''}`);
+    setPayError(null);
     setShowPayForm(true);
   }
 
@@ -289,7 +300,14 @@ export default function Commissions() {
       qc.invalidateQueries({ queryKey: ['commissions-detail'] });
       qc.invalidateQueries({ queryKey: ['commissions-summary'] });
       qc.invalidateQueries({ queryKey: ['finance-summary'] });
-      setShowPayForm(false); setSelected(new Set());
+      setShowPayForm(false);
+      setSelected(new Set());
+      setPaySuccess('Pagamento registrado com sucesso!');
+      setTimeout(() => setPaySuccess(null), 4000);
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || 'Erro ao registrar pagamento. Tente novamente.';
+      setPayError(msg);
     },
   });
 
@@ -310,6 +328,16 @@ export default function Commissions() {
 
   return (
     <div className={styles.page}>
+      {/* ── Toast de sucesso ── */}
+      {paySuccess && (
+        <div className={styles.successToast}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          {paySuccess}
+        </div>
+      )}
+
       {/* ── Header ── */}
       <div className={styles.pageHeader}>
         <div className={styles.headerLeft}>
@@ -321,9 +349,14 @@ export default function Commissions() {
             {!detailEmpId && <p className={styles.pageSubtitle}>Resumo por profissional</p>}
           </div>
         </div>
-        {detailEmpId && !isEmployee && selected.size > 0 && !showPayForm && aPagar > 0 && (
-          <button className={styles.payBtn} onClick={openPayForm}>
-            Registrar Pagamento · {formatCurrency(aPagar)}
+        {detailEmpId && !isEmployee && !showPayForm && aPagar > 0 && (
+          <button
+            className={styles.payBtn}
+            onClick={openPayForm}
+            disabled={selected.size === 0}
+            title={selected.size === 0 ? 'Selecione ao menos uma comissão abaixo' : undefined}
+          >
+            Registrar Pagamento{selected.size > 0 ? ` · ${formatCurrency(selectedTotal)}` : ''}
           </button>
         )}
       </div>
@@ -479,14 +512,19 @@ export default function Commissions() {
       {/* ── Summary table ── */}
       {!detailEmpId && (
         summaryLoading ? (
-          <p className={styles.empty}>Carregando...</p>
+          <div className={styles.loadingWrap}>
+            <span className={styles.spinner} />
+            <span className={styles.loadingText}>Carregando remunerações...</span>
+          </div>
         ) : (
           <div className={styles.tableWrap}>
             <table className={styles.table}>
               <thead>
                 <tr>
                   <th className={styles.thEmp}>Profissional</th>
-                  <th className={styles.thNum}>Valor Total (R$)</th>
+                  <th className={styles.thNum}>Taxa %</th>
+                  <th className={styles.thNum}>Receita Gerada (R$)</th>
+                  <th className={styles.thNum}>Comissão Total (R$)</th>
                   <th className={styles.thNum}>Valor Pago (R$)</th>
                   <th className={styles.thNum}>Pendente Pagamento (R$)</th>
                   <th className={styles.thNum}>Vales Pendentes (R$)</th>
@@ -494,7 +532,7 @@ export default function Commissions() {
               </thead>
               <tbody>
                 {summary.length === 0 ? (
-                  <tr><td colSpan={5} className={styles.emptyCell}>Nenhum dado no período.</td></tr>
+                  <tr><td colSpan={7} className={styles.emptyCell}>Nenhum dado no período.</td></tr>
                 ) : summary.map(row => (
                   <tr key={row.employeeId}
                     className={`${styles.tableRow} ${!isEmployee ? styles.tableRowClickable : ''}`}
@@ -507,12 +545,16 @@ export default function Commissions() {
                       }
                       <span className={styles.empName}>{row.name}</span>
                     </td>
+                    <td className={styles.tdNum}>{(row.commissionRate ?? 0).toLocaleString('pt-BR')}%</td>
+                    <td className={styles.tdNum}>{formatCurrency(row.grossRevenue ?? 0)}</td>
                     <td className={styles.tdNum}>{formatCurrency(row.totalAmount)}</td>
                     <td className={styles.tdNum}>{formatCurrency(row.paidAmount)}</td>
                     <td className={`${styles.tdNum} ${row.pendingAmount > 0 ? styles.tdPending : ''}`}>
                       {formatCurrency(row.pendingAmount)}
                     </td>
-                    <td className={styles.tdNum}>{formatCurrency(row.valesAmount ?? 0)}</td>
+                    <td className={`${styles.tdNum} ${(row.valesAmount ?? 0) > 0 ? styles.tdPending : ''}`}>
+                      {formatCurrency(row.valesAmount ?? 0)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -549,7 +591,15 @@ export default function Commissions() {
 
           {!isEmployee && unpaid.length > 0 && !showPayForm && (
             <div className={styles.selectBar}>
-              <button className={styles.selectAllBtn} onClick={() => setSelected(new Set(unpaid.map(c => c._id)))}>Selecionar todos</button>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={styles.selectBarIcon}>
+                <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+              </svg>
+              <span className={styles.selectBarHint}>
+                {selected.size === 0
+                  ? 'Selecione as comissões abaixo para registrar um pagamento'
+                  : `${selected.size} de ${unpaid.length} selecionada${selected.size !== 1 ? 's' : ''} · ${formatCurrency(selectedTotal)}`}
+              </span>
+              <button className={styles.selectAllBtn} onClick={() => setSelected(new Set(unpaid.map(c => c._id)))}>Selecionar todas</button>
               {selected.size > 0 && <button className={styles.clearBtn} onClick={() => setSelected(new Set())}>Limpar</button>}
             </div>
           )}
@@ -573,9 +623,23 @@ export default function Commissions() {
                 <label>Descrição</label>
                 <input type="text" value={payDesc} onChange={e => setPayDesc(e.target.value)} />
               </div>
+              <div className={styles.payFormSummary}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                {selected.size} comissão{selected.size !== 1 ? 'ões' : ''} serão marcadas como pagas — total {formatCurrency(selectedTotal)}
+              </div>
+              {payError && (
+                <div className={styles.payFormError}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  {payError}
+                </div>
+              )}
               <div className={styles.formActions}>
                 <button type="button" className={styles.cancelBtn} onClick={() => setShowPayForm(false)}>Cancelar</button>
-                <button type="submit" className={styles.submitBtn} disabled={registerPayment.isPending}>
+                <button type="submit" className={styles.submitBtn} disabled={registerPayment.isPending || selected.size === 0}>
                   {registerPayment.isPending ? 'Salvando...' : 'Confirmar Pagamento'}
                 </button>
               </div>
@@ -585,7 +649,10 @@ export default function Commissions() {
           <div className={styles.detailColumns}>
             <div>
               {detailLoading ? (
-                <p className={styles.empty}>Carregando...</p>
+                <div className={styles.loadingWrap}>
+                  <span className={styles.spinner} />
+                  <span className={styles.loadingText}>Carregando comissões...</span>
+                </div>
               ) : unpaid.length === 0 && paid.length === 0 ? (
                 <p className={styles.empty}>Nenhuma comissão no período selecionado.</p>
               ) : (
@@ -614,7 +681,12 @@ export default function Commissions() {
                                 {clientName && <span className={styles.commClient}>{clientName}</span>}
                                 <span className={styles.commDate}>{dateStr}{appt?.startTime ? ` · ${appt.startTime}` : ''}</span>
                               </div>
-                              <span className={styles.commAmount}>{formatCurrency(c.amount)}</span>
+                              <div className={styles.commRight}>
+                                <span className={styles.commAmount}>{formatCurrency(getPayableAmount(c))}</span>
+                                {(c.deductedVales ?? 0) > 0 && (
+                                  <span className={styles.valeDeduction}>Vale -{formatCurrency(c.deductedVales ?? 0)}</span>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
@@ -638,7 +710,10 @@ export default function Commissions() {
                                 <span className={styles.commDate}>{dateStr}{appt?.startTime ? ` · ${appt.startTime}` : ''}</span>
                               </div>
                               <div className={styles.commRight}>
-                                <span className={styles.commAmount}>{formatCurrency(c.amount)}</span>
+                                <span className={styles.commAmount}>{formatCurrency(getPayableAmount(c))}</span>
+                                {(c.deductedVales ?? 0) > 0 && (
+                                  <span className={styles.valeDeduction}>Vale -{formatCurrency(c.deductedVales ?? 0)}</span>
+                                )}
                                 <span className={styles.paidBadge}>Pago</span>
                               </div>
                             </div>
@@ -652,7 +727,7 @@ export default function Commissions() {
             </div>
 
             {!isEmployee && (
-              <EmployeeVales employeeId={detailEmpId} unitId={unitId} />
+              <EmployeeVales employeeId={detailEmpId} unitId={unitId} availableCommissions={unpaid} />
             )}
           </div>
         </>

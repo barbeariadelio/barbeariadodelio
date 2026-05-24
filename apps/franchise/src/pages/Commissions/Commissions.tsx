@@ -9,19 +9,25 @@ interface EmployeeSummary {
   employeeId: string;
   name: string;
   avatar?: string;
+  grossRevenue: number;
   totalAmount: number;
   paidAmount: number;
   pendingAmount: number;
   valesAmount: number;
+  valesDiscountedAmount: number;
+  commissionRate?: number;
 }
 
 interface Commission {
   _id: string;
   amount: number;
+  payableAmount?: number;
+  deductedVales?: number;
   description: string;
   date: string;
   isPaid?: boolean;
   appointmentId?: {
+    _id?: string;
     date?: string;
     startTime?: string;
     clientId?: { name: string } | null;
@@ -268,8 +274,9 @@ export default function Commissions() {
 
   const unpaid = commissions.filter(c => !c.isPaid);
   const paid   = commissions.filter(c => c.isPaid);
-  const selectedTotal = unpaid.filter(c => selected.has(c._id)).reduce((s, c) => s + c.amount, 0);
-  const totalPending  = unpaid.reduce((s, c) => s + c.amount, 0);
+  const getPayableAmount = (commission: Commission) => commission.payableAmount ?? commission.amount;
+  const selectedTotal = unpaid.filter(c => selected.has(c._id)).reduce((s, c) => s + getPayableAmount(c), 0);
+  const totalPending  = unpaid.reduce((s, c) => s + getPayableAmount(c), 0);
   const currentEmpSummary = summary.find(s => s.employeeId === detailEmpId);
   const aPagar = currentEmpSummary?.pendingAmount ?? totalPending;
 
@@ -486,7 +493,9 @@ export default function Commissions() {
               <thead>
                 <tr>
                   <th className={styles.thEmp}>Profissional</th>
-                  <th className={styles.thNum}>Valor Total (R$)</th>
+                  <th className={styles.thNum}>Taxa %</th>
+                  <th className={styles.thNum}>Receita Gerada (R$)</th>
+                  <th className={styles.thNum}>Comissão Total (R$)</th>
                   <th className={styles.thNum}>Valor Pago (R$)</th>
                   <th className={styles.thNum}>Pendente Pagamento (R$)</th>
                   <th className={styles.thNum}>Vales Pendentes (R$)</th>
@@ -494,7 +503,7 @@ export default function Commissions() {
               </thead>
               <tbody>
                 {summary.length === 0 ? (
-                  <tr><td colSpan={5} className={styles.emptyCell}>Nenhum dado no período.</td></tr>
+                  <tr><td colSpan={7} className={styles.emptyCell}>Nenhum dado no período.</td></tr>
                 ) : summary.map(row => (
                   <tr key={row.employeeId}
                     className={`${styles.tableRow} ${!isEmployee ? styles.tableRowClickable : ''}`}
@@ -507,12 +516,16 @@ export default function Commissions() {
                       }
                       <span className={styles.empName}>{row.name}</span>
                     </td>
+                    <td className={styles.tdNum}>{(row.commissionRate ?? 0).toLocaleString('pt-BR')}%</td>
+                    <td className={styles.tdNum}>{formatCurrency(row.grossRevenue ?? 0)}</td>
                     <td className={styles.tdNum}>{formatCurrency(row.totalAmount)}</td>
                     <td className={styles.tdNum}>{formatCurrency(row.paidAmount)}</td>
                     <td className={`${styles.tdNum} ${row.pendingAmount > 0 ? styles.tdPending : ''}`}>
                       {formatCurrency(row.pendingAmount)}
                     </td>
-                    <td className={styles.tdNum}>{formatCurrency(row.valesAmount ?? 0)}</td>
+                    <td className={`${styles.tdNum} ${(row.valesAmount ?? 0) > 0 ? styles.tdPending : ''}`}>
+                      {formatCurrency(row.valesAmount ?? 0)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -614,7 +627,12 @@ export default function Commissions() {
                                 {clientName && <span className={styles.commClient}>{clientName}</span>}
                                 <span className={styles.commDate}>{dateStr}{appt?.startTime ? ` · ${appt.startTime}` : ''}</span>
                               </div>
-                              <span className={styles.commAmount}>{formatCurrency(c.amount)}</span>
+                              <div className={styles.commRight}>
+                                <span className={styles.commAmount}>{formatCurrency(getPayableAmount(c))}</span>
+                                {(c.deductedVales ?? 0) > 0 && (
+                                  <span className={styles.valeDeduction}>Vale -{formatCurrency(c.deductedVales ?? 0)}</span>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
@@ -638,7 +656,10 @@ export default function Commissions() {
                                 <span className={styles.commDate}>{dateStr}{appt?.startTime ? ` · ${appt.startTime}` : ''}</span>
                               </div>
                               <div className={styles.commRight}>
-                                <span className={styles.commAmount}>{formatCurrency(c.amount)}</span>
+                                <span className={styles.commAmount}>{formatCurrency(getPayableAmount(c))}</span>
+                                {(c.deductedVales ?? 0) > 0 && (
+                                  <span className={styles.valeDeduction}>Vale -{formatCurrency(c.deductedVales ?? 0)}</span>
+                                )}
                                 <span className={styles.paidBadge}>Pago</span>
                               </div>
                             </div>
@@ -652,7 +673,7 @@ export default function Commissions() {
             </div>
 
             {!isEmployee && (
-              <EmployeeVales employeeId={detailEmpId} unitId={unitId} />
+              <EmployeeVales employeeId={detailEmpId} unitId={unitId} availableCommissions={unpaid} />
             )}
           </div>
         </>

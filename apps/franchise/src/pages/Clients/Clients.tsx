@@ -751,6 +751,7 @@ export default function Clients() {
             )}
 
             {/* ── Tabs ── */}
+            <div className={styles.clientActivityScroll}>
             <div className={styles.clientTabs}>
               <button className={`${styles.clientTab} ${clientTab === 'history' ? styles.clientTabActive : ''}`} onClick={() => setClientTab('history')}>
                 Histórico de Atendimentos
@@ -868,6 +869,7 @@ export default function Clients() {
                 </div>
               );
             })()}
+            </div>
           </div>
         )}
       </div>

@@ -83,10 +83,19 @@ interface FinanceSummary {
   byUnit?: Array<{ unitId: string; name: string; income: number; expense: number; profit: number }>;
   byCategory?: Array<{ category: string; amount: number }>;
   byService?: Array<{ name: string; revenue: number; count: number }>;
-  byEmployee?: Array<{ id: string; name: string; unitId: string; unitName: string; appointments: number; grossRevenue: number; totalVouchers: number }>;
+  byEmployee?: Array<{ id: string; name: string; unitId: string; unitName: string; appointments: number; grossRevenue: number; totalVouchers: number; commissionRate?: number }>;
   byPaymentMethod?: Array<{ method: string; amount: number; count: number }>;
   byProduct?: Array<{ name: string; amount: number; quantity: number; count: number }>;
   chart?: Array<{ date: string; income: number; expense: number }>;
+}
+
+interface RemunerationSummaryItem {
+  employeeId: string;
+  totalAmount: number;
+  paidAmount: number;
+  pendingAmount: number;
+  valesAmount: number;
+  valesDiscountedAmount: number;
 }
 
 interface Transaction {
@@ -150,9 +159,12 @@ export default function Finance() {
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [deletingTxId, setDeletingTxId] = useState<string | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
-  const [commissionRate, setCommissionRate] = useState(55);   // %
+  const [servicesCollapsed, setServicesCollapsed] = useState(true);
+  const [commissionRate, setCommissionRate] = useState('');
   const [individualRates, setIndividualRates] = useState<Record<string, number>>({});
   const qc = useQueryClient();
+  const getCommissionRate = (employee: { id: string; commissionRate?: number }) =>
+    individualRates[employee.id] ?? employee.commissionRate ?? 0;
 
   const { data: units = [] } = useQuery<Unit[]>({
     queryKey: ['units'],
@@ -172,7 +184,7 @@ export default function Finance() {
     staleTime: 60 * 1000,
   });
 
-  const { data: transactions = [], isLoading: txLoading } = useQuery<Transaction[]>({
+  const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ['finance-transactions', unitId],
     queryFn: async () => {
       const { data } = await api.get('/finance/transactions', { params: { unitId, limit: 1000 } });
@@ -198,7 +210,7 @@ export default function Finance() {
     return { start: iso(first), end: iso(last) };
   }, [period]);
 
-  const { data: remunerationSummary } = useQuery<{ employeeId: string; paidAmount: number; pendingAmount: number; valesDiscountedAmount: number }[]>({
+  const { data: remunerationSummary = [] } = useQuery<RemunerationSummaryItem[]>({
     queryKey: ['remuneration-summary', unitId, remunerationDateRange],
     queryFn: async () => {
       const { data } = await api.get('/finance/remunerations/summary', { params: { unitId, ...remunerationDateRange } });
@@ -206,6 +218,10 @@ export default function Finance() {
     },
     staleTime: 60 * 1000,
   });
+  const remunerationByEmployee = useMemo(
+    () => new Map(remunerationSummary.map(item => [item.employeeId, item])),
+    [remunerationSummary],
+  );
 
   // Derived from all transactions (not period-filtered) — stays consistent with Lançamentos tab
   const paymentPieData = useMemo(() => {
@@ -538,10 +554,20 @@ export default function Finance() {
 
           {!isStaff && (
             <div className={styles.section}>
-              <h3 className={styles.sectionTitle}>Receita por Serviço Atendido</h3>
-              {(summary?.byService ?? []).length === 0 && <p className={styles.empty}>Nenhum agendamento confirmado ou concluído no período.</p>}
+              <div className={styles.collapsibleSectionHeader}>
+                <h3 className={styles.sectionTitle}>Receita por Serviço Atendido</h3>
+                <button
+                  type="button"
+                  className={styles.collapseBtn}
+                  onClick={() => setServicesCollapsed(prev => !prev)}
+                  aria-expanded={!servicesCollapsed}
+                >
+                  {servicesCollapsed ? 'Expandir' : 'Recolher'}
+                </button>
+              </div>
+              {!servicesCollapsed && (summary?.byService ?? []).length === 0 && <p className={styles.empty}>Nenhum agendamento confirmado ou concluído no período.</p>}
               
-              {(summary?.byService ?? []).length > 0 && (() => {
+              {!servicesCollapsed && (summary?.byService ?? []).length > 0 && (() => {
                 type Svc = { name: string; revenue: number; count: number; unitId: string; unitName: string };
                 const svcList = summary!.byService as Svc[];
 
@@ -675,25 +701,35 @@ export default function Finance() {
               {!isStaff && (
                 <div className={styles.rateControls}>
                   <div className={styles.rateField}>
-                    <label className={styles.rateLabel}>Comissão</label>
-                    <div className={styles.rateInputWrap}>
-                      <input
-                        type="number"
-                        className={styles.rateInput}
-                        value={commissionRate}
-                        min={0} max={100} step={0.1}
-                        onChange={e => {
-                          const newRate = Number(e.target.value);
-                          setCommissionRate(newRate);
+                    <label className={styles.rateLabel}>Aplicar taxa a todos</label>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <div className={styles.rateInputWrap}>
+                        <input
+                          type="number"
+                          className={styles.rateInput}
+                          value={commissionRate}
+                          min={0} max={100} step={0.1}
+                          onChange={e => setCommissionRate(e.target.value)}
+                          onWheel={e => (e.target as HTMLInputElement).blur()}
+                          onFocus={e => e.target.select()}
+                          placeholder="0"
+                        />
+                        <span className={styles.rateSuffix}>%</span>
+                      </div>
+                      <button
+                        className={styles.applyRateBtn}
+                        disabled={commissionRate === ''}
+                        onClick={() => {
                           const allEmps = (summary?.byEmployee ?? []) as Array<{ id: string }>;
+                          const rate = Number(commissionRate);
                           if (allEmps.length > 0) {
-                            setIndividualRates(Object.fromEntries(allEmps.map(emp => [emp.id, newRate])));
+                            setIndividualRates(Object.fromEntries(allEmps.map(emp => [emp.id, rate])));
                           }
                         }}
-                        onWheel={e => (e.target as HTMLInputElement).blur()}
-                        onFocus={e => e.target.select()}
-                      />
-                      <span className={styles.rateSuffix}>%</span>
+                        title="Sobrescreve a taxa de todos os profissionais com este valor. Salve para tornar permanente."
+                      >
+                        Aplicar
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -737,7 +773,7 @@ export default function Finance() {
                         <span>Profissional</span>
                         <span>Atend.</span>
                         {!isStaff && <span>Receita Gerada</span>}
-                        {!isStaff && <span style={{ textAlign: 'center' }}>%</span>}
+                        {!isStaff && <span style={{ textAlign: 'center' }} title="Taxa de comissão do profissional. Edite para ajustar e salve para aplicar permanentemente.">Taxa %</span>}
                         <span>Comissão</span>
                         <span>Vales</span>
                         <span>A Pagar</span>
@@ -745,9 +781,13 @@ export default function Finance() {
                         {!isStaff && <span>Parte Loja</span>}
                       </div>
                       {employees.map(emp => {
-                        const rate = individualRates[emp.id] ?? emp.commissionRate ?? commissionRate;
-                        const gross = emp.grossRevenue * (rate / 100);
-                        const salonShare = emp.grossRevenue - gross;
+                        const rate = getCommissionRate(emp);
+                        const remuneration = remunerationByEmployee.get(emp.id);
+                        const commissionAmount = remuneration?.totalAmount ?? 0;
+                        const pendingAmount = remuneration?.pendingAmount ?? 0;
+                        const valesAmount = remuneration?.valesAmount ?? emp.totalVouchers ?? 0;
+                        const paidAmount = remuneration?.paidAmount ?? 0;
+                        const salonShare = emp.grossRevenue - commissionAmount;
                         return (
                           <div
                             key={emp.id}
@@ -761,7 +801,10 @@ export default function Finance() {
                             <span className={styles.commissionCell}>{emp.appointments}</span>
                             {!isStaff && <span className={`${styles.commissionCell} ${styles.amber}`}>{formatCurrency(emp.grossRevenue)}</span>}
                             {!isStaff && (
-                              <div className={styles.miniRateInputWrap}>
+                              <div
+                                className={`${styles.miniRateInputWrap} ${individualRates[emp.id] !== undefined ? styles.miniRateWrapDirty : ''}`}
+                                title={individualRates[emp.id] !== undefined ? 'Taxa alterada — clique em "Salvar Alterações" para aplicar permanentemente' : 'Clique para editar a taxa de comissão'}
+                              >
                                 <input
                                   type="number"
                                   className={styles.miniRateInput}
@@ -771,13 +814,14 @@ export default function Finance() {
                                   onWheel={e => (e.target as HTMLInputElement).blur()}
                                 />
                                 <span className={styles.miniRateSuffix}>%</span>
+                                {individualRates[emp.id] !== undefined && <span className={styles.rateDirtyDot} />}
                               </div>
                             )}
-                            <span className={`${styles.commissionCell} ${styles.blue}`}>{formatCurrency(emp.grossRevenue * (rate / 100))}</span>
-                            <span className={`${styles.commissionCell} ${styles.red}`}>{formatCurrency(emp.totalVouchers || 0)}</span>
-                            <span className={`${styles.commissionCell} ${styles.green}`} style={{ fontWeight: 800 }}>{formatCurrency(Math.max(0, (emp.grossRevenue * (rate / 100)) - (remunerationSummary?.find(r => r.employeeId === emp.id)?.valesDiscountedAmount ?? 0) - (remunerationSummary?.find(r => r.employeeId === emp.id)?.paidAmount ?? 0)))}</span>
-                            {isStaff && <span className={styles.commissionCell} style={{ color: '#6B7280', fontWeight: 600 }}>{formatCurrency(remunerationSummary?.find(r => r.employeeId === emp.id)?.paidAmount ?? 0)}</span>}
-                            {!isStaff && <span className={styles.commissionCell}>{formatCurrency(emp.grossRevenue - (emp.grossRevenue * (rate / 100)))}</span>}
+                            <span className={`${styles.commissionCell} ${styles.blue}`}>{formatCurrency(commissionAmount)}</span>
+                            <span className={`${styles.commissionCell} ${styles.red}`}>{formatCurrency(valesAmount)}</span>
+                            <span className={`${styles.commissionCell} ${styles.green}`} style={{ fontWeight: 800 }}>{formatCurrency(pendingAmount)}</span>
+                            {isStaff && <span className={styles.commissionCell} style={{ color: '#6B7280', fontWeight: 600 }}>{formatCurrency(paidAmount)}</span>}
+                            {!isStaff && <span className={styles.commissionCell}>{formatCurrency(salonShare)}</span>}
                           </div>
                         );
                       })}
@@ -787,29 +831,33 @@ export default function Finance() {
                             <span>{employees.reduce((s, e) => s + e.appointments, 0)}</span>
                             <span>{formatCurrency(employees.reduce((s, e) => s + e.grossRevenue, 0))}</span>
                             <span /> 
-                            <span>{formatCurrency(employees.reduce((s, e) => s + (e.grossRevenue * ((individualRates[e.id] ?? e.commissionRate ?? commissionRate) / 100)), 0))}</span>
-                            <span>{formatCurrency(employees.reduce((s, e) => s + (e.totalVouchers || 0), 0))}</span>
-                            <span style={{ fontWeight: 800 }}>{formatCurrency(employees.reduce((s, e) => s + ((e.grossRevenue * ((individualRates[e.id] ?? e.commissionRate ?? commissionRate) / 100)) - (e.totalVouchers || 0)), 0))}</span>
-                            <span>{formatCurrency(employees.reduce((s, e) => s + (e.grossRevenue - (e.grossRevenue * ((individualRates[e.id] ?? e.commissionRate ?? commissionRate) / 100))), 0))}</span>
+                            <span>{formatCurrency(employees.reduce((s, e) => s + (remunerationByEmployee.get(e.id)?.totalAmount ?? 0), 0))}</span>
+                            <span>{formatCurrency(employees.reduce((s, e) => s + (remunerationByEmployee.get(e.id)?.valesAmount ?? e.totalVouchers ?? 0), 0))}</span>
+                            <span style={{ fontWeight: 800 }}>{formatCurrency(employees.reduce((s, e) => s + (remunerationByEmployee.get(e.id)?.pendingAmount ?? 0), 0))}</span>
+                            <span>{formatCurrency(employees.reduce((s, e) => s + (e.grossRevenue - (remunerationByEmployee.get(e.id)?.totalAmount ?? 0)), 0))}</span>
                           </div>
                       )}
 
-                      {Object.keys(individualRates).length > 0 && (
-                        <div className={styles.saveBar}>
-                          <p className={styles.saveText}>
-                            Existem alterações de comissão não salvas para {Object.keys(individualRates).length} profissional(is).
-                          </p>
-                          <div className={styles.saveActions}>
-                            <button className={styles.cancelLink} onClick={() => setIndividualRates({})}>Descartar</button>
-                            <button className={styles.saveBtn} onClick={() => setShowSaveModal(true)}>Salvar Alterações</button>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
               });
             })()}
+
+            {Object.keys(individualRates).length > 0 && (
+              <div className={styles.saveBar}>
+                <div className={styles.saveBarIcon}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <p className={styles.saveText}>
+                  Taxa de comissão alterada para <strong>{Object.keys(individualRates).length} profissional(is)</strong>. Salve para aplicar permanentemente.
+                </p>
+                <div className={styles.saveActions}>
+                  <button className={styles.cancelLink} onClick={() => setIndividualRates({})}>Descartar</button>
+                  <button className={styles.saveBtn} onClick={() => setShowSaveModal(true)}>Salvar Alterações</button>
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -829,16 +877,29 @@ export default function Finance() {
                 className={styles.confirmBtn} 
                 onClick={async () => {
                   try {
+                    const savedRates = { ...individualRates };
                     await Promise.all(
-                      Object.entries(individualRates)
+                      Object.entries(savedRates)
                         .filter(([id]) => id && id !== 'unknown')
                         .map(([id, rate]) =>
                           api.patch(`/employees/${id}`, { commissionRate: rate })
                         )
                     );
+                    qc.setQueriesData<FinanceSummary>({ queryKey: ['finance-summary'] }, old => {
+                      if (!old) return old;
+                      return {
+                        ...old,
+                        byEmployee: old.byEmployee?.map(emp =>
+                          savedRates[emp.id] !== undefined
+                            ? { ...emp, commissionRate: savedRates[emp.id] }
+                            : emp
+                        ),
+                      };
+                    });
                     setIndividualRates({});
                     setShowSaveModal(false);
-                    qc.invalidateQueries({ queryKey: ['finance-summary'] });
+                    await qc.invalidateQueries({ queryKey: ['finance-summary'], refetchType: 'active' });
+                    await qc.invalidateQueries({ queryKey: ['remuneration-summary'], refetchType: 'active' });
                   } catch (err) {
                     console.error('Failed to save rates', err);
                   }

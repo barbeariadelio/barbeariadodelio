@@ -21,5 +21,6 @@ export const updateTransactionSchema = z.object({
     employeeId: z.string().optional(),
     type: z.enum(['income', 'expense', 'royalty']).optional(),
     isPaid: z.boolean().optional(),
+    appointmentId: z.string().optional(),
   }).strict(),
 });
