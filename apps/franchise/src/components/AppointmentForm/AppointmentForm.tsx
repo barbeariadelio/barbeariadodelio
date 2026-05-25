@@ -615,11 +615,11 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
           </div>
 
           <div className={styles.field} style={{ opacity: serviceId ? 1 : 0.5, pointerEvents: serviceId ? 'auto' : 'none' }}>
-            <label className={styles.label}>Duração do agendamento (min)</label>
+            <label className={styles.label}>Duração do agendamento (min) - opcional</label>
             <input
               type="number"
               min={1}
-              step={5}
+              step={1}
               className={styles.input}
               value={customDurationMinutes}
               onChange={e => setCustomDurationMinutes(e.target.value)}

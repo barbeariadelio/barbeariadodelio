@@ -330,7 +330,7 @@ export default function Book() {
         <div className={styles.successDetails}>
           <span>{selectedService?.name} com {selectedEmployee?.name}</span>
           <span>{fmtDateLong(selectedDate)} às {selectedTime}</span>
-          <span className={styles.successPrice}>A partir de {fmt(selectedService?.price ?? 0)}</span>
+          <span className={styles.successPrice}>{fmt(selectedService?.price ?? 0)}</span>
         </div>
         <div className={styles.successActions}>
           <button className={styles.successPrimary} onClick={() => navigate('/profile')}>Ver meus agendamentos</button>
