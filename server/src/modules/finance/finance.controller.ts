@@ -16,9 +16,12 @@ export async function getSummary(req: AuthRequest, res: Response, next: NextFunc
       : (req.user!.unitId || rawQueryUnitId);
     const periodRaw = Array.isArray(req.query.period) ? req.query.period[0] : req.query.period;
     const period = (periodRaw as 'day' | 'month' | 'week' | 'year') || 'month';
+    const start = req.query.start as string | undefined;
+    const end = req.query.end as string | undefined;
+    const allTime = req.query.allTime === 'true';
     const appScope = req.headers['x-app-scope'] as string | undefined;
     const jwtUnitId = req.user!.unitId;
-    const summary = await service.getSummary(req.user!.id, req.user!.role, unitId, period, appScope, jwtUnitId);
+    const summary = await service.getSummary(req.user!.id, req.user!.role, unitId, period, appScope, jwtUnitId, start, end, allTime);
     ok(res, summary);
   } catch (e) { next(e); }
 }
@@ -35,9 +38,11 @@ export async function listTransactions(req: AuthRequest, res: Response, next: Ne
     const { page, limit } = parsePagination(req.query);
     const employeeId = req.query.employeeId as string;
     const category = req.query.category as string;
+    const start = req.query.start as string | undefined;
+    const end = req.query.end as string | undefined;
     const appScope = req.headers['x-app-scope'] as string | undefined;
     const jwtUnitId = req.user!.unitId;
-    const result = await service.getTransactions(req.user!.id, req.user!.role, unitId, page, limit, { employeeId, category }, appScope, jwtUnitId);
+    const result = await service.getTransactions(req.user!.id, req.user!.role, unitId, page, limit, { employeeId, category, start, end }, appScope, jwtUnitId);
     ok(res, result);
   } catch (e) { next(e); }
 }

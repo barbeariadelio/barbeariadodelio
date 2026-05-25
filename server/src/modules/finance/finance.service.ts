@@ -68,22 +68,27 @@ export class FinanceService {
     period: 'day' | 'month' | 'week' | 'year' = 'month',
     appScope?: string,
     jwtUnitId?: string,
+    start?: string,
+    end?: string,
+    allTime = false,
   ): Promise<FinanceSummary> {
     const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
-    const { startDate, endDate } = this.resolvePeriod(period);
+    const resolvedPeriod = start && end ? { startDate: start, endDate: end } : this.resolvePeriod(period);
+    const dateFilter = allTime ? {} : { date: { $gte: resolvedPeriod.startDate, $lte: resolvedPeriod.endDate } };
 
-    const cacheKey = `finance:summary:${unitIds.sort().join(',')}:${period}:${startDate}`;
+    const cacheRange = allTime ? 'all' : `${resolvedPeriod.startDate}:${resolvedPeriod.endDate}`;
+    const cacheKey = `finance:summary:${unitIds.sort().join(',')}:${cacheRange}`;
     const cached = sharedCache.get<FinanceSummary>(cacheKey);
     if (cached) return cached;
 
     const [transactions, appointments, unitsInfo, allEmployees] = await Promise.all([
       TransactionModel.find({
         unitId: { $in: unitIds },
-        date: { $gte: startDate, $lte: endDate },
+        ...dateFilter,
       }).populate('unitId', 'name').populate('employeeId', 'name').lean(),
       AppointmentModel.find({
         unitId: { $in: unitIds },
-        date: { $gte: startDate, $lte: endDate },
+        ...dateFilter,
         status: { $in: ['pending', 'confirmed', 'completed'] },
       })
         .populate('serviceId', 'name price')
@@ -103,13 +108,16 @@ export class FinanceService {
     return summary;
   }
 
-  async getTransactions(userId: string, role: string, unitId: string, page: number, limit: number, filters?: { employeeId?: string; category?: string }, appScope?: string, jwtUnitId?: string): Promise<{ data: ITransaction[]; total: number }> {
+  async getTransactions(userId: string, role: string, unitId: string, page: number, limit: number, filters?: { employeeId?: string; category?: string; start?: string; end?: string }, appScope?: string, jwtUnitId?: string): Promise<{ data: ITransaction[]; total: number }> {
     const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
 
     const query: FilterQuery<ITransaction> = {
       unitId: { $in: unitIds },
       ...(filters?.employeeId ? { employeeId: new mongoose.Types.ObjectId(filters.employeeId) } : {}),
       ...(filters?.category ? { category: filters.category as TransactionCategory } : {}),
+      ...(filters?.start || filters?.end
+        ? { date: { ...(filters.start ? { $gte: filters.start } : {}), ...(filters.end ? { $lte: filters.end } : {}) } }
+        : {}),
     };
 
     const [data, total] = await Promise.all([

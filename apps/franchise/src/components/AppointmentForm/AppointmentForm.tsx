@@ -123,6 +123,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
   const [clientId, setClientId] = useState('');
   const [quickSelectedClient, setQuickSelectedClient] = useState<Client | null>(null);
   const [clientSearch, setClientSearch] = useState('');
+  const [debouncedClientSearch, setDebouncedClientSearch] = useState('');
   const [showClientList, setShowClientList] = useState(false);
   const [showQuickRegister, setShowQuickRegister] = useState(false);
   const [quickName, setQuickName] = useState('');
@@ -197,6 +198,11 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedClientSearch(clientSearch.trim()), 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [clientSearch]);
+
   const envUnitId = activeUnitId;
 
   const { data: units = [] } = useQuery<Unit[]>({
@@ -253,8 +259,12 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
   });
 
   const { data: clients = [] } = useQuery<Client[]>({
-    queryKey: ['clients', unitId],
-    queryFn: () => unitApi.get(`/clients${unitId ? `?unitId=${unitId}` : ''}`).then(r => Array.isArray(r.data) ? r.data : r.data?.clients ?? []),
+    queryKey: ['clients', unitId, debouncedClientSearch],
+    queryFn: () => {
+      const params = new URLSearchParams({ unitId });
+      if (debouncedClientSearch) params.set('q', debouncedClientSearch);
+      return unitApi.get(`/clients?${params.toString()}`).then(r => Array.isArray(r.data) ? r.data : r.data?.clients ?? []);
+    },
     enabled: !!unitId,
   });
 
@@ -330,7 +340,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     try {
       const res = await unitApi.post('/clients', { name: quickName.trim(), phone: quickPhone.replace(/\D/g, '') || undefined, unitId: unitId || undefined });
       const newClient: Client = res.data;
-      qc.setQueryData<Client[]>(['clients', unitId], current => {
+      qc.setQueryData<Client[]>(['clients', unitId, ''], current => {
         const list = Array.isArray(current) ? current : [];
         return list.some(client => client._id === newClient._id) ? list : [newClient, ...list];
       });

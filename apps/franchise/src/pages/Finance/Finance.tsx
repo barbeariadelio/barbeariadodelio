@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, getSelectedUnitId } from '../../api/client';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend, Cell, PieChart, Pie } from 'recharts';
@@ -18,11 +18,44 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const PERIOD_OPTIONS = [
+  { label: 'Todos', value: 'all' },
   { label: 'Dia', value: 'day' },
   { label: 'Semana', value: 'week' },
   { label: 'Mês', value: 'month' },
   { label: 'Ano', value: 'year' },
-];
+  { label: 'Personalizado', value: 'custom' },
+] as const;
+
+type Period = typeof PERIOD_OPTIONS[number]['value'];
+
+function toISO(d: Date) {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function rangeForPeriod(period: Period) {
+  const now = new Date();
+  if (period === 'day') return { start: toISO(now), end: toISO(now) };
+  if (period === 'week') {
+    const start = new Date(now);
+    start.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
+    return { start: toISO(start), end: toISO(end) };
+  }
+  if (period === 'year') return { start: `${now.getFullYear()}-01-01`, end: `${now.getFullYear()}-12-31` };
+  if (period === 'month') {
+    return {
+      start: toISO(new Date(now.getFullYear(), now.getMonth(), 1)),
+      end: toISO(new Date(now.getFullYear(), now.getMonth() + 1, 0)),
+    };
+  }
+  return { start: '', end: '' };
+}
+
+function formatFilterDate(date: string) {
+  return date.split('-').reverse().join('/');
+}
 
 // --- Local Components for Soul Style ---
 
@@ -154,7 +187,15 @@ export default function Finance() {
   const userId = (user as any)?.id || (user as any)?._id;
   const activeUnitId = getSelectedUnitId() || import.meta.env.VITE_UNIT_ID || 'all';
   const [unitId, setUnitId] = useState(activeUnitId);
-  const [period, setPeriod] = useState('month');
+  const initialRange = rangeForPeriod('month');
+  const [period, setPeriod] = useState<Period>('month');
+  const [filterStart, setFilterStart] = useState(initialRange.start);
+  const [filterEnd, setFilterEnd] = useState(initialRange.end);
+  const [periodMenuOpen, setPeriodMenuOpen] = useState(false);
+  const [showCustomPeriod, setShowCustomPeriod] = useState(false);
+  const [customStart, setCustomStart] = useState(initialRange.start);
+  const [customEnd, setCustomEnd] = useState(initialRange.end);
+  const periodMenuRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<TabType>('geral');
   const [showForm, setShowForm] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
@@ -167,6 +208,67 @@ export default function Finance() {
   const getCommissionRate = (employee: { id: string; commissionRate?: number }) =>
     individualRates[employee.id] ?? employee.commissionRate ?? 0;
 
+  useEffect(() => {
+    function closePeriodMenu(event: MouseEvent) {
+      if (periodMenuRef.current && !periodMenuRef.current.contains(event.target as Node)) setPeriodMenuOpen(false);
+    }
+    document.addEventListener('mousedown', closePeriodMenu);
+    return () => document.removeEventListener('mousedown', closePeriodMenu);
+  }, []);
+
+  function applyPeriod(nextPeriod: Period) {
+    setPeriodMenuOpen(false);
+    if (nextPeriod === 'custom') {
+      setCustomStart(filterStart || toISO(new Date()));
+      setCustomEnd(filterEnd || toISO(new Date()));
+      setShowCustomPeriod(true);
+      return;
+    }
+    setPeriod(nextPeriod);
+    const nextRange = rangeForPeriod(nextPeriod);
+    setFilterStart(nextRange.start);
+    setFilterEnd(nextRange.end);
+  }
+
+  function applyCustomPeriod() {
+    if (!customStart || !customEnd || customStart > customEnd) return;
+    setPeriod('custom');
+    setFilterStart(customStart);
+    setFilterEnd(customEnd);
+    setShowCustomPeriod(false);
+  }
+
+  function shiftPeriod(direction: -1 | 1) {
+    if (!filterStart || period === 'custom' || period === 'all') return;
+    const start = new Date(`${filterStart}T12:00:00`);
+    if (period === 'day') {
+      start.setDate(start.getDate() + direction);
+      setFilterStart(toISO(start));
+      setFilterEnd(toISO(start));
+    } else if (period === 'week') {
+      start.setDate(start.getDate() + direction * 7);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      setFilterStart(toISO(start));
+      setFilterEnd(toISO(end));
+    } else if (period === 'month') {
+      const nextStart = new Date(start.getFullYear(), start.getMonth() + direction, 1);
+      const nextEnd = new Date(nextStart.getFullYear(), nextStart.getMonth() + 1, 0);
+      setFilterStart(toISO(nextStart));
+      setFilterEnd(toISO(nextEnd));
+    } else {
+      const year = start.getFullYear() + direction;
+      setFilterStart(`${year}-01-01`);
+      setFilterEnd(`${year}-12-31`);
+    }
+  }
+
+  const summaryParams = useMemo(() => ({
+    unitId,
+    period: period === 'all' || period === 'custom' ? 'month' : period,
+    ...(period === 'all' ? { allTime: true } : { start: filterStart, end: filterEnd }),
+  }), [unitId, period, filterStart, filterEnd]);
+
   const { data: units = [] } = useQuery<Unit[]>({
     queryKey: ['units'],
     queryFn: async () => {
@@ -177,9 +279,9 @@ export default function Finance() {
   });
 
   const { data: summary, isLoading: summaryLoading } = useQuery<FinanceSummary>({
-    queryKey: ['finance-summary', unitId, period],
+    queryKey: ['finance-summary', summaryParams],
     queryFn: async () => {
-      const { data } = await api.get('/finance/summary', { params: { unitId, period } });
+      const { data } = await api.get('/finance/summary', { params: summaryParams });
       return data;
     },
     staleTime: 60 * 1000,
@@ -205,23 +307,10 @@ export default function Finance() {
     [summary?.byEmployee],
   );
 
-  const remunerationDateRange = useMemo(() => {
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    if (period === 'day') { const t = iso(now); return { start: t, end: t }; }
-    if (period === 'week') {
-      const day = now.getDay();
-      const mon = new Date(now); mon.setDate(now.getDate() - ((day + 6) % 7));
-      const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-      return { start: iso(mon), end: iso(sun) };
-    }
-    if (period === 'year') return { start: `${now.getFullYear()}-01-01`, end: `${now.getFullYear()}-12-31` };
-    // month (default)
-    const first = new Date(now.getFullYear(), now.getMonth(), 1);
-    const last  = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return { start: iso(first), end: iso(last) };
-  }, [period]);
+  const remunerationDateRange = useMemo(
+    () => period === 'all' ? {} : { start: filterStart, end: filterEnd },
+    [period, filterStart, filterEnd],
+  );
 
   const { data: remunerationSummary = [] } = useQuery<RemunerationSummaryItem[]>({
     queryKey: ['remuneration-summary', unitId, remunerationDateRange],
@@ -237,9 +326,15 @@ export default function Finance() {
   );
 
   const { data: transactions = [] } = useQuery<Transaction[]>({
-    queryKey: ['finance-transactions', unitId],
+    queryKey: ['finance-transactions', unitId, period, filterStart, filterEnd],
     queryFn: async () => {
-      const { data } = await api.get('/finance/transactions', { params: { unitId, limit: 1000 } });
+      const { data } = await api.get('/finance/transactions', {
+        params: {
+          unitId,
+          limit: 1000,
+          ...(period === 'all' ? {} : { start: filterStart, end: filterEnd }),
+        },
+      });
       return Array.isArray(data) ? data : data.data ?? [];
     },
     staleTime: 30 * 1000,
@@ -307,6 +402,48 @@ export default function Finance() {
     saveAs(blob, `financeiro_${unitId}_${period}_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
+  const periodLabel = PERIOD_OPTIONS.find(option => option.value === period)?.label ?? 'Mês';
+  const hasRangeNavigation = period !== 'all' && period !== 'custom';
+  const rangeLabel = filterStart && filterEnd
+    ? (filterStart === filterEnd ? formatFilterDate(filterStart) : `${formatFilterDate(filterStart)} - ${formatFilterDate(filterEnd)}`)
+    : '';
+  const periodFilter = (
+    <div className={styles.periodFilter}>
+      <div className={styles.periodDropdown} ref={periodMenuRef}>
+        <button type="button" className={styles.periodSelectBtn} onClick={() => setPeriodMenuOpen(open => !open)}>
+          {periodLabel}
+          <span aria-hidden="true">⌄</span>
+        </button>
+        {periodMenuOpen && (
+          <div className={styles.periodMenu}>
+            {PERIOD_OPTIONS.map(option => (
+              <button
+                type="button"
+                key={option.value}
+                className={`${styles.periodMenuItem} ${period === option.value ? styles.periodMenuItemActive : ''}`}
+                onClick={() => applyPeriod(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {hasRangeNavigation && (
+        <div className={styles.rangeNavigation}>
+          <button type="button" onClick={() => shiftPeriod(-1)} aria-label="Período anterior">‹</button>
+          <span>{rangeLabel}</span>
+          <button type="button" onClick={() => shiftPeriod(1)} aria-label="Próximo período">›</button>
+        </div>
+      )}
+      {period === 'custom' && (
+        <button type="button" className={styles.customRangeBtn} onClick={() => setShowCustomPeriod(true)}>
+          {rangeLabel}
+        </button>
+      )}
+    </div>
+  );
+
   if (summaryLoading) {
     return (
       <div className={styles.page}>
@@ -349,17 +486,7 @@ export default function Finance() {
             ))}
           </select>
 
-          <div className={styles.periodTabs}>
-            {PERIOD_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                className={`${styles.periodBtn} ${period === opt.value ? styles.periodBtnActive : ''}`}
-                onClick={() => setPeriod(opt.value)}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+          {periodFilter}
 
           <div className={styles.tabs}>
             {(['geral', 'mensal', 'despesas', 'lancamentos'] as TabType[]).map(tab => (
@@ -379,16 +506,26 @@ export default function Finance() {
         <div style={{ marginBottom: '2rem' }}>
           <h3 className={styles.sectionTitle}>Meu Salário e Comissões</h3>
           <p className={styles.subtitle}>Acompanhe seus rendimentos no período selecionado</p>
-          <div className={styles.periodTabs} style={{ marginTop: '1rem' }}>
-            {PERIOD_OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                className={`${styles.periodBtn} ${period === opt.value ? styles.periodBtnActive : ''}`}
-                onClick={() => setPeriod(opt.value)}
-              >
-                {opt.label}
-              </button>
-            ))}
+          <div style={{ marginTop: '1rem' }}>{periodFilter}</div>
+        </div>
+      )}
+
+      {showCustomPeriod && (
+        <div className={styles.periodModalOverlay} onClick={() => setShowCustomPeriod(false)}>
+          <div className={styles.periodModal} onClick={event => event.stopPropagation()}>
+            <h2>Escolher Período</h2>
+            <label>
+              De
+              <input type="date" value={customStart} onChange={event => setCustomStart(event.target.value)} />
+            </label>
+            <label>
+              Até
+              <input type="date" value={customEnd} onChange={event => setCustomEnd(event.target.value)} />
+            </label>
+            <div className={styles.periodModalActions}>
+              <button type="button" onClick={() => setShowCustomPeriod(false)}>Voltar</button>
+              <button type="button" onClick={applyCustomPeriod} disabled={!customStart || !customEnd || customStart > customEnd}>Pesquisar</button>
+            </div>
           </div>
         </div>
       )}
