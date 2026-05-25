@@ -276,8 +276,13 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     : services;
   const selectedService = services.find(s => s._id === serviceId);
 
-  const filteredClients = clientSearch.trim()
-    ? clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase().trim()))
+  const normalizedClientSearch = clientSearch.trim().toLowerCase();
+  const clientSearchDigits = normalizedClientSearch.replace(/\D/g, '');
+  const filteredClients = normalizedClientSearch
+    ? clients.filter(c =>
+      c.name.toLowerCase().includes(normalizedClientSearch) ||
+      (clientSearchDigits.length > 0 && (c.phone ?? '').replace(/\D/g, '').includes(clientSearchDigits))
+    )
     : clients;
 
   const selectedClient = clients.find(c => c._id === clientId) ?? (quickSelectedClient?._id === clientId ? quickSelectedClient : undefined);
@@ -505,7 +510,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
                   <input
                     type="text"
                     className={styles.clientSearchInput}
-                    placeholder="Buscar cliente pelo nome..."
+                    placeholder="Buscar cliente por nome ou telefone..."
                     value={clientSearch}
                     onChange={e => { setClientSearch(e.target.value); setShowClientList(true); }}
                     onFocus={() => setShowClientList(true)}
