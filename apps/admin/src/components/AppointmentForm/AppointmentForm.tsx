@@ -222,20 +222,9 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
   const selectedClient = clients.find(c => c._id === clientId) ?? (quickSelectedClient?._id === clientId ? quickSelectedClient : undefined);
   const selectedService = services.find(s => s._id === serviceId);
 
-  useEffect(() => {
-    if (!serviceId) {
-      setCustomDurationMinutes('');
-      return;
-    }
-    if (!customDurationMinutes && selectedService) {
-      setCustomDurationMinutes(String(selectedService.durationMinutes > 0 ? selectedService.durationMinutes : 30));
-    }
-  }, [serviceId, selectedService, customDurationMinutes]);
-
   function handleServiceChange(nextServiceId: string) {
     setServiceId(nextServiceId);
-    const svc = services.find(s => s._id === nextServiceId);
-    setCustomDurationMinutes(svc ? String(svc.durationMinutes > 0 ? svc.durationMinutes : 30) : '');
+    setCustomDurationMinutes('');
   }
 
   function selectClient(c: Client) {
@@ -301,7 +290,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       return;
     }
     const service = services.find(s => s._id === serviceId);
-    const durationMinutes = Math.max(1, Number(customDurationMinutes) || service?.durationMinutes || 30);
+    const customDuration = customDurationMinutes.trim() ? Math.max(1, Number(customDurationMinutes)) : null;
 
     if (date < todayISO()) {
       setError('Não é possível agendar em uma data que já passou.');
@@ -315,12 +304,14 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
         serviceId,
         date: apptDate,
         startTime,
-        endTime: addMinutesToTime(startTime, durationMinutes),
         notes,
         isPackage: finalIsPackage,
         products: apptProducts.length > 0 ? apptProducts : undefined,
         seriesId,
       };
+      if (customDuration !== null) {
+        payload.endTime = addMinutesToTime(startTime, customDuration);
+      }
       // Only include price on creation — edits must not reset the stored prorated price
       if (!appointment?._id) {
         payload.price = finalIsPackage ? 0 : (service?.price ?? 0);

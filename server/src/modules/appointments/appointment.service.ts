@@ -200,12 +200,14 @@ export class AppointmentService {
       }
     }
 
-    if (!data.endTime && data.serviceId && data.startTime) {
+    const internalOverride = data.source === 'admin';
+
+    // Custom duration is reserved for internal scheduling. Public/client
+    // requests always use the registered service duration.
+    if (data.serviceId && data.startTime && (!internalOverride || !data.endTime)) {
       const svc = await ServiceModel.findById(data.serviceId);
       if (svc) data.endTime = calcEndTime(data.startTime, svc.durationMinutes);
     }
-
-    const internalOverride = data.source === 'admin';
 
     if (data.status !== 'blocked' && !internalOverride) {
       const unit = await UnitModel.findById(data.unitId).select('workingDays');
@@ -836,15 +838,16 @@ export class AppointmentService {
     if (!appt) throw new NotFoundError('Appointment');
     const internalOverride = data.source === 'admin';
 
-    if (data.startTime && !data.endTime && (data.serviceId || appt.serviceId)) {
+    const mustUseServiceDuration = !internalOverride && Boolean(data.endTime);
+    if ((data.startTime || data.serviceId || mustUseServiceDuration) && (data.serviceId || appt.serviceId)) {
       const svcId = data.serviceId || appt.serviceId;
       const svc = await ServiceModel.findById(svcId);
-      if (svc) {
-        data.endTime = calcEndTime(data.startTime, svc.durationMinutes);
+      if (svc && (!internalOverride || !data.endTime)) {
+        data.endTime = calcEndTime(data.startTime || appt.startTime, svc.durationMinutes);
       }
     }
 
-    if (data.startTime || data.date || data.employeeId) {
+    if (data.startTime || data.endTime || data.serviceId || data.date || data.employeeId) {
       const checkDate = data.date || appt.date;
 
       // Validate working days

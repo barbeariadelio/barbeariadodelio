@@ -282,20 +282,9 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
 
   const selectedClient = clients.find(c => c._id === clientId) ?? (quickSelectedClient?._id === clientId ? quickSelectedClient : undefined);
 
-  useEffect(() => {
-    if (!serviceId) {
-      setCustomDurationMinutes('');
-      return;
-    }
-    if (!customDurationMinutes && selectedService) {
-      setCustomDurationMinutes(String(selectedService.durationMinutes > 0 ? selectedService.durationMinutes : 30));
-    }
-  }, [serviceId, selectedService, customDurationMinutes]);
-
   function handleServiceChange(nextServiceId: string) {
     setServiceId(nextServiceId);
-    const svc = services.find(s => s._id === nextServiceId);
-    setCustomDurationMinutes(svc ? String(svc.durationMinutes > 0 ? svc.durationMinutes : 30) : '');
+    setCustomDurationMinutes('');
   }
 
   function selectClient(c: Client) {
@@ -372,21 +361,27 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       return;
     }
     const service = services.find(s => s._id === serviceId);
-    const durationMinutes = Math.max(1, Number(customDurationMinutes) || service?.durationMinutes || 30);
+    const customDuration = customDurationMinutes.trim() ? Math.max(1, Number(customDurationMinutes)) : null;
 
     if (date < todayISO()) {
       setError('Não é possível agendar em uma data que já passou.');
       return;
     }
 
-    const buildPayload = (apptDate: string, finalIsPackage: boolean, seriesId?: string) => ({
-      unitId, clientId, employeeId, serviceId,
-      date: apptDate, startTime, endTime: addMinutesToTime(startTime, durationMinutes), notes,
-      price: finalIsPackage ? 0 : (service?.price ?? 0),
-      isPackage: finalIsPackage,
-      products: cart && cart.length > 0 ? cart.map(i => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice })) : undefined,
-      ...(seriesId ? { seriesId } : {}),
-    });
+    const buildPayload = (apptDate: string, finalIsPackage: boolean, seriesId?: string) => {
+      const payload: Record<string, unknown> = {
+        unitId, clientId, employeeId, serviceId,
+        date: apptDate, startTime, notes,
+        price: finalIsPackage ? 0 : (service?.price ?? 0),
+        isPackage: finalIsPackage,
+        products: cart && cart.length > 0 ? cart.map(i => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice })) : undefined,
+        ...(seriesId ? { seriesId } : {}),
+      };
+      if (customDuration !== null) {
+        payload.endTime = addMinutesToTime(startTime, customDuration);
+      }
+      return payload;
+    };
 
     const doCreate = async (finalIsPackage: boolean) => {
       setError(null);
