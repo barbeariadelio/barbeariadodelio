@@ -43,7 +43,7 @@ interface Product {
 
 interface Props {
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (appointment?: unknown) => void;
   initialDate?: string;
   initialEmployeeId?: string;
   initialTime?: string;
@@ -377,6 +377,8 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     }
     const service = services.find(s => s._id === serviceId);
     const customDuration = customDurationMinutes.trim() ? Math.max(1, Number(customDurationMinutes)) : null;
+    const originalServiceId = appointment?.serviceId?._id || appointment?.serviceId;
+    const serviceChanged = Boolean(appointment?._id && originalServiceId !== serviceId);
 
     if (date < todayISO()) {
       setError('Não é possível agendar em uma data que já passou.');
@@ -387,11 +389,13 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       const payload: Record<string, unknown> = {
         unitId, clientId, employeeId, serviceId,
         date: apptDate, startTime, notes,
-        price: finalIsPackage ? 0 : (service?.price ?? 0),
         isPackage: finalIsPackage,
         products: cart && cart.length > 0 ? cart.map(i => ({ productId: i.productId, name: i.name, quantity: i.quantity, unitPrice: i.unitPrice })) : undefined,
         ...(seriesId ? { seriesId } : {}),
       };
+      if (!appointment?._id || serviceChanged) {
+        payload.price = finalIsPackage ? 0 : (service?.price ?? 0);
+      }
       if (customDuration !== null) {
         payload.endTime = addMinutesToTime(startTime, customDuration);
       }
@@ -404,11 +408,12 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       try {
         if (!repeatEnabled || appointment?._id) {
           if (appointment?._id) {
-            await unitApi.patch(`/appointments/${appointment._id}`, buildPayload(date, finalIsPackage));
+            const { data: updatedAppointment } = await unitApi.patch(`/appointments/${appointment._id}`, buildPayload(date, finalIsPackage));
+            onSuccess(updatedAppointment);
           } else {
             await unitApi.post('/appointments', buildPayload(date, finalIsPackage));
+            onSuccess();
           }
-          onSuccess();
         } else {
           const dates: string[] = [date];
           const endISO = repeatEndType === 'date' && repeatEndDate ? repeatEndDate : twoYearsISO(date);

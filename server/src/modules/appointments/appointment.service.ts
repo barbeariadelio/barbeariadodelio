@@ -254,7 +254,7 @@ export class AppointmentService {
     
     const svc = await ServiceModel.findById(data.serviceId);
 
-    let finalPrice = data.price ?? svc?.price ?? 0;
+    let finalPrice = svc?.price ?? data.price ?? 0;
     let usedPackageId = undefined;
     let isPackage = data.isPackage || svc?.type === 'package';
 
@@ -421,7 +421,7 @@ export class AppointmentService {
     const isBuyingPackage = svc.type === 'package';
     const isUsingPackage = !!activeSub && svc.type === 'single';
 
-    let finalPrice = isUsingPackage ? 0 : price;
+    let finalPrice = isUsingPackage ? 0 : svc.price;
     let usedPackageId = undefined;
 
     if (isUsingPackage) {
@@ -509,6 +509,10 @@ export class AppointmentService {
         ],
       });
       if (conflict) throw new AppError('Este horário já está ocupado por outro agendamento.', 409);
+    }
+
+    if (appt.isBilled && options?.price != null && options.price !== appt.price) {
+      throw new AppError('Não é possível alterar o valor de um agendamento já faturado.', 400);
     }
 
     appt.status = status;
@@ -837,6 +841,27 @@ export class AppointmentService {
     const appt = await AppointmentModel.findById(id);
     if (!appt) throw new NotFoundError('Appointment');
     const internalOverride = data.source === 'admin';
+    const isServiceChange = Boolean(
+      data.serviceId && data.serviceId.toString() !== appt.serviceId?.toString()
+    );
+    const mustRecalculatePrice = isServiceChange || (!internalOverride && data.price !== undefined);
+    const changesBilledService = appt.isBilled && (
+      data.clientId !== undefined ||
+      data.employeeId !== undefined ||
+      data.serviceId !== undefined ||
+      data.unitId !== undefined ||
+      data.date !== undefined ||
+      data.startTime !== undefined ||
+      data.endTime !== undefined ||
+      data.price !== undefined ||
+      data.isPackage !== undefined ||
+      data.usedPackageId !== undefined
+    );
+    const changesBilledProducts = appt.productsBilled && data.products !== undefined;
+
+    if (changesBilledService || changesBilledProducts) {
+      throw new AppError('Não é possível editar valores ou dados de um agendamento já faturado.', 400);
+    }
 
     const mustUseServiceDuration = !internalOverride && Boolean(data.endTime);
     if ((data.startTime || data.serviceId || mustUseServiceDuration) && (data.serviceId || appt.serviceId)) {
@@ -845,6 +870,37 @@ export class AppointmentService {
       if (svc && (!internalOverride || !data.endTime)) {
         data.endTime = calcEndTime(data.startTime || appt.startTime, svc.durationMinutes);
       }
+    }
+
+    if (mustRecalculatePrice && appt.status !== 'blocked') {
+      const nextServiceId = data.serviceId || appt.serviceId;
+      const nextClientId = data.clientId || appt.clientId;
+      const svc = await ServiceModel.findById(nextServiceId);
+      if (!svc) throw new NotFoundError('Service');
+
+      let finalPrice = svc.price;
+      let isPackage = svc.type === 'package';
+      let usedPackageId: mongoose.Types.ObjectId | undefined;
+
+      if (svc.type === 'package') {
+        const totalSessions = svc.packageItems?.reduce((total, item) => total + (item.quantity || 1), 0) || 1;
+        finalPrice = Math.round((svc.price / totalSessions) * 100) / 100;
+      }
+      if (svc.type === 'single' && nextClientId) {
+        const client = await ClientModel.findById(nextClientId);
+        if (client) {
+          const packagePrice = await this.calculateProratedPrice(client, nextServiceId.toString());
+          if (packagePrice.packageId) {
+            finalPrice = packagePrice.price;
+            usedPackageId = packagePrice.packageId;
+            isPackage = true;
+          }
+        }
+      }
+
+      data.price = finalPrice;
+      data.isPackage = isPackage;
+      data.usedPackageId = usedPackageId;
     }
 
     if (data.startTime || data.endTime || data.serviceId || data.date || data.employeeId) {
@@ -880,7 +936,7 @@ export class AppointmentService {
     Object.assign(appt, data);
     const saved = await appt.save();
     invalidateSlotCache(saved.unitId.toString(), saved.employeeId.toString(), saved.date);
-    return saved;
+    return this.findById(saved._id.toString());
   }
 
   private generateSlots(start: string, end: string, intervalMin: number): string[] {

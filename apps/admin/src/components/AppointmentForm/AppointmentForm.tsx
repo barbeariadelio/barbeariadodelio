@@ -62,7 +62,7 @@ function formatRepeatPreview(baseDate: string, interval: number, unit: RepeatUni
 
 interface Props {
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (appointment?: unknown) => void;
   initialDate?: string;
   initialEmployeeId?: string;
   initialTime?: string;
@@ -296,6 +296,8 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     }
     const service = services.find(s => s._id === serviceId);
     const customDuration = customDurationMinutes.trim() ? Math.max(1, Number(customDurationMinutes)) : null;
+    const originalServiceId = appointment?.serviceId?._id || appointment?.serviceId;
+    const serviceChanged = Boolean(appointment?._id && originalServiceId !== serviceId);
 
     if (date < todayISO()) {
       setError('Não é possível agendar em uma data que já passou.');
@@ -317,8 +319,9 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       if (customDuration !== null) {
         payload.endTime = addMinutesToTime(startTime, customDuration);
       }
-      // Only include price on creation — edits must not reset the stored prorated price
-      if (!appointment?._id) {
+      // A service swap adopts the selected service price. Other edits preserve
+      // possible billed or package-adjusted values already stored.
+      if (!appointment?._id || serviceChanged) {
         payload.price = finalIsPackage ? 0 : (service?.price ?? 0);
       }
       return payload;
@@ -326,10 +329,11 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
 
     const createOne = async (apptDate: string, finalIsPackage: boolean, seriesId?: string) => {
       if (appointment?._id) {
-        await api.patch(`/appointments/${appointment._id}`, buildPayload(apptDate, finalIsPackage));
-      } else {
-        await api.post('/appointments', buildPayload(apptDate, finalIsPackage, seriesId));
+        const { data: updatedAppointment } = await api.patch(`/appointments/${appointment._id}`, buildPayload(apptDate, finalIsPackage));
+        return updatedAppointment;
       }
+      await api.post('/appointments', buildPayload(apptDate, finalIsPackage, seriesId));
+      return undefined;
     };
 
     const doCreate = async (finalIsPackage: boolean) => {
@@ -337,8 +341,8 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       setIsSubmitting(true);
       try {
         if (!repeatEnabled || appointment?._id) {
-          await createOne(date, finalIsPackage);
-          onSuccess();
+          const updatedAppointment = await createOne(date, finalIsPackage);
+          onSuccess(updatedAppointment);
         } else {
           // Build full list of dates
           const dates: string[] = [date];

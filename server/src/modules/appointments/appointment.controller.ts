@@ -181,6 +181,9 @@ export async function updateAppointmentStatus(req: AuthRequest, res: Response, n
 
     // Security check
     const isOwnerOrFranchisor = req.user!.role === 'owner';
+    if (req.user!.role === 'client' && status !== 'cancelled') {
+      throw new AppError('Clientes só podem cancelar seus próprios agendamentos.', 403);
+    }
     if (!isOwnerOrFranchisor) {
       if (req.user!.role === 'client') {
         const clients = await ClientModel.find({ userId: req.user!.id });

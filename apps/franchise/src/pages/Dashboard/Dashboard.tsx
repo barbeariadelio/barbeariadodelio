@@ -134,6 +134,22 @@ export default function Dashboard() {
     qc.invalidateQueries({ queryKey: ['employees'] });
   }
 
+  function handleAppointmentSaved(updatedAppointment?: unknown) {
+    if (updatedAppointment && typeof updatedAppointment === 'object' && '_id' in updatedAppointment) {
+      const updated = updatedAppointment as ScheduleAppointment;
+      if (updated.date === dayISO) {
+        qc.setQueryData<ScheduleAppointment[]>(['appointments-day', dayISO, unitId], current =>
+          current?.map(appointment => appointment._id === updated._id ? updated : appointment) ?? current,
+        );
+      }
+    }
+    setShowForm(false);
+    setEditAppt(null);
+    setSlotEmployeeId(undefined);
+    setSlotTime(undefined);
+    handleScheduleUpdate();
+  }
+
   /* ── Mutations for Shared Components ── */
   const statusMut = useMutation({
     mutationFn: ({ id, status, options }: { id: string; status: string; options?: StatusOptions }) =>
@@ -246,13 +262,7 @@ export default function Dashboard() {
             setSlotEmployeeId(undefined);
             setSlotTime(undefined);
           }}
-          onSuccess={() => {
-            setShowForm(false);
-            setEditAppt(null);
-            setSlotEmployeeId(undefined);
-            setSlotTime(undefined);
-            handleScheduleUpdate();
-          }}
+          onSuccess={handleAppointmentSaved}
         />
       )}
     </div>
