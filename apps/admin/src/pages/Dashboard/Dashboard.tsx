@@ -1,8 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { useAuth } from '../../contexts/AuthContext';
 import { api, apiBaseUrl, getSelectedUnitId } from '../../api/client';
 import { 
@@ -17,15 +15,6 @@ function dateISO(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function getGreeting(name?: string | null) {
-  const h = new Date().getHours();
-  const first = name?.split(' ')[0] ?? '';
-  const suffix = first ? `, ${first}` : '';
-  if (h < 12) return `Bom dia${suffix}`;
-  if (h < 18) return `Boa tarde${suffix}`;
-  return `Boa noite${suffix}`;
-}
-
 interface UnitConfig {
   workingDays?: number[];
   workingHours?: { start: string; end: string; lunchStart?: string; lunchEnd?: string };
@@ -38,7 +27,6 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const unitId = getSelectedUnitId() || (user as any)?.unitId;
-  const dateLabel = format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
   const isStaff = user?.role === 'employee';
   const isCashier = user?.role === 'cashier';
   const userId = (user as any)?.id || (user as any)?._id;
@@ -172,16 +160,6 @@ export default function Dashboard() {
           ⚠️ {errorMsg}
         </div>
       )}
-      <header className={styles.header}>
-        <p className={styles.dateLabel}>{dateLabel}</p>
-        <h1 className={styles.greeting}>{getGreeting(user?.name)}</h1>
-        <p className={styles.subtitle}>
-          {dayAppointments.length === 0
-            ? 'Nenhum agendamento neste dia.'
-            : `${dayAppointments.length} agendamento${dayAppointments.length > 1 ? 's' : ''} no dia selecionado.`}
-        </p>
-      </header>
-
       <StaffSchedule
         appointments={dayAppointments}
         employees={employees}

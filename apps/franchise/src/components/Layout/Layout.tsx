@@ -240,9 +240,13 @@ export default function Layout() {
     }
   }, [notifsOpen, unreadCount, markAllAsReadMutation]);
 
-  function handleLogout() {
-    logout();
-    navigate('/login');
+  async function handleLogout() {
+    try {
+      await api.post('/auth/logout');
+    } finally {
+      logout();
+      navigate('/login');
+    }
   }
 
   const handleToggleTheme = async () => {

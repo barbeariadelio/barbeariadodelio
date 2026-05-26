@@ -56,6 +56,15 @@ export default function Layout() {
   const qc = useQueryClient();
   const lastNotifId = useRef<string | null>(null);
 
+  async function handleLogout() {
+    try {
+      await api.post('/auth/logout');
+    } finally {
+      logout();
+      navigate('/login');
+    }
+  }
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (notifsRef.current && !notifsRef.current.contains(event.target as Node)) {
@@ -170,7 +179,7 @@ export default function Layout() {
             <div className={styles.avatar}>{user?.name?.[0]?.toUpperCase() ?? 'U'}</div>
             {!collapsed && <div className={styles.userMeta}><span className={styles.userName}>{user?.name}</span><span className={styles.userRole}>{user?.role}</span></div>}
           </div>
-          <button onClick={() => { logout(); navigate('/login'); }} className={styles.logoutBtn} title="Sair"><IconLogOut /></button>
+          <button onClick={handleLogout} className={styles.logoutBtn} title="Sair"><IconLogOut /></button>
         </div>
       </aside>
 

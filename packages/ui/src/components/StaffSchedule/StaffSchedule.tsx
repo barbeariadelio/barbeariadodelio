@@ -34,6 +34,11 @@ const PALETTES = [
   { bg: 'rgba(136,14,79,0.12)',   border: '#880E4F', text: '#880E4F', avatar: '#880E4F' },
 ];
 
+const APPOINTMENT_PALETTES = {
+  pendingBilling: { bg: '#FFF1B8', border: '#EAB308', text: '#4A3B0B' },
+  billed: { bg: '#D6E7FF', border: '#3B82F6', text: '#164E90' },
+};
+
 const STATUS_DOT: Record<string, string> = {
   confirmed: '#22C55E',
   completed: '#1E88E5',
@@ -786,6 +791,7 @@ export default function StaffSchedule({
 
   const cols = employees.length || 1;
   const gridCols = `56px repeat(${cols}, minmax(150px, 1fr))`;
+  const dayAppointmentCount = appointments.filter(appt => appt.status !== 'blocked').length;
 
   return (
     <div className={styles.wrap}>
@@ -815,10 +821,17 @@ export default function StaffSchedule({
             <button className={styles.navBtn} onClick={() => onDateChange(subDays(selectedDate, 1))}><ChevL /></button>
             <button className={styles.navBtn} onClick={() => onDateChange(addDays(selectedDate, 1))}><ChevR /></button>
           </div>
-          <span className={styles.dateLabel}>
-            <span className={styles.hideMobile}>{dateLabel}</span>
-            <span className={styles.showMobile}>{shortDateLabel}</span>
-          </span>
+          <div className={styles.dateInfo}>
+            <span className={styles.dateLabel}>
+              <span className={styles.hideMobile}>{dateLabel}</span>
+              <span className={styles.showMobile}>{shortDateLabel}</span>
+            </span>
+            <span className={styles.appointmentCount}>
+              {dayAppointmentCount === 0
+                ? 'Nenhum agendamento neste dia'
+                : `${dayAppointmentCount} agendamento${dayAppointmentCount > 1 ? 's' : ''} no dia`}
+            </span>
+          </div>
         </div>
         {canManageAppointments && (
           <button className={styles.newBtn} onClick={onNewAppt}>
@@ -969,19 +982,21 @@ export default function StaffSchedule({
                 )}
 
                 {!fullyBlocked && isT && <div className={styles.nowLine} style={{ top: nowTop }} />}
-                {!fullyBlocked && appts.map(appt => (
-                  <div
-                    key={appt._id}
-                    className={styles.apptCard}
-                    style={{
-                      top: timeToTop(appt.startTime),
-                      height: timeToHeight(appt.startTime, appt.endTime, slotDuration),
-                      background: appt.status === 'blocked' ? '#374151' : pal.bg,
-                      borderLeftColor: appt.status === 'blocked' ? '#6B7280' : pal.border,
-                      color: appt.status === 'blocked' ? '#E5E7EB' : pal.text,
-                    }}
-                    onClick={(e) => { e.stopPropagation(); setSelectedAppt(appt); }}
-                  >
+                {!fullyBlocked && appts.map(appt => {
+                  const cardPalette = appt.isBilled ? APPOINTMENT_PALETTES.billed : APPOINTMENT_PALETTES.pendingBilling;
+                  return (
+                    <div
+                      key={appt._id}
+                      className={styles.apptCard}
+                      style={{
+                        top: timeToTop(appt.startTime),
+                        height: timeToHeight(appt.startTime, appt.endTime, slotDuration),
+                        background: appt.status === 'blocked' ? '#374151' : cardPalette.bg,
+                        borderLeftColor: appt.status === 'blocked' ? '#6B7280' : cardPalette.border,
+                        color: appt.status === 'blocked' ? '#E5E7EB' : cardPalette.text,
+                      }}
+                      onClick={(e) => { e.stopPropagation(); setSelectedAppt(appt); }}
+                    >
                     <div className={styles.apptCardHeader}>
                       <div className={styles.apptTime}>{appt.startTime} – {appt.endTime}</div>
                       <div className={styles.apptIcons}>
@@ -1022,9 +1037,10 @@ export default function StaffSchedule({
                       </div>
                     )}
 
-                    <span className={styles.statusDot} style={{ background: STATUS_DOT[appt.status] }} />
-                  </div>
-                ))}
+                      <span className={styles.statusDot} style={{ background: STATUS_DOT[appt.status] }} />
+                    </div>
+                  );
+                })}
               </div>
             );
           })}

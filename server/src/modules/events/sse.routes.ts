@@ -1,11 +1,12 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env';
+import { UserModel } from '../auth/auth.model';
 import { sseService } from './sse.service';
 
 const router = Router();
 
-router.get('/', (req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
   const token = req.query.token as string | undefined;
   if (!token) { res.status(401).end(); return; }
 
@@ -15,6 +16,14 @@ router.get('/', (req: Request, res: Response) => {
   } catch {
     res.status(401).end();
     return;
+  }
+
+  if (payload?.persistentSession === true) {
+    const user = await UserModel.findById(payload.id).select('tokenVersion isActive').lean();
+    if (!user?.isActive || user.tokenVersion !== payload.tokenVersion) {
+      res.status(401).end();
+      return;
+    }
   }
 
   const unitId = payload?.unitId as string | undefined;

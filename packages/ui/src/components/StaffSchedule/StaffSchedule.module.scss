@@ -139,6 +139,14 @@
   & + & { border-left: 1px solid var(--border-default); }
 }
 
+.dateInfo {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
 .dateLabel {
   font-family: 'Inter', sans-serif;
   font-size: 0.875rem;
@@ -150,6 +158,13 @@
   @media (max-width: 640px) {
     font-size: 0.8125rem;
   }
+}
+
+.appointmentCount {
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
 
 .newBtn {

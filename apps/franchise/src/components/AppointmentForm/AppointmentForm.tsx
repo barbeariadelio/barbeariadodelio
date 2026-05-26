@@ -2,6 +2,7 @@ import { FormEvent, useState, useRef, useEffect, useMemo, useCallback } from 're
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { api, resolveApiBaseUrl, getStoredAccessToken, getSelectedUnitId, setupInterceptors } from '../../api/client';
+import { useAuth } from '../../contexts/AuthContext';
 import styles from './AppointmentForm.module.scss';
 
 function maskPhone(raw: string) {
@@ -117,8 +118,12 @@ function IconX() {
 }
 
 export default function AppointmentForm({ onClose, onSuccess, initialDate, initialEmployeeId, initialTime, appointment }: Props) {
+  const { user } = useAuth();
   const qc = useQueryClient();
-  const activeUnitId = getSelectedUnitId() || import.meta.env.VITE_UNIT_ID || '';
+  const isCashier = user?.role === 'cashier';
+  const activeUnitId = isCashier
+    ? user?.unitId || ''
+    : getSelectedUnitId() || import.meta.env.VITE_UNIT_ID || '';
   const [unitId, setUnitId] = useState(activeUnitId);
   const [clientId, setClientId] = useState('');
   const [quickSelectedClient, setQuickSelectedClient] = useState<Client | null>(null);
@@ -235,6 +240,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     }
   }, [units, unitId]);
 
+  const availableUnits = isCashier ? units.filter(u => u._id === activeUnitId) : units;
   const selectedUnit = units.find(u => u._id === unitId);
 
   const unitApi = useMemo(() => {
@@ -494,12 +500,12 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.field}>
             <label className={styles.label}>Unidade *</label>
-            <select className={styles.select} value={unitId} onChange={e => {
+            <select className={styles.select} value={unitId} disabled={isCashier} onChange={e => {
               setUnitId(e.target.value);
               setClientId(''); setEmployeeId(''); setServiceId(''); setCustomDurationMinutes('');
             }} required>
               <option value="">Selecione uma unidade</option>
-              {units.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
+              {availableUnits.map(u => <option key={u._id} value={u._id}>{u.name}</option>)}
             </select>
           </div>
 

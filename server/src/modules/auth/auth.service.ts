@@ -40,6 +40,7 @@ export class AuthService {
       user.role,
       user.tokenVersion,
       user.unitId?.toString(),
+      user.role !== 'client',
     );
 
     const userObj = user.toObject();
@@ -141,6 +142,7 @@ export class AuthService {
         role: UserRole;
         tokenVersion: number;
         unitId?: string;
+        persistentSession?: boolean;
       };
       
       const user = await UserModel.findById(payload.id);
@@ -152,7 +154,13 @@ export class AuthService {
         throw new AppError('Sessão expirada. Faça login novamente.', 401);
       }
 
-      const accessToken = this.signAccess(payload.id, payload.role, payload.unitId);
+      const accessToken = this.signAccess(
+        payload.id,
+        payload.role,
+        payload.unitId,
+        payload.tokenVersion,
+        payload.persistentSession === true,
+      );
       return { accessToken };
     } catch (e) {
       if (e instanceof AppError) throw e;
@@ -249,21 +257,19 @@ export class AuthService {
     }
   }
 
-  private generateTokens(id: string, role: UserRole, tokenVersion: number, unitId?: string): AuthTokens {
-    const accessToken = this.signAccess(id, role, unitId);
-    const refreshToken = jwt.sign(
-      { id, role, unitId, tokenVersion },
-      env.jwtRefreshSecret,
-      { expiresIn: env.jwtRefreshExpiresIn as any },
-    );
+  private generateTokens(id: string, role: UserRole, tokenVersion: number, unitId?: string, persistentSession = false): AuthTokens {
+    const accessToken = this.signAccess(id, role, unitId, tokenVersion, persistentSession);
+    const refreshPayload = { id, role, unitId, tokenVersion, persistentSession: persistentSession || undefined };
+    const refreshToken = persistentSession
+      ? jwt.sign(refreshPayload, env.jwtRefreshSecret)
+      : jwt.sign(refreshPayload, env.jwtRefreshSecret, { expiresIn: env.jwtRefreshExpiresIn as any });
     return { accessToken, refreshToken };
   }
 
-  private signAccess(id: string, role: UserRole, unitId?: string): string {
-    return jwt.sign(
-      { id, role, unitId },
-      env.jwtSecret,
-      { expiresIn: env.jwtExpiresIn as any },
-    );
+  private signAccess(id: string, role: UserRole, unitId?: string, tokenVersion?: number, persistentSession = false): string {
+    const accessPayload = { id, role, unitId, tokenVersion, persistentSession: persistentSession || undefined };
+    return persistentSession
+      ? jwt.sign(accessPayload, env.jwtSecret)
+      : jwt.sign(accessPayload, env.jwtSecret, { expiresIn: env.jwtExpiresIn as any });
   }
 }
