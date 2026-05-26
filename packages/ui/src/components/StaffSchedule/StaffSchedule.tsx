@@ -776,9 +776,12 @@ export default function StaffSchedule({
 
   useEffect(() => {
     if (isT && scrollRef.current) {
-      scrollRef.current.scrollTop = Math.max(0, nowTop - 160);
+      const isCurrentTimeInsideGrid = nowTop < TOTAL_H;
+      scrollRef.current.scrollTop = isCurrentTimeInsideGrid ? Math.max(0, nowTop - 160) : 0;
     }
-  }, [isT, selectedDate]);
+    // Do not follow `nowTop` minute by minute after the user starts navigating.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isT, selectedDate, TOTAL_H]);
 
   const byEmployee = useMemo(() => {
     const map: Record<string, ScheduleAppointment[]> = {};
