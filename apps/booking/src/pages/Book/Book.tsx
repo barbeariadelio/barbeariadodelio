@@ -8,7 +8,8 @@ import styles from './Book.module.scss';
 
 interface Unit { _id: string; name: string; apiUrl?: string; workingDays?: number[]; }
 interface Service { _id: string; name: string; description?: string; price: number; durationMinutes: number; isActive?: boolean; image?: string; showPrice?: boolean; showPricePrefix?: boolean; }
-interface Employee { _id: string; name: string; hasAvatar?: boolean; serviceIds?: string[]; daySchedules?: { day: number; slots: { start: string; end: string }[] }[]; workSchedule?: { workDays?: number[] }; }
+type ServiceIdRef = string | { _id: string };
+interface Employee { _id: string; name: string; hasAvatar?: boolean; serviceIds?: ServiceIdRef[]; daySchedules?: { day: number; slots: { start: string; end: string }[] }[]; workSchedule?: { workDays?: number[] }; }
 
 type Step = 'barber' | 'service' | 'datetime' | 'confirm';
 const STEPS: Step[] = ['barber', 'service', 'datetime', 'confirm'];
@@ -28,6 +29,10 @@ function maskPhone(raw: string) {
 }
 function todayISO() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function initials(name: string) { return name.split(' ').slice(0,2).map(n=>n[0]).join('').toUpperCase(); }
+function normalizeId(id: ServiceIdRef | undefined): string {
+  if (!id) return '';
+  return typeof id === 'string' ? id : id._id;
+}
 function fmtDateLong(iso: string) {
   if (!iso) return '—';
   const [y,m,d] = iso.split('-').map(Number);
@@ -219,9 +224,13 @@ export default function Book() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const visibleServices = selectedEmployee?.serviceIds?.length
-    ? services.filter(s => selectedEmployee.serviceIds!.includes(s._id))
+  const selectedEmployeeServiceIds = selectedEmployee?.serviceIds?.map(normalizeId).filter(Boolean) ?? [];
+  const matchedEmployeeServices = selectedEmployeeServiceIds.length
+    ? services.filter(s => selectedEmployeeServiceIds.includes(s._id))
     : services;
+  const visibleServices = selectedEmployeeServiceIds.length && matchedEmployeeServices.length === 0
+    ? services
+    : matchedEmployeeServices;
 
   const { data: slots = [], isFetching: slotsLoading } = useQuery<string[]>({
     queryKey: ['slots', unitId, selectedEmployee?._id, selectedDate, selectedService?.durationMinutes, unit?.apiUrl],

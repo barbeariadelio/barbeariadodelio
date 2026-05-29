@@ -12,8 +12,14 @@ export class ServiceService {
     if (onlineOnly) filter.isOnline = true;
 
     const services = await ServiceModel.find(filter).sort({ name: 1 }).lean() as unknown as IService[];
-    sharedCache.set(cacheKey, services, 60);
-    return services;
+    const payload = (onlineOnly
+      ? services.map((svc) => ({
+          ...svc,
+          image: typeof svc.image === 'string' && /^https?:\/\//i.test(svc.image) ? svc.image : undefined,
+        }))
+      : services) as unknown as IService[];
+    sharedCache.set(cacheKey, payload, 60);
+    return payload;
   }
 
   async findById(id: string): Promise<IService> {

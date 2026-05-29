@@ -11,11 +11,14 @@ export async function listServices(req: AuthRequest, res: Response, next: NextFu
     // Soul540-style: non-owners are locked to their JWT unitId.
     // listServices is also called unauthenticated (booking flow), so fall back
     // to query param when there is no authenticated user.
-    const unitId = req.user
-      ? resolveUnitId(req)
-      : (req.query.unitId as string | undefined) || null;
-    if (!unitId) { ok(res, []); return; }
     const onlineOnly = req.query.online === 'true';
+    const queryUnitId = (req.query.unitId as string | undefined) || null;
+    const unitId = onlineOnly && queryUnitId
+      ? queryUnitId
+      : req.user
+        ? resolveUnitId(req)
+        : queryUnitId;
+    if (!unitId) { ok(res, []); return; }
     const services = await service.findByUnit(unitId, onlineOnly);
     ok(res, services);
   } catch (e) { next(e); }
