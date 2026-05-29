@@ -124,9 +124,10 @@ export default function Commissions() {
   const qc = useQueryClient();
   const unitId = getSelectedUnitId() || (user as any)?.unitId;
 
-  const [preset, setPreset] = useState<Preset>('all');
-  const [filterStart, setFilterStart] = useState('');
-  const [filterEnd, setFilterEnd] = useState('');
+  const initialWeekRange = getInitialRange('week');
+  const [preset, setPreset] = useState<Preset>('week');
+  const [filterStart, setFilterStart] = useState(initialWeekRange.start);
+  const [filterEnd, setFilterEnd] = useState(initialWeekRange.end);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [monthPickerOpen, setMonthPickerOpen] = useState(false);
   const dropdownRef    = useRef<HTMLDivElement>(null);
@@ -301,10 +302,11 @@ export default function Commissions() {
 
   const unpaid = commissions.filter(c => !c.isPaid);
   const paid   = commissions.filter(c => c.isPaid);
-  const getPayableAmount = (commission: Commission) => commission.payableAmount ?? commission.amount;
-  const selectedTotal = unpaid.filter(c => selected.has(c._id)).reduce((s, c) => s + getPayableAmount(c), 0);
-  const totalPending  = unpaid.reduce((s, c) => s + getPayableAmount(c), 0);
   const currentEmpSummary = summary.find(s => s.employeeId === detailEmpId);
+  const weeklyValeDiscount = currentEmpSummary?.valesDiscountedAmount ?? 0;
+  const selectedGrossTotal = unpaid.filter(c => selected.has(c._id)).reduce((s, c) => s + c.amount, 0);
+  const selectedTotal = selected.size > 0 ? Math.max(0, selectedGrossTotal - weeklyValeDiscount) : 0;
+  const totalPending  = currentEmpSummary?.pendingAmount ?? Math.max(0, unpaid.reduce((s, c) => s + c.amount, 0) - weeklyValeDiscount);
   const aPagar = currentEmpSummary?.pendingAmount ?? totalPending;
 
   function toggleSelect(id: string) {
@@ -312,8 +314,11 @@ export default function Commissions() {
   }
 
   function openPayForm() {
+    if (selected.size === 0) {
+      setSelected(new Set(unpaid.map(c => c._id)));
+    }
     setPayAmount(formatBR(Math.max(0, aPagar)));
-    setPayDesc(`Pagamento de comissões (${selected.size} atend.)`);
+    setPayDesc('Pagamento semanal de comissões');
     setShowPayForm(true);
   }
 
@@ -331,8 +336,9 @@ export default function Commissions() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const amount = parseBR(payAmount);
-    if (!amount || selected.size === 0) return;
-    registerPayment.mutate({ employeeId: detailEmpId, unitId, commissionIds: Array.from(selected), amount, description: payDesc, date: payDate });
+    const commissionIds = selected.size > 0 ? Array.from(selected) : unpaid.map(c => c._id);
+    if (commissionIds.length === 0) return;
+    registerPayment.mutate({ employeeId: detailEmpId, unitId, commissionIds, amount, description: payDesc, date: payDate, start: filterStart, end: filterEnd });
   }
 
   function openDetail(empId: string, empName: string) {
@@ -356,9 +362,9 @@ export default function Commissions() {
             {!detailEmpId && <p className={styles.pageSubtitle}>Resumo por profissional</p>}
           </div>
         </div>
-        {detailEmpId && !isEmployee && selected.size > 0 && !showPayForm && aPagar > 0 && (
+        {detailEmpId && !isEmployee && !showPayForm && unpaid.length > 0 && (
           <button className={styles.payBtn} onClick={openPayForm}>
-            Registrar Pagamento · {formatCurrency(aPagar)}
+            Registrar Pagamento Semanal · {formatCurrency(aPagar)}
           </button>
         )}
       </div>
@@ -656,10 +662,7 @@ export default function Commissions() {
                                 <span className={styles.commDate}>{dateStr}{appt?.startTime ? ` · ${appt.startTime}` : ''}</span>
                               </div>
                               <div className={styles.commRight}>
-                                <span className={styles.commAmount}>{formatCurrency(getPayableAmount(c))}</span>
-                                {(c.deductedVales ?? 0) > 0 && (
-                                  <span className={styles.valeDeduction}>Vale -{formatCurrency(c.deductedVales ?? 0)}</span>
-                                )}
+                                <span className={styles.commAmount}>{formatCurrency(c.amount)}</span>
                               </div>
                             </div>
                           );
@@ -684,10 +687,7 @@ export default function Commissions() {
                                 <span className={styles.commDate}>{dateStr}{appt?.startTime ? ` · ${appt.startTime}` : ''}</span>
                               </div>
                               <div className={styles.commRight}>
-                                <span className={styles.commAmount}>{formatCurrency(getPayableAmount(c))}</span>
-                                {(c.deductedVales ?? 0) > 0 && (
-                                  <span className={styles.valeDeduction}>Vale -{formatCurrency(c.deductedVales ?? 0)}</span>
-                                )}
+                                <span className={styles.commAmount}>{formatCurrency(c.amount)}</span>
                                 <span className={styles.paidBadge}>Pago</span>
                               </div>
                             </div>
@@ -729,7 +729,7 @@ export default function Commissions() {
               </section>
 
               {!isEmployee && (
-                <EmployeeVales employeeId={detailEmpId} unitId={unitId} availableCommissions={unpaid} />
+                <EmployeeVales employeeId={detailEmpId} unitId={unitId} />
               )}
             </div>
           </div>

@@ -19,8 +19,6 @@ interface UnitConfig {
   name?: string;
   workingDays?: number[];
   workingHours?: { start: string; end: string; lunchStart?: string; lunchEnd?: string };
-  slotInterval?: number;
-  calendarGrid?: number;
 }
 
 type EditableAppointment = ScheduleAppointment;
@@ -216,7 +214,6 @@ export default function Dashboard() {
         unitId={unitId}
         workingDays={unitConfig?.workingDays}
         workingHours={unitConfig?.workingHours}
-        slotDuration={unitConfig?.calendarGrid || 15}
         onStatusChange={async (id, s, opts) => { await statusMut.mutateAsync({ id, status: s, options: opts }); }}
         onDelete={handleDelete}
         onBlock={async (payload) => { await blockMut.mutateAsync(payload); }}

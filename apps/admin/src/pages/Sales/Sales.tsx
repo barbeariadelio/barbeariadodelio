@@ -60,7 +60,7 @@ export default function Sales() {
   const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ['sales-history', unitId, fromDate, toDate],
     queryFn: () => {
-      const params = new URLSearchParams({ unitId, category: 'sale' });
+      const params = new URLSearchParams({ unitId, category: 'product' });
       if (fromDate) params.set('from', fromDate);
       if (toDate) params.set('to', toDate);
       return api.get(`/finance/transactions?${params}`).then(r => {
@@ -102,17 +102,18 @@ export default function Sales() {
     setChecking(true);
     setSuccessMsg('');
     try {
-      const description = 'Venda: ' + cart.map(i => `${i.product.name} x${i.qty}`).join(', ');
       const today = todayISO();
 
-      await api.post('/finance/transactions', {
-        unitId,
-        type: 'income',
-        category: 'sale',
-        amount: total,
-        description,
-        date: today,
-      });
+      await Promise.all(cart.map(i =>
+        api.post('/finance/transactions', {
+          unitId,
+          type: 'income',
+          category: 'product',
+          amount: i.product.price * i.qty,
+          description: `Produto: ${i.product.name} (x${i.qty})`,
+          date: today,
+        })
+      ));
 
       await Promise.all(cart.map(i =>
         api.put(`/products/${i.product._id}`, {

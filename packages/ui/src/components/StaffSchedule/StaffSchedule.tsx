@@ -6,6 +6,7 @@ import styles from './StaffSchedule.module.scss';
 
 const SLOT_H = 54;
 const HEADER_H = 72;
+const GRID_SLOT_DURATION = 30;
 
 function buildGrid(startHour: number, endHour: number, slotDuration: number = 30) {
   const slotsPerHour = 60 / slotDuration;
@@ -99,6 +100,40 @@ function initials(name: string) {
   return name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
 }
 
+function capitalize(value: string) {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+}
+
+function titleCaseDate(value: string) {
+  return value
+    .split(' ')
+    .map(part => part.includes('-') ? part.split('-').map(capitalize).join('-') : capitalize(part))
+    .join(' ');
+}
+
+function greetingByHour(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 12) return 'Bom dia';
+  if (hour < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
+function formatReminderDate(isoDate: string) {
+  const date = new Date(`${isoDate}T12:00:00`);
+  const formatted = titleCaseDate(format(date, "EEEE, dd 'de' MMMM", { locale: ptBR }));
+  return isToday(date) ? `Hoje, ${formatted}` : formatted;
+}
+
+function buildWhatsAppReminder(appt: ScheduleAppointment, businessName: string) {
+  const serviceName = appt.serviceId?.name ?? 'Serviço';
+  const employeeName = appt.employeeId?.name ?? 'Barbeiro';
+  return `Olá, ${greetingByHour()}! Você tem um horário marcado para ${formatReminderDate(appt.date)}.\n\n` +
+    `_${appt.startTime} - ${serviceName} - ${employeeName}_\n\n` +
+    `Podemos confirmar o seu horário?\n\n` +
+    `Obrigado,\n` +
+    `[Barbearia do Délio]`;
+}
+
 function ChevL() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -122,13 +157,7 @@ function XIcon() {
 }
 
 function WhatsAppModal({ appt, onClose, onReminderSent, businessName = 'Barbearia' }: { appt: any, onClose: () => void, onReminderSent?: () => void, businessName?: string }) {
-  const defaultMsg = `Olá, ${appt.clientId?.name}! Você tem um horário marcado para ${appt.date.split('-').reverse().join('/')} às ${appt.startTime}.\n\n` +
-    `${appt.serviceId?.name ?? 'Serviço'}\n\n` +
-    `Podemos confirmar o seu horário?\n\n` +
-    `Obrigado,\n` +
-    `${businessName}`;
-
-  const [message, setMessage] = useState(defaultMsg);
+  const [message, setMessage] = useState(buildWhatsAppReminder(appt, businessName));
 
   const handleSend = () => {
     const phone = appt.clientId?.phone?.replace(/\D/g, '');
@@ -699,7 +728,6 @@ interface Props {
   businessName?: string;
   canBill?: boolean;
   canManageAppointments?: boolean;
-  slotDuration?: number;
 }
 
 export default function StaffSchedule({
@@ -726,12 +754,11 @@ export default function StaffSchedule({
   businessName,
   canBill = true,
   canManageAppointments = true,
-  slotDuration = 30,
 }: Props) {
   const startHour = workingHours?.start ? parseInt(workingHours.start.split(':')[0], 10) : 8;
   const endHour   = workingHours?.end   ? parseInt(workingHours.end.split(':')[0], 10) + (parseInt(workingHours.end.split(':')[1], 10) > 0 ? 1 : 0) : 21;
-  const { totalH: TOTAL_H, timeSlots: TIME_SLOTS, slotsPerHour } = buildGrid(startHour, Math.max(endHour, startHour + 1), slotDuration);
-  const timeToTop = makeTimeToTop(startHour, slotDuration);
+  const { totalH: TOTAL_H, timeSlots: TIME_SLOTS, slotsPerHour } = buildGrid(startHour, Math.max(endHour, startHour + 1), GRID_SLOT_DURATION);
+  const timeToTop = makeTimeToTop(startHour, GRID_SLOT_DURATION);
 
   const [selectedAppt, setSelectedAppt] = useState<ScheduleAppointment | null>(null);
   const [blockPrompt, setBlockPrompt] = useState<{ employeeId: string; employeeName: string; time: string } | null>(null);
@@ -756,8 +783,8 @@ export default function StaffSchedule({
   }
 
   const isT = isToday(selectedDate);
-  const dateLabel = format(selectedDate, "EEE, d 'de' MMMM 'de' yyyy", { locale: ptBR });
-  const shortDateLabel = format(selectedDate, "dd/MM/yy");
+  const dateLabel = capitalize(format(selectedDate, "EEE, dd/MMM/yy", { locale: ptBR }).replace(/\./g, ''));
+  const shortDateLabel = dateLabel;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -793,12 +820,13 @@ export default function StaffSchedule({
   }, [appointments]);
 
   const cols = employees.length || 1;
-  const gridCols = `56px repeat(${cols}, minmax(150px, 1fr))`;
+  const gridCols = `68px repeat(${cols}, minmax(210px, 1fr))`;
   const dayAppointmentCount = appointments.filter(appt => appt.status !== 'blocked').length;
 
   return (
     <div className={styles.wrap}>
       <div className={styles.toolbar}>
+        <div className={styles.scheduleTitle}>Atendimentos</div>
         <div className={styles.toolbarLeft}>
           <button className={styles.datePickerBtn} onClick={() => dateInputRef.current?.showPicker()} title="Escolher data">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
@@ -842,7 +870,7 @@ export default function StaffSchedule({
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
             </svg>
             <span className={styles.hideMobile}>Novo Agendamento</span>
-            <span className={styles.showMobile}>Novo</span>
+            <span className={styles.showMobile}>Agendar</span>
           </button>
         )}
       </div>
@@ -901,7 +929,7 @@ export default function StaffSchedule({
             return (
               <div key={emp._id} className={styles.empCol} style={{ height: TOTAL_H }}>
                 {TIME_SLOTS.map((t, si) => {
-                  const endMins = startHour * 60 + (si + 1) * slotDuration;
+                  const endMins = startHour * 60 + (si + 1) * GRID_SLOT_DURATION;
                   const endT = `${Math.floor(endMins / 60).toString().padStart(2, '0')}:${(endMins % 60).toString().padStart(2, '0')}`;
                   return (
                     <div
@@ -961,7 +989,7 @@ export default function StaffSchedule({
                           <div className={styles.offHours} style={{ top: timeToTop(emp.workSchedule.end), height: TOTAL_H - timeToTop(emp.workSchedule.end), pointerEvents: 'none' }} />
                         )}
                         {emp.workSchedule.lunchStart && emp.workSchedule.lunchEnd && (
-                          <div className={styles.lunchBreak} style={{ top: timeToTop(emp.workSchedule.lunchStart), height: timeToHeight(emp.workSchedule.lunchStart, emp.workSchedule.lunchEnd, slotDuration), pointerEvents: 'none' }}>
+                          <div className={styles.lunchBreak} style={{ top: timeToTop(emp.workSchedule.lunchStart), height: timeToHeight(emp.workSchedule.lunchStart, emp.workSchedule.lunchEnd, GRID_SLOT_DURATION), pointerEvents: 'none' }}>
                             <span>ALMOÇO</span>
                           </div>
                         )}
@@ -975,7 +1003,7 @@ export default function StaffSchedule({
                           <div className={styles.offHours} style={{ top: timeToTop(workingHours.end), height: TOTAL_H - timeToTop(workingHours.end), pointerEvents: 'none' }} />
                         )}
                         {workingHours.lunchStart && workingHours.lunchEnd && (
-                          <div className={styles.lunchBreak} style={{ top: timeToTop(workingHours.lunchStart), height: timeToHeight(workingHours.lunchStart, workingHours.lunchEnd, slotDuration), pointerEvents: 'none' }}>
+                          <div className={styles.lunchBreak} style={{ top: timeToTop(workingHours.lunchStart), height: timeToHeight(workingHours.lunchStart, workingHours.lunchEnd, GRID_SLOT_DURATION), pointerEvents: 'none' }}>
                             <span>ALMOÇO</span>
                           </div>
                         )}
@@ -993,7 +1021,7 @@ export default function StaffSchedule({
                       className={styles.apptCard}
                       style={{
                         top: timeToTop(appt.startTime),
-                        height: timeToHeight(appt.startTime, appt.endTime, slotDuration),
+                        height: timeToHeight(appt.startTime, appt.endTime, GRID_SLOT_DURATION),
                         background: appt.status === 'blocked' ? '#374151' : cardPalette.bg,
                         borderLeftColor: appt.status === 'blocked' ? '#6B7280' : cardPalette.border,
                         color: appt.status === 'blocked' ? '#E5E7EB' : cardPalette.text,

@@ -18,8 +18,6 @@ function dateISO(d: Date) {
 interface UnitConfig {
   workingDays?: number[];
   workingHours?: { start: string; end: string; lunchStart?: string; lunchEnd?: string };
-  slotInterval?: number;
-  calendarGrid?: number;
 }
 
 export default function Dashboard() {
@@ -183,7 +181,6 @@ export default function Dashboard() {
         unitId={unitId}
         workingDays={unitConfig?.workingDays}
         workingHours={unitConfig?.workingHours}
-        slotDuration={unitConfig?.calendarGrid || 15}
         onStatusChange={async (id, s, opts) => { await statusMut.mutateAsync({ id, status: s, options: opts }); }}
         onDelete={async (id: string, mode?: 'single' | 'this-and-future') => { await deleteMut.mutateAsync({ id, mode }); }}
         onBlock={async (payload) => { await blockMut.mutateAsync(payload); }}

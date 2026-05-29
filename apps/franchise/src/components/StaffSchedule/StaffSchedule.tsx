@@ -90,6 +90,40 @@ function initials(name: string) {
   return name.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase();
 }
 
+function capitalize(value: string) {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+}
+
+function titleCaseDate(value: string) {
+  return value
+    .split(' ')
+    .map(part => part.includes('-') ? part.split('-').map(capitalize).join('-') : capitalize(part))
+    .join(' ');
+}
+
+function greetingByHour(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 12) return 'Bom dia';
+  if (hour < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
+function formatReminderDate(isoDate: string) {
+  const date = new Date(`${isoDate}T12:00:00`);
+  const formatted = titleCaseDate(format(date, "EEEE, dd 'de' MMMM", { locale: ptBR }));
+  return isToday(date) ? `Hoje, ${formatted}` : formatted;
+}
+
+function buildWhatsAppReminder(appt: ScheduleAppointment, businessName: string) {
+  const serviceName = appt.serviceId?.name ?? 'Serviço';
+  const employeeName = appt.employeeId?.name ?? 'Barbeiro';
+  return `Olá, ${greetingByHour()}! Você tem um horário marcado para ${formatReminderDate(appt.date)}.\n\n` +
+    `_${appt.startTime} - ${serviceName} - ${employeeName}_\n\n` +
+    `Podemos confirmar o seu horário?\n\n` +
+    `Obrigado,\n` +
+    `[Barbearia do Délio]`;
+}
+
 function ChevL() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -120,13 +154,7 @@ function WhatsAppIcon() {
 }
 
 function WhatsAppModal({ appt, onClose }: { appt: any, onClose: () => void }) {
-  const defaultMsg = `Olá, ${appt.clientId?.name}! Você tem um horário marcado para ${appt.date.split('-').reverse().join('/')} às ${appt.startTime}.\n\n` +
-    `${appt.serviceId?.name ?? 'Serviço'}\n\n` +
-    `Podemos confirmar o seu horário?\n\n` +
-    `Obrigado,\n` +
-    `Barbearia do Delio`;
-
-  const [message, setMessage] = useState(defaultMsg);
+  const [message, setMessage] = useState(buildWhatsAppReminder(appt, 'Barbearia do Delio'));
 
   const handleSend = () => {
     const phone = appt.clientId?.phone?.replace(/\D/g, '');

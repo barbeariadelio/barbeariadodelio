@@ -80,39 +80,45 @@ export async function getRemunerationsSummary(req: AuthRequest, res: Response, n
 export async function registerPayment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const { role } = req.user!;
-    const { employeeId, commissionIds, amount, description, date, unitId: bodyUnitId } = req.body;
+    const { employeeId, commissionIds, amount = 0, description, date, unitId: bodyUnitId, start, end } = req.body;
     const rawQueryUnitId = Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string);
     const unitId = bodyUnitId || rawQueryUnitId || (req.user!.unitId as string);
-    if (!employeeId || !commissionIds?.length || !amount || !date) {
-      res.status(400).json({ message: 'Campos obrigatórios: employeeId, commissionIds, amount, date.' });
+    if (!employeeId || !commissionIds?.length || !date) {
+      res.status(400).json({ message: 'Campos obrigatórios: employeeId, commissionIds, date.' });
       return;
     }
     const appScope = req.headers['x-app-scope'] as string | undefined;
     const jwtUnitId = req.user!.unitId;
     const desc = description || `Pagamento de comissões (${commissionIds.length} atend.)`;
-    const payment = await service.registerPayment(req.user!.id, role, unitId, employeeId, commissionIds, amount, desc, date, appScope, jwtUnitId);
+    const payment = await service.registerPayment(req.user!.id, role, unitId, employeeId, commissionIds, amount, desc, date, appScope, jwtUnitId, start, end);
     created(res, payment);
   } catch (e) { next(e); }
 }
 
 export async function createTransaction(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const unitId = req.body.unitId || req.user!.unitId;
-    const transaction = await service.create({ ...req.body, unitId, createdBy: req.user!.id });
+    const requestedUnitId = req.body.unitId || req.user!.unitId;
+    const appScope = req.headers['x-app-scope'] as string | undefined;
+    const jwtUnitId = req.user!.unitId;
+    const transaction = await service.create(req.body, req.user!.id, req.user!.role, requestedUnitId, appScope, jwtUnitId);
     created(res, transaction);
   } catch (e) { next(e); }
 }
 
 export async function updateTransaction(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const transaction = await service.update(req.params.id, req.body);
+    const appScope = req.headers['x-app-scope'] as string | undefined;
+    const jwtUnitId = req.user!.unitId;
+    const transaction = await service.update(req.params.id, req.body, req.user!.id, req.user!.role, appScope, jwtUnitId);
     ok(res, transaction);
   } catch (e) { next(e); }
 }
 
 export async function deleteTransaction(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    await service.delete(req.params.id);
+    const appScope = req.headers['x-app-scope'] as string | undefined;
+    const jwtUnitId = req.user!.unitId;
+    await service.delete(req.params.id, req.user!.id, req.user!.role, appScope, jwtUnitId);
     ok(res, { deleted: true });
   } catch (e) { next(e); }
 }

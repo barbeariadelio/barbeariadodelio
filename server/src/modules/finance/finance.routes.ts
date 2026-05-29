@@ -9,9 +9,9 @@ export const financeRoutes = Router();
 
 financeRoutes.get('/summary', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), getSummary);
 financeRoutes.get('/transactions', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), listTransactions);
-financeRoutes.post('/transactions', authenticate, requireRoles('owner', 'employee', 'cashier'), validate(createTransactionSchema), createTransaction);
-financeRoutes.patch('/transactions/:id', authenticate, requireRoles('owner', 'employee', 'cashier'), validate(updateTransactionSchema), updateTransaction);
-financeRoutes.delete('/transactions/:id', authenticate, requireRoles('owner', 'employee', 'cashier'), deleteTransaction);
+financeRoutes.post('/transactions', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), validate(createTransactionSchema), createTransaction);
+financeRoutes.patch('/transactions/:id', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), validate(updateTransactionSchema), updateTransaction);
+financeRoutes.delete('/transactions/:id', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), deleteTransaction);
 financeRoutes.get('/remunerations/summary', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), getRemunerationsSummary);
 financeRoutes.get('/remunerations', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), listRemunerations);
 financeRoutes.post('/payment', authenticate, requireRoles('owner', 'cashier'), registerPayment);
