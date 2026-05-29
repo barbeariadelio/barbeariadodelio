@@ -3,7 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
-import { api, resolveApiBaseUrl, setupInterceptors } from '../../api/client';
+import { api, publicRequestConfig, resolveApiBaseUrl, setupInterceptors } from '../../api/client';
 import styles from './Book.module.scss';
 
 interface Unit { _id: string; name: string; apiUrl?: string; workingDays?: number[]; }
@@ -173,7 +173,7 @@ export default function Book() {
 
   const { data: unit } = useQuery<Unit>({
     queryKey: ['unit-public', unitId],
-    queryFn: async () => { const { data } = await api.get(`/units/public/${unitId}`); return data; },
+    queryFn: async () => { const { data } = await api.get(`/units/public/${unitId}`, publicRequestConfig); return data; },
     enabled: !!unitId,
     staleTime: 5 * 60 * 1000,
   });
@@ -211,16 +211,16 @@ export default function Book() {
   const stepIdx = STEPS.indexOf(step);
 
   const { data: services = [], isLoading: svcLoading } = useQuery<Service[]>({
-    queryKey: ['services', unitId],
-    queryFn: async () => { const { data } = await api.get(`/services?unitId=${unitId}&online=true`); return Array.isArray(data) ? data : data.services ?? []; },
-    enabled: !!unitId,
+    queryKey: ['services', unitId, unit?.apiUrl],
+    queryFn: async () => { const { data } = await unitApi.get(`/services?unitId=${unitId}&online=true`, publicRequestConfig); return Array.isArray(data) ? data : data.services ?? []; },
+    enabled: !!unitId && !!unit,
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: employees = [], isLoading: empLoading } = useQuery<Employee[]>({
-    queryKey: ['employees', unitId],
-    queryFn: async () => { const { data } = await api.get(`/employees/public?unitId=${unitId}`); return Array.isArray(data) ? data : data.employees ?? []; },
-    enabled: !!unitId,
+    queryKey: ['employees', unitId, unit?.apiUrl],
+    queryFn: async () => { const { data } = await unitApi.get(`/employees/public?unitId=${unitId}`, publicRequestConfig); return Array.isArray(data) ? data : data.employees ?? []; },
+    enabled: !!unitId && !!unit,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -235,12 +235,20 @@ export default function Book() {
   const { data: slots = [], isFetching: slotsLoading } = useQuery<string[]>({
     queryKey: ['slots', unitId, selectedEmployee?._id, selectedDate, selectedService?.durationMinutes, unit?.apiUrl],
     queryFn: async () => {
-      const { data } = await unitApi.get(`/appointments/slots?unitId=${unitId}&employeeId=${selectedEmployee!._id}&date=${selectedDate}&durationMinutes=${selectedService!.durationMinutes}&source=guest`);
+      const { data } = await unitApi.get(`/appointments/slots?unitId=${unitId}&employeeId=${selectedEmployee!._id}&date=${selectedDate}&durationMinutes=${selectedService!.durationMinutes}&source=guest`, publicRequestConfig);
       return Array.isArray(data) ? data : [];
     },
     enabled: !!unitId && !!selectedEmployee && !!selectedDate && !!selectedService && step === 'datetime',
     staleTime: 60 * 1000,
   });
+  const availableSlots = useMemo(() => slots.filter(s => {
+    if (selectedDate !== todayISO()) return true;
+    const [sh, sm] = s.split(':').map(Number);
+    const slotMins = sh * 60 + sm;
+    const now = new Date();
+    const nowMins = now.getHours() * 60 + now.getMinutes();
+    return slotMins >= nowMins + 30;
+  }), [slots, selectedDate]);
 
   // Fetch appointment if editing
   const { data: editAppt } = useQuery<any>({
@@ -283,7 +291,7 @@ export default function Book() {
   });
 
   const guestMutation = useMutation({
-    mutationFn: (payload: object) => unitApi.post('/appointments/guest', payload),
+    mutationFn: (payload: object) => unitApi.post('/appointments/guest', payload, publicRequestConfig),
     onSuccess: (res) => {
       const payload = res.data as { accessToken?: string; refreshToken?: string; user?: any };
       if (payload?.accessToken) {
@@ -304,6 +312,13 @@ export default function Book() {
     else setStep(STEPS[stepIdx - 1]);
   }
 
+  const storedGuestName = user?.name?.trim() ?? '';
+  const storedGuestPhone = user?.phone?.trim() ?? '';
+  const effectiveGuestName = guestName.trim() || storedGuestName;
+  const effectiveGuestPhone = guestPhone.trim() || storedGuestPhone;
+  const needsGuestDetailsForm = !storedGuestName || !storedGuestPhone;
+  const canSubmitGuest = !!effectiveGuestName && !!effectiveGuestPhone;
+
   function handleBook() {
     setBookError(null);
     const payload = { 
@@ -316,15 +331,17 @@ export default function Book() {
       notes: notes.trim() || undefined
     };
 
-    if (user) {
+    if (editId) {
       bookMutation.mutate(payload);
-    } else {
-      if (!guestName.trim() || !guestPhone.trim()) {
-        setBookError('Preencha seu nome e telefone para continuar.');
-        return;
-      }
-      guestMutation.mutate({ ...payload, guestName: guestName.trim(), guestPhone: guestPhone.trim() });
+      return;
     }
+
+    if (!canSubmitGuest) {
+      setBookError('Preencha seu nome e telefone para continuar.');
+      return;
+    }
+
+    guestMutation.mutate({ ...payload, guestName: effectiveGuestName, guestPhone: effectiveGuestPhone });
   }
 
   const isBooking = bookMutation.isPending || guestMutation.isPending;
@@ -486,18 +503,11 @@ export default function Book() {
                   </p>
                   {slotsLoading ? (
                     <p className={styles.loading}>Verificando disponibilidade...</p>
-                  ) : slots.length === 0 ? (
+                  ) : availableSlots.length === 0 ? (
                     <p className={styles.slotsEmpty}>Nenhum horário disponível para este dia.</p>
                   ) : (
                     <div className={styles.slotsGrid}>
-                      {slots.filter(s => {
-                        if (selectedDate !== todayISO()) return true;
-                        const [sh, sm] = s.split(':').map(Number);
-                        const slotMins = sh * 60 + sm;
-                        const now = new Date();
-                        const nowMins = now.getHours() * 60 + now.getMinutes();
-                        return slotMins >= nowMins + 30;
-                      }).map(s => (
+                      {availableSlots.map(s => (
                         <button
                           key={s}
                           className={`${styles.slot} ${selectedTime === s ? styles.slotSel : ''}`}
@@ -541,7 +551,7 @@ export default function Book() {
                   </div>
                 </div>
 
-                {!user && (
+                {needsGuestDetailsForm && (
                   <div className={styles.guestForm}>
                     <div className={styles.guestFormHead}>
                       <p className={styles.guestFormTitle}>Seus dados</p>
@@ -591,12 +601,12 @@ export default function Book() {
                 {bookError && <div className={styles.error}>{bookError}</div>}
                 <button
                   className={styles.confirmBtn}
-                  disabled={isBooking || !selectedTime || (!user && (!guestName.trim() || !guestPhone.trim()))}
+                  disabled={isBooking || !selectedTime || (!editId && !canSubmitGuest)}
                   onClick={handleBook}
                 >
                   {isBooking ? 'Agendando...' : 'Confirmar Agendamento'}
                 </button>
-                {user && (
+                {user && !needsGuestDetailsForm && !editId && (
                   <p className={styles.loggedAsNote}>
                     Agendando como <strong>{(user as { name: string }).name}</strong>
                   </p>

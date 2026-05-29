@@ -97,11 +97,12 @@ export class AppointmentService {
     if (cached) return cached;
 
     const [employee, unit] = await Promise.all([
-      UserModel.findById(employeeId).select('workSchedule daySchedules vacations blockedDays').lean(),
+      UserModel.findById(employeeId).select('unitId workSchedule daySchedules vacations blockedDays').lean(),
       UnitModel.findById(unitId).select('slotInterval workingDays').lean(),
     ]);
     if (!employee) throw new NotFoundError('Employee');
     if (!unit) throw new NotFoundError('Unit');
+    if (employee.unitId?.toString() !== unitId) return [];
 
     // Check if the day is a working day for the unit
     // Use T12:00:00 to avoid timezone shifts that could change the day
@@ -358,11 +359,22 @@ export class AppointmentService {
       ClientModel.findOne({ phone: guestPhone, unitId }),
       UserModel.findOne({ email: guestEmail }),
       UserModel.findOne({ phone: guestPhone }),
-      UserModel.findById(employeeId).select('vacations blockedDays').lean(),
+      UserModel.findById(employeeId).select('unitId role isActive allowOnlineBooking serviceIds vacations blockedDays').lean(),
     ]);
 
     if (!svc) throw new AppError('Service not found', 404);
     if (!employee) throw new NotFoundError('Employee');
+    if (svc.unitId.toString() !== unitId || svc.isActive === false || svc.isOnline !== true) {
+      throw new AppError('Serviço indisponível para agendamento online.', 400);
+    }
+    if (
+      employee.unitId?.toString() !== unitId ||
+      employee.role !== 'employee' ||
+      employee.isActive === false ||
+      employee.allowOnlineBooking === false
+    ) {
+      throw new AppError('Profissional indisponível para agendamento online.', 400);
+    }
 
     if (employee.blockedDays?.includes(date)) {
       throw new AppError('Profissional indisponível: Dia bloqueado.', 400);

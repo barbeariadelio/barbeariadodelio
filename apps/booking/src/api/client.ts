@@ -12,6 +12,8 @@ export const apiClient = axios.create({
   baseURL: apiBaseUrl,
 });
 
+export const publicRequestConfig = { skipAuth: true, skipRefresh: true } as any;
+
 apiClient.interceptors.request.use(config => {
   const envUnitId = import.meta.env.VITE_UNIT_ID;
   if (envUnitId && !config.params?.unitId) {
@@ -23,7 +25,7 @@ apiClient.interceptors.request.use(config => {
 export function setupInterceptors(instance: any) {
   instance.interceptors.request.use((config: any) => {
     const token = localStorage.getItem('accessToken');
-    if (token) {
+    if (token && !config.skipAuth) {
       config.headers = config.headers || {};
       config.headers['Authorization'] = `Bearer ${token}`;
     }
@@ -42,6 +44,7 @@ export function setupInterceptors(instance: any) {
       if (
         error.response?.status === 401 &&
         !config?._retry &&
+        !config?.skipRefresh &&
         !config?.url?.includes('/auth/refresh')
       ) {
         config._retry = true;
