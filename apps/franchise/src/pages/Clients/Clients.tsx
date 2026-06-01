@@ -264,7 +264,7 @@ export default function Clients() {
   const { data: allProducts = [] } = useQuery<Product[]>({
     queryKey: ['products', unitId],
     queryFn: async () => {
-      const { data } = await api.get('/products');
+      const { data } = await api.get('/products?limit=1000');
       return Array.isArray(data) ? data : [];
     },
     enabled: !!user,

@@ -31,6 +31,42 @@ function sanitize(str?: string): string {
   return str.replace(/<[^>]*>?/gm, '').trim();
 }
 
+function phoneLookupRegex(phone: string): RegExp {
+  return new RegExp(phone.split('').join('.*'));
+}
+
+let slotLockIndexReady: Promise<unknown> | null = null;
+
+async function acquireAppointmentSlotLock(parts: {
+  unitId: string;
+  employeeId: string;
+  date: string;
+  startTime: string;
+}): Promise<string> {
+  const collection = mongoose.connection.collection<any>('appointment_slot_locks');
+  slotLockIndexReady ??= collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(() => null);
+  await slotLockIndexReady;
+
+  const lockId = `${parts.unitId}:${parts.employeeId}:${parts.date}:${parts.startTime}`;
+  try {
+    await collection.insertOne({
+      _id: lockId,
+      expiresAt: new Date(Date.now() + 2 * 60 * 1000),
+      createdAt: new Date(),
+    });
+    return lockId;
+  } catch (error: any) {
+    if (error?.code === 11000) {
+      throw new AppError('Horário em processamento por outro cliente. Escolha outro horário ou tente novamente.', 409);
+    }
+    throw error;
+  }
+}
+
+async function releaseAppointmentSlotLock(lockId: string): Promise<void> {
+  await mongoose.connection.collection<any>('appointment_slot_locks').deleteOne({ _id: lockId }).catch(() => null);
+}
+
 import { IService } from '../services/service.model';
 import { IClient } from '../clients/client.model';
 
@@ -352,13 +388,14 @@ export class AppointmentService {
 
     const cleanPhone = guestPhone.replace(/\D/g, '');
     const guestEmail = `guest_${cleanPhone}_${unitId}@delio.guest`;
+    const phoneRegex = phoneLookupRegex(cleanPhone);
 
     // Batch 1: all independent reads in parallel
     const [svc, existingClient, userByEmail, userByPhone, employee] = await Promise.all([
       ServiceModel.findById(serviceId),
-      ClientModel.findOne({ phone: guestPhone, unitId }),
+      ClientModel.findOne({ phone: phoneRegex, unitId }),
       UserModel.findOne({ email: guestEmail }),
-      UserModel.findOne({ phone: guestPhone }),
+      UserModel.findOne({ phone: phoneRegex }),
       UserModel.findById(employeeId).select('unitId role isActive allowOnlineBooking serviceIds vacations blockedDays').lean(),
     ]);
 
@@ -385,116 +422,139 @@ export class AppointmentService {
 
     const endTime = calcEndTime(startTime, svc.durationMinutes || 30);
 
-    // Batch 2: conflict check (needs endTime from svc) + client/user writes
-    const conflict = await AppointmentModel.findOne({
-      employeeId,
-      date,
-      status: { $nin: ['cancelled'] },
-      $or: [
-        { startTime: { $lt: endTime, $gte: startTime } },
-        { endTime: { $gt: startTime, $lte: endTime } },
-        { startTime: { $lte: startTime }, endTime: { $gte: endTime } },
-      ],
-    }).select('_id').lean();
-    if (conflict) throw new AppError('Time slot already booked', 409);
+    const lockId = await acquireAppointmentSlotLock({ unitId, employeeId, date, startTime });
 
-    let client = existingClient;
-    if (!client) {
-      client = await ClientModel.create({ name: guestName, phone: guestPhone, email: guestEmail, unitId });
-    } else if (client.name !== guestName) {
-      client.name = guestName;
-      await client.save();
-    }
+    try {
+      // Re-check inside the lock so simultaneous confirmations cannot reserve the same slot.
+      const conflict = await AppointmentModel.findOne({
+        employeeId,
+        date,
+        status: { $nin: ['cancelled'] },
+        $or: [
+          { startTime: { $lt: endTime, $gte: startTime } },
+          { endTime: { $gt: startTime, $lte: endTime } },
+          { startTime: { $lte: startTime }, endTime: { $gte: endTime } },
+        ],
+      }).select('_id').lean();
+      if (conflict) throw new AppError('Time slot already booked', 409);
 
-    // Prefer account matched by guest email, fall back to phone match
-    let userAccount = userByEmail ?? userByPhone ?? null;
-    if (!userAccount) {
-      const passwordHash = await bcrypt.hash(cleanPhone.slice(-4), 10);
-      userAccount = await UserModel.create({
-        name: guestName,
-        email: guestEmail,
-        phone: guestPhone,
-        passwordHash,
-        role: 'client',
-        unitId,
-        isActive: true,
-      });
-    }
-
-    if (!client.userId) {
-      client.userId = userAccount._id as any;
-      await client.save();
-    }
-
-    const activeSub = client.packages?.find(p =>
-      p.active && (p.packageId.toString() === serviceId || p.itemLimits?.some(il => il.serviceId.toString() === serviceId))
-    );
-
-    const isBuyingPackage = svc.type === 'package';
-    const isUsingPackage = !!activeSub && svc.type === 'single';
-
-    let finalPrice = isUsingPackage ? 0 : svc.price;
-    let usedPackageId = undefined;
-
-    if (isUsingPackage) {
-      const { price: prorated, packageId } = await this.calculateProratedPrice(client, serviceId);
-      if (packageId) {
-        finalPrice = prorated;
-        usedPackageId = packageId;
+      let client = existingClient;
+      if (!client) {
+        client = await ClientModel.create({ name: guestName, phone: cleanPhone, email: guestEmail, unitId });
+      } else {
+        let changed = false;
+        if (client.name !== guestName) {
+          client.name = guestName;
+          changed = true;
+        }
+        if (client.phone !== cleanPhone) {
+          client.phone = cleanPhone;
+          changed = true;
+        }
+        if (changed) await client.save();
       }
-    }
 
-    if (isBuyingPackage) {
-      const totalSessions = svc.packageItems?.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1;
-      finalPrice = Math.round((svc.price / totalSessions) * 100) / 100;
-    }
+      // Prefer account matched by guest email, fall back to phone match
+      let userAccount = userByEmail ?? userByPhone ?? null;
+      if (!userAccount) {
+        const passwordHash = await bcrypt.hash(cleanPhone.slice(-4), 10);
+        try {
+          userAccount = await UserModel.create({
+            name: guestName,
+            email: guestEmail,
+            phone: cleanPhone,
+            passwordHash,
+            role: 'client',
+            unitId,
+            isActive: true,
+          });
+        } catch (error: any) {
+          if (error?.code === 11000) {
+            userAccount = await UserModel.findOne({ $or: [{ email: guestEmail }, { phone: phoneRegex }] });
+          }
+          if (!userAccount) throw error;
+        }
+      }
 
-    const finalIsPackage = isUsingPackage || isBuyingPackage;
-
-    if (svc.type === 'package') {
-      const alreadyHas = client.packages?.some(p => p.packageId.toString() === serviceId && p.active);
-      if (!alreadyHas) {
-        client.packages = client.packages || [];
-        client.packages.push({
-          packageId: svc._id as any,
-          startDate: new Date(),
-          active: true,
-          itemLimits: svc.packageItems?.map(pi => ({
-            serviceId: pi.serviceId,
-            quantity: pi.quantity,
-            used: 0,
-          })) || []
-        });
+      if (!client.userId) {
+        client.userId = userAccount._id as any;
         await client.save();
       }
+
+      const activeSub = client.packages?.find(p =>
+        p.active && (p.packageId.toString() === serviceId || p.itemLimits?.some(il => il.serviceId.toString() === serviceId))
+      );
+
+      const isBuyingPackage = svc.type === 'package';
+      const isUsingPackage = !!activeSub && svc.type === 'single';
+
+      let finalPrice = isUsingPackage ? 0 : svc.price;
+      let usedPackageId = undefined;
+
+      if (isUsingPackage) {
+        const { price: prorated, packageId } = await this.calculateProratedPrice(client, serviceId);
+        if (packageId) {
+          finalPrice = prorated;
+          usedPackageId = packageId;
+        }
+      }
+
+      if (isBuyingPackage) {
+        const totalSessions = svc.packageItems?.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1;
+        finalPrice = Math.round((svc.price / totalSessions) * 100) / 100;
+      }
+
+      const finalIsPackage = isUsingPackage || isBuyingPackage;
+
+      if (svc.type === 'package') {
+        const alreadyHas = client.packages?.some(p => p.packageId.toString() === serviceId && p.active);
+        if (!alreadyHas) {
+          client.packages = client.packages || [];
+          client.packages.push({
+            packageId: svc._id as any,
+            startDate: new Date(),
+            active: true,
+            itemLimits: svc.packageItems?.map(pi => ({
+              serviceId: pi.serviceId,
+              quantity: pi.quantity,
+              used: 0,
+            })) || []
+          });
+          await client.save();
+        }
+      }
+
+      const appointment = await AppointmentModel.create({
+        clientId: client._id,
+        employeeId,
+        serviceId,
+        unitId,
+        date,
+        startTime,
+        endTime,
+        price: finalPrice,
+        status: 'confirmed',
+        isPackage: finalIsPackage,
+        usedPackageId,
+        source: 'guest',
+        notes: sanitize(notes)
+      });
+
+      invalidateSlotCache(unitId, employeeId, date);
+
+      const tokenPayload = { id: userAccount._id.toString(), role: 'client' as const, unitId };
+      const accessToken = jwt.sign(tokenPayload, env.jwtSecret, { expiresIn: env.jwtExpiresIn as any });
+      const refreshToken = jwt.sign(tokenPayload, env.jwtRefreshSecret, { expiresIn: env.jwtRefreshExpiresIn as any });
+
+      return {
+        appointment,
+        accessToken,
+        refreshToken,
+        user: { id: userAccount._id.toString(), name: userAccount.name, email: userAccount.email, role: 'client', phone: userAccount.phone },
+      };
+    } finally {
+      await releaseAppointmentSlotLock(lockId);
     }
-
-    const appointment = await AppointmentModel.create({
-      clientId: client._id,
-      employeeId,
-      serviceId,
-      unitId,
-      date,
-      startTime,
-      endTime,
-      price: finalPrice,
-      status: 'confirmed',
-      isPackage: finalIsPackage,
-      usedPackageId,
-      source: 'guest',
-      notes: sanitize(notes)
-    });
-
-    const tokenPayload = { id: userAccount._id.toString(), role: 'client' as const, unitId };
-    const accessToken = jwt.sign(tokenPayload, env.jwtSecret, { expiresIn: env.jwtExpiresIn as any });
-    const refreshToken = jwt.sign(tokenPayload, env.jwtRefreshSecret, { expiresIn: env.jwtRefreshExpiresIn as any });
-
-    return {
-      appointment,
-      accessToken,
-      refreshToken,
-      user: { id: userAccount._id.toString(), name: userAccount.name, email: userAccount.email, role: 'client', phone: userAccount.phone },
-    };
   }
 
   async updateStatus(

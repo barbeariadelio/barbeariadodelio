@@ -282,7 +282,11 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
 
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ['products', unitId],
-    queryFn: () => unitApi.get(`/products${unitId ? `?unitId=${unitId}` : ''}`).then(r => Array.isArray(r.data) ? r.data : r.data?.products ?? []),
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: '1000' });
+      if (unitId) params.set('unitId', unitId);
+      return unitApi.get(`/products?${params.toString()}`).then(r => Array.isArray(r.data) ? r.data : r.data?.products ?? []);
+    },
     enabled: !!unitId,
   });
 

@@ -210,7 +210,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
 
   const { data: products = [] } = useQuery<Product[]>({
     queryKey: ['products', unitId],
-    queryFn: () => api.get(`/products?unitId=${unitId}`).then(r => Array.isArray(r.data) ? r.data : r.data?.products ?? []),
+    queryFn: () => api.get(`/products?unitId=${unitId}&limit=1000`).then(r => Array.isArray(r.data) ? r.data : r.data?.products ?? []),
     enabled: !!unitId,
   });
   const activeProducts = products.filter(p => p.isActive && p.stockQuantity > 0);

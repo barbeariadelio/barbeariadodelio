@@ -44,7 +44,7 @@ export default function Inventory() {
   const { data: products = [], isLoading } = useQuery<Product[]>({
     queryKey: ['products', unitId],
     queryFn: async () => {
-      const { data } = await api.get('/products');
+      const { data } = await api.get('/products?limit=1000');
       return Array.isArray(data) ? data : data.products ?? [];
     },
     enabled: !!user,
