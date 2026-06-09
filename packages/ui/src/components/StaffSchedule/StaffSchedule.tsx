@@ -1018,13 +1018,13 @@ export default function StaffSchedule({
                   return (
                     <div
                       key={appt._id}
-                      className={styles.apptCard}
+                      className={`${styles.apptCard} ${appt.status === 'blocked' ? styles.blockedCard : ''}`}
                       style={{
                         top: timeToTop(appt.startTime),
                         height: timeToHeight(appt.startTime, appt.endTime, GRID_SLOT_DURATION),
-                        background: appt.status === 'blocked' ? '#374151' : cardPalette.bg,
-                        borderLeftColor: appt.status === 'blocked' ? '#6B7280' : cardPalette.border,
-                        color: appt.status === 'blocked' ? '#E5E7EB' : cardPalette.text,
+                        background: appt.status === 'blocked' ? undefined : cardPalette.bg,
+                        borderLeftColor: appt.status === 'blocked' ? undefined : cardPalette.border,
+                        color: appt.status === 'blocked' ? undefined : cardPalette.text,
                       }}
                       onClick={(e) => { e.stopPropagation(); setSelectedAppt(appt); }}
                     >

@@ -774,13 +774,13 @@ export default function StaffSchedule({ appointments, employees, selectedDate, o
                 {!fullyBlocked && appts.map(appt => (
                   <div
                     key={appt._id}
-                    className={styles.apptCard}
+                    className={`${styles.apptCard} ${appt.status === 'blocked' ? styles.blockedCard : ''}`}
                     style={{
                       top: timeToTop(appt.startTime),
                       height: timeToHeight(appt.startTime, appt.endTime),
-                      background: appt.status === 'blocked' ? '#374151' : pal.bg,
-                      borderLeftColor: appt.status === 'blocked' ? '#6B7280' : pal.border,
-                      color: appt.status === 'blocked' ? '#E5E7EB' : pal.text,
+                      background: appt.status === 'blocked' ? undefined : pal.bg,
+                      borderLeftColor: appt.status === 'blocked' ? undefined : pal.border,
+                      color: appt.status === 'blocked' ? undefined : pal.text,
                     }}
                     onClick={(e) => { e.stopPropagation(); setSelectedAppt(appt); }}
                   >
