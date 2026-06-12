@@ -4,6 +4,30 @@ import { sharedCache } from '../../shared/utils/cache';
 import { invalidateEmployeeSlotCache } from '../../shared/cache/slotCache';
 import bcrypt from 'bcryptjs';
 
+const SCHEDULE_EMPLOYEE_ORDER: Record<string, string[]> = {
+  '69fa463aa078044937f7024e': ['Delio', 'Keu', 'Neto', 'Maicon', 'Alessio', 'Henrique'],
+  '69fa463aa078044937f70250': ['Pedro', 'Gabriel', 'Miguel', 'Davi'],
+};
+
+function sortScheduleEmployees(unitId: string, employees: any[]): any[] {
+  const order = SCHEDULE_EMPLOYEE_ORDER[unitId] ?? [];
+  const normalizeName = (name: string) =>
+    name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+  const indexByName = new Map(order.map((name, index) => [normalizeName(name), index]));
+
+  return employees.sort((a, b) => {
+    const aName = a.name ?? '';
+    const bName = b.name ?? '';
+    const aIndex = indexByName.get(normalizeName(aName));
+    const bIndex = indexByName.get(normalizeName(bName));
+
+    if (aIndex !== undefined && bIndex !== undefined) return aIndex - bIndex;
+    if (aIndex !== undefined) return -1;
+    if (bIndex !== undefined) return 1;
+    return aName.localeCompare(bName, 'pt-BR');
+  });
+}
+
 export class EmployeeService {
   async findByUnitPublic(unitId: string): Promise<any[]> {
     const cacheKey = `users:public:${unitId}`;
@@ -52,8 +76,7 @@ export class EmployeeService {
     const employees = await UserModel.find({ unitId, role: 'employee', isActive: true })
       .select('name avatar workSchedule daySchedules vacations blockedDays serviceIds')
       .lean();
-    const sorted = (employees as any[])
-      .sort((a, b) => (a.name ?? '').localeCompare(b.name ?? '', 'pt-BR'))
+    const sorted = sortScheduleEmployees(unitId, employees as any[])
       .map((e) => {
         const { avatar, ...rest } = e as any;
         const avatarUrl = typeof avatar === 'string' && avatar.startsWith('http') ? avatar : undefined;

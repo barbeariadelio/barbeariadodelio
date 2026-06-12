@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../contexts/AuthContext';
 import { api, getSelectedUnitId } from '../../api/client';
 import styles from './Settings.module.scss';
@@ -30,6 +30,7 @@ const WEEK_DAYS = [
 
 export default function Settings() {
   const { user, setUser } = useAuth();
+  const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>('profile');
 
   const [profileName, setProfileName] = useState(user?.name ?? '');
@@ -95,6 +96,9 @@ export default function Settings() {
   const unitMutation = useMutation({
     mutationFn: (payload: object) => api.patch(`/units/${unit!._id}`, payload),
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['unit', unitId] });
+      qc.invalidateQueries({ queryKey: ['unit-config', unitId] });
+      qc.invalidateQueries({ queryKey: ['units'] });
       setUnitSuccess(true);
       setUnitError(null);
       setTimeout(() => setUnitSuccess(false), 3000);

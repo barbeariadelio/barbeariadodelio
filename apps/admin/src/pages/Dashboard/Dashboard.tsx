@@ -45,7 +45,9 @@ export default function Dashboard() {
       api.get(`/appointments?date=${dayISO}${unitId ? `&unitId=${unitId}` : ''}&limit=1000`)
          .then(r => Array.isArray(r.data) ? r.data : r.data?.appointments ?? []),
     enabled: !!user,
-    staleTime: 30 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const dayAppointments = useMemo(() => {
@@ -68,7 +70,9 @@ export default function Dashboard() {
            }));
          }),
     enabled: !!user,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const employees = useMemo(() => {
@@ -83,7 +87,9 @@ export default function Dashboard() {
     queryKey: ['unit-config', unitId],
     queryFn: () => api.get(`/units/${unitId}`).then(r => r.data as UnitConfig),
     enabled: !!unitId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   function handleScheduleUpdate() {

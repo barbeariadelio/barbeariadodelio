@@ -324,7 +324,9 @@ export default function Employees() {
       }));
     },
     enabled: !!user && !!unitId,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   useEffect(() => {
@@ -480,6 +482,7 @@ export default function Employees() {
           onSuccess={() => {
             setFormTarget(null);
             qc.invalidateQueries({ queryKey: ['employees'] });
+            qc.invalidateQueries({ queryKey: ['users'] });
           }}
         />
       )}

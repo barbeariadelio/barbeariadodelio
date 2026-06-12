@@ -283,7 +283,9 @@ export default function Finance() {
       const { data } = await api.get('/finance/summary', { params: summaryParams });
       return data;
     },
-    staleTime: 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const billedProductSales = useMemo(
@@ -318,7 +320,9 @@ export default function Finance() {
       });
       return Array.isArray(data) ? data : data.data ?? [];
     },
-    staleTime: 30 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const remunerationDateRange = useMemo(
@@ -332,7 +336,9 @@ export default function Finance() {
       const { data } = await api.get('/finance/remunerations/summary', { params: { unitId, ...remunerationDateRange } });
       return Array.isArray(data) ? data : [];
     },
-    staleTime: 60 * 1000,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
   const remunerationByEmployee = useMemo(
     () => new Map(remunerationSummary.map(item => [item.employeeId, item])),
