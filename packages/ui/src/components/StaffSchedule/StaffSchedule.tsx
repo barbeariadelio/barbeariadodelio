@@ -1016,10 +1016,10 @@ export default function StaffSchedule({
                 {!fullyBlocked && isT && <div className={styles.nowLine} style={{ top: nowTop }} />}
                 {!fullyBlocked && appts.map(appt => {
                   const hasNotes = typeof appt.notes === 'string' && appt.notes.trim().length > 0;
-                  const cardPalette = appt.isBilled
-                    ? APPOINTMENT_PALETTES.billed
-                    : hasNotes
+                  const cardPalette = hasNotes
                       ? APPOINTMENT_PALETTES.withNotes
+                    : appt.isBilled
+                      ? APPOINTMENT_PALETTES.billed
                       : APPOINTMENT_PALETTES.pendingBilling;
                   return (
                     <div

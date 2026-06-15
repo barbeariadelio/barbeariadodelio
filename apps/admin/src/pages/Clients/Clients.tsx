@@ -592,7 +592,7 @@ export default function Clients() {
               <div className={styles.detailAvatar}>
                 {selectedClient.name[0].toUpperCase()}
               </div>
-              <div style={{ flex: 1 }}>
+              <div className={styles.detailMain}>
                 <h2 className={styles.detailName}>{selectedClient.name}</h2>
                 {selectedClient.phone && (
                   <div className={styles.detailMetaWrapper}>
@@ -622,7 +622,7 @@ export default function Clients() {
               </div>
 
               {/* Action buttons */}
-              <div style={{ display: 'flex', gap: '0.5rem', alignSelf: 'flex-start', flexShrink: 0 }}>
+              <div className={styles.detailActions}>
                 <button className={styles.mergeBtn} onClick={() => { setEditingClient(selectedClient); setShowForm(true); }} title="Editar cadastro">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4Z"/></svg>
                   Editar

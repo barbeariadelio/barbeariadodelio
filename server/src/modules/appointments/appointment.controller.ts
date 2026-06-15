@@ -294,8 +294,15 @@ export async function updateAppointment(req: AuthRequest, res: Response, next: N
       }
     }
 
-    req.body.source = req.user!.role === 'client' ? 'client' : 'admin';
-    const updated = await service.update(id, req.body);
+    const updateData = { ...req.body } as Record<string, unknown>;
+    if (req.user!.role === 'client') {
+      updateData.source = 'client';
+    } else {
+      delete updateData.source;
+      updateData.__internalOverride = true;
+    }
+
+    const updated = await service.update(id, updateData);
 
     // Create notification for edit
     const fullAppt = await service.findById(id);

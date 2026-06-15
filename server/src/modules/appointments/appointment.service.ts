@@ -912,7 +912,9 @@ export class AppointmentService {
   async update(id: string, data: Partial<IAppointment>): Promise<IAppointment> {
     const appt = await AppointmentModel.findById(id);
     if (!appt) throw new NotFoundError('Appointment');
-    const internalOverride = data.source === 'admin';
+    const updateData = data as Partial<IAppointment> & { __internalOverride?: boolean };
+    const internalOverride = updateData.__internalOverride === true || updateData.source === 'admin';
+    delete updateData.__internalOverride;
     const isServiceChange = Boolean(
       data.serviceId && data.serviceId.toString() !== appt.serviceId?.toString()
     );
