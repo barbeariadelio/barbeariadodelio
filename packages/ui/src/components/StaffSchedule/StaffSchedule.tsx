@@ -37,6 +37,7 @@ const PALETTES = [
 
 const APPOINTMENT_PALETTES = {
   pendingBilling: { bg: '#FFF1B8', border: '#EAB308', text: '#4A3B0B' },
+  withNotes: { bg: '#EDE9FE', border: '#7C3AED', text: '#4C1D95' },
   billed: { bg: '#D6E7FF', border: '#3B82F6', text: '#164E90' },
 };
 
@@ -1014,7 +1015,12 @@ export default function StaffSchedule({
 
                 {!fullyBlocked && isT && <div className={styles.nowLine} style={{ top: nowTop }} />}
                 {!fullyBlocked && appts.map(appt => {
-                  const cardPalette = appt.isBilled ? APPOINTMENT_PALETTES.billed : APPOINTMENT_PALETTES.pendingBilling;
+                  const hasNotes = typeof appt.notes === 'string' && appt.notes.trim().length > 0;
+                  const cardPalette = appt.isBilled
+                    ? APPOINTMENT_PALETTES.billed
+                    : hasNotes
+                      ? APPOINTMENT_PALETTES.withNotes
+                      : APPOINTMENT_PALETTES.pendingBilling;
                   return (
                     <div
                       key={appt._id}

@@ -3,6 +3,10 @@
   animation: fadeIn 0.4s ease;
   background: var(--bg-base);
   color: var(--text-primary);
+
+  @media (max-width: 768px) {
+    max-width: 100%;
+  }
 }
 
 @keyframes fadeIn {
@@ -15,6 +19,12 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 2rem;
+
+  @media (max-width: 640px) {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+  }
 }
 
 .pageTitle {
@@ -58,6 +68,15 @@
   gap: 1.5rem;
   height: calc(100vh - 180px);
   overflow: hidden;
+
+  @media (max-width: 1024px) {
+    height: min(420px, calc(100vh - 180px));
+  }
+
+  @media (max-width: 640px) {
+    padding: 1rem;
+    height: min(360px, calc(100vh - 170px));
+  }
 }
 
 .searchInput {
@@ -141,6 +160,14 @@
   border-radius: 4px;
   padding: 2.5rem;
   animation: slideIn 0.3s ease;
+
+  @media (max-width: 768px) {
+    padding: 1.5rem;
+  }
+
+  @media (max-width: 640px) {
+    padding: 1rem;
+  }
 }
 
 .clientActivityScroll {
@@ -164,6 +191,11 @@
 
   &::-webkit-scrollbar-thumb:hover {
     background: var(--border-strong);
+  }
+
+  @media (max-width: 768px) {
+    max-height: min(560px, calc(100vh - 12rem));
+    padding-right: 0;
   }
 }
 
@@ -193,7 +225,18 @@
   border: 2px solid var(--gold);
 }
 
-.detailName { font-family: 'Playfair Display', serif; font-size: 2.5rem; font-weight: 700; margin: 0 0 0.5rem; color: var(--text-primary); }
+.detailName {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem;
+  color: var(--text-primary);
+
+  @media (max-width: 640px) {
+    font-size: 2rem;
+    overflow-wrap: anywhere;
+  }
+}
 .detailMeta { font-size: 0.875rem; color: var(--text-secondary); margin: 0; }
 .detailNotes { font-size: 0.8125rem; color: var(--text-muted); margin-top: 1rem; font-style: italic; }
 
@@ -221,22 +264,58 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  @media (max-width: 640px) { flex-direction: column; align-items: flex-start; gap: 1rem; }
+  gap: 1rem;
+
+  @media (max-width: 640px) {
+    flex-direction: column;
+    align-items: flex-start !important;
+    padding: 1rem;
+  }
 }
 
 .historyInfo {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+  flex: 1;
 }
 
-.historyDate { font-size: 0.8125rem; font-weight: 700; color: var(--text-primary); }
-.historySub { font-size: 0.75rem; color: var(--text-secondary); }
+.historyDate {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.historySub {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
 
 .historyRight {
   display: flex;
   align-items: center;
   gap: 1.5rem;
+  flex-shrink: 0;
+
+  @media (max-width: 768px) {
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  @media (max-width: 640px) {
+    width: 100%;
+    align-items: flex-start !important;
+    justify-content: space-between;
+    gap: 0.5rem;
+
+    > * {
+      flex-shrink: 0;
+    }
+  }
 }
 
 .badge {
@@ -586,6 +665,12 @@
   gap: 0;
   border-bottom: 2px solid var(--border-subtle);
   margin-bottom: 1.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 .clientTab {
@@ -604,6 +689,13 @@
   white-space: nowrap;
 
   &:hover { color: var(--text-primary); }
+
+  @media (max-width: 640px) {
+    flex: 1 0 auto;
+    padding: 0.65rem 0.85rem;
+    font-size: 0.72rem;
+    text-align: center;
+  }
 }
 
 .clientTabActive {
