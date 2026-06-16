@@ -117,6 +117,31 @@
   gap: 0.75rem;
 }
 
+.scheduleSlotRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.scheduleSlotInput {
+  min-width: 0;
+}
+
+@media (max-width: 560px) {
+  .schedGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .scheduleSlotRow {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+  }
+
+  .scheduleSlotRow input:nth-of-type(2) {
+    grid-column: 2 / -1;
+  }
+}
+
 
 .label {
   font-family: 'Inter', sans-serif;

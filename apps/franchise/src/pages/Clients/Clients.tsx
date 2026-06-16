@@ -945,7 +945,7 @@ export default function Clients() {
                 {billingRegisterPayment && (
                   <div style={{ marginBottom: '1.25rem' }}>
                     <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Forma de Pagamento</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <div className={styles.paymentMethodGrid}>
                       {(['money', 'debit', 'credit', 'pix', 'other'] as const).map(pm => (
                         <button key={pm} onClick={() => setBillingPaymentMethod(pm)}
                           style={{ padding: '8px', borderRadius: '8px', border: `2px solid ${billingPaymentMethod === pm ? 'var(--gold)' : 'var(--border-default)'}`, background: billingPaymentMethod === pm ? 'var(--gold-dim)' : 'var(--bg-base)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', color: billingPaymentMethod === pm ? 'var(--gold)' : 'var(--text-primary)' }}>
@@ -959,7 +959,7 @@ export default function Clients() {
             ) : (
               <div style={{ marginBottom: '1.25rem' }}>
                 <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', marginBottom: '6px' }}>Forma de Pagamento</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                <div className={styles.paymentMethodGrid}>
                   {(['money', 'debit', 'credit', 'pix', 'other'] as const).map(pm => (
                     <button key={pm} onClick={() => setBillingPaymentMethod(pm)}
                       style={{ padding: '8px', borderRadius: '8px', border: `2px solid ${billingPaymentMethod === pm ? 'var(--gold)' : 'var(--border-default)'}`, background: billingPaymentMethod === pm ? 'var(--gold-dim)' : 'var(--bg-base)', fontWeight: 600, fontSize: '13px', cursor: 'pointer', color: billingPaymentMethod === pm ? 'var(--gold)' : 'var(--text-primary)' }}>
@@ -969,7 +969,7 @@ export default function Clients() {
                 </div>
               </div>
             )}
-            <div style={{ display: 'flex', gap: '10px', marginTop: '0.5rem' }}>
+            <div className={styles.modalActionRow}>
               <button onClick={() => setBillingAppt(null)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: '1px solid var(--border-default)', background: 'var(--bg-elevated)', fontWeight: 600, cursor: 'pointer', color: 'var(--text-primary)' }}>Voltar</button>
               <button onClick={confirmBilling} disabled={billMutation.isPending} style={{ flex: 2, padding: '10px', borderRadius: '8px', border: 'none', background: 'var(--gold)', color: '#080808', fontWeight: 700, cursor: 'pointer', opacity: billMutation.isPending ? 0.7 : 1 }}>
                 {billMutation.isPending ? 'Processando...' : 'Confirmar e Concluir'}
@@ -1191,7 +1191,7 @@ export default function Clients() {
               </div>
               <div className={styles.psField} style={{ marginBottom: '1rem' }}>
                 <label className={styles.psLabel}>Forma de Pagamento</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                <div className={styles.comandaPaymentGrid}>
                   {(['money', 'debit', 'credit', 'pix', 'other'] as const).map(pm => (
                     <button key={pm} className={`${styles.pmBtn} ${comandaPayment === pm ? styles.pmBtnActive : ''}`} onClick={() => setComandaPayment(pm)}>
                       {pm === 'money' ? 'Dinheiro' : pm === 'debit' ? 'Débito' : pm === 'credit' ? 'Crédito' : pm === 'pix' ? 'Pix' : 'Outro'}

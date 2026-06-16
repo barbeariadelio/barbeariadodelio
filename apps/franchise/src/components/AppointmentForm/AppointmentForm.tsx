@@ -723,12 +723,11 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
             <div className={styles.field} style={{ opacity: unitId ? 1 : 0.5, pointerEvents: unitId ? 'auto' : 'none' }}>
               <label className={styles.label}>Produtos (opcional)</label>
               {products && products.length > 0 && (
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: cart.length > 0 ? '0.5rem' : 0 }}>
+                <div className={styles.productPickerRow}>
                   <select
-                    className={styles.select}
+                    className={`${styles.select} ${styles.productPickerSelect}`}
                     value={selectedProductId}
                     onChange={e => setSelectedProductId(e.target.value)}
-                    style={{ flex: 1 }}
                   >
                     <option value="">Selecionar produto</option>
                     {products.filter((p: any) => p.isActive !== false && p.stockQuantity > 0).map((p: any) => (
@@ -740,13 +739,11 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
                     min={1}
                     value={productQty}
                     onChange={e => setProductQty(Math.max(1, Number(e.target.value) || 1))}
-                    className={styles.input}
-                    style={{ width: '64px' }}
+                    className={`${styles.input} ${styles.productQtyInput}`}
                   />
                   <button
                     type="button"
-                    className={styles.submitBtn}
-                    style={{ padding: '0 0.75rem', whiteSpace: 'nowrap' }}
+                    className={`${styles.submitBtn} ${styles.productAddBtn}`}
                     disabled={!selectedProductId}
                     onClick={() => {
                       const prod = (products || []).find((p: any) => p._id === selectedProductId);
@@ -762,9 +759,9 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
               )}
 
               {cart.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div className={styles.productCartList}>
                   {cart.map(c => (
-                    <div key={c.productId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '0.45rem 0.65rem', fontSize: '0.875rem' }}>
+                    <div key={c.productId} className={styles.productCartItem}>
                       <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{c.name}</span>
                       <span style={{ color: 'var(--text-secondary)' }}>x{c.quantity} · R$ {(c.quantity * c.unitPrice).toFixed(2).replace('.', ',')}</span>
                       <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: '0 0.25rem' }} onClick={() => setCart(prev => prev.filter(x => x.productId !== c.productId))}>✕</button>

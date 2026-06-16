@@ -687,12 +687,11 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
           <div className={styles.field}>
               <label className={styles.label}>Produtos (opcional)</label>
               {activeProducts.length > 0 && (
-                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: apptProducts.length > 0 ? '0.5rem' : 0 }}>
+                <div className={styles.productPickerRow}>
                   <select
-                    className={styles.select}
+                    className={`${styles.select} ${styles.productPickerSelect}`}
                     value={selectedProductId}
                     onChange={e => setSelectedProductId(e.target.value)}
-                    style={{ flex: 1 }}
                   >
                     <option value="">Selecionar produto</option>
                     {activeProducts.map(p => (
@@ -706,13 +705,11 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
                     min={1}
                     value={productQty}
                     onChange={e => setProductQty(Math.max(1, Number(e.target.value)))}
-                    className={styles.input}
-                    style={{ width: '64px' }}
+                    className={`${styles.input} ${styles.productQtyInput}`}
                   />
                   <button
                     type="button"
-                    className={styles.submitBtn}
-                    style={{ padding: '0 0.75rem', whiteSpace: 'nowrap' }}
+                    className={`${styles.submitBtn} ${styles.productAddBtn}`}
                     disabled={!selectedProductId}
                     onClick={() => {
                       const prod = activeProducts.find(p => p._id === selectedProductId);
@@ -731,9 +728,9 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
                 </div>
               )}
               {apptProducts.length > 0 && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                <div className={styles.productCartList}>
                   {apptProducts.map(p => (
-                    <div key={p.productId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-surface,#F9FAFB)', border: '1px solid var(--border,#E5E7EB)', borderRadius: '6px', padding: '0.45rem 0.65rem', fontSize: '0.875rem' }}>
+                    <div key={p.productId} className={styles.productCartItem}>
                       <span style={{ fontWeight: 600, color: '#111827' }}>{p.name}</span>
                       <span style={{ color: '#6B7280' }}>x{p.quantity} · R$ {(p.quantity * p.unitPrice).toFixed(2).replace('.', ',')}</span>
                       <button type="button" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444', padding: '0 0.25rem' }} onClick={() => setApptProducts(prev => prev.filter(x => x.productId !== p.productId))}>✕</button>

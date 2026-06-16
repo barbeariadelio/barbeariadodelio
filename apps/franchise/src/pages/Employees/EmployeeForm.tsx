@@ -275,22 +275,20 @@ export default function EmployeeForm({ employee, onClose, onSuccess }: Props) {
               <div key={day} style={{ marginBottom: '0.625rem', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '0.625rem 0.75rem' }}>
                 <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>{DAY_NAMES[day]}</p>
                 {slots.map((slot, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: idx < slots.length - 1 ? '0.4rem' : 0 }}>
+                  <div key={idx} className={styles.scheduleSlotRow} style={{ marginBottom: idx < slots.length - 1 ? '0.4rem' : 0 }}>
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', width: '20px', flexShrink: 0 }}>De</span>
                     <input
                       type="time"
-                      className={styles.input}
+                      className={`${styles.input} ${styles.scheduleSlotInput}`}
                       value={slot.start}
                       onChange={e => setDaySchedules(prev => prev.map(ds => ds.day === day ? { ...ds, slots: ds.slots.map((s, i) => i === idx ? { ...s, start: e.target.value } : s) } : ds))}
-                      style={{ flex: 1 }}
                     />
                     <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', width: '24px', flexShrink: 0 }}>Até</span>
                     <input
                       type="time"
-                      className={styles.input}
+                      className={`${styles.input} ${styles.scheduleSlotInput}`}
                       value={slot.end}
                       onChange={e => setDaySchedules(prev => prev.map(ds => ds.day === day ? { ...ds, slots: ds.slots.map((s, i) => i === idx ? { ...s, end: e.target.value } : s) } : ds))}
-                      style={{ flex: 1 }}
                     />
                     <button
                       type="button"
