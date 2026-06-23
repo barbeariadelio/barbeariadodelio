@@ -291,7 +291,7 @@ export class AppointmentService {
     
     const svc = await ServiceModel.findById(data.serviceId);
 
-    let finalPrice = svc?.price ?? data.price ?? 0;
+    let finalPrice = internalOverride && data.price != null ? data.price : (svc?.price ?? data.price ?? 0);
     let usedPackageId = undefined;
     let isPackage = data.isPackage || svc?.type === 'package';
 
@@ -337,8 +337,10 @@ export class AppointmentService {
       finalPrice = Math.round((svc.price / totalSessions) * 100) / 100;
     }
 
-    // If it's a single service, check if client is using an active package for it
-    if (svc?.type === 'single' && data.clientId) {
+    // If it's a single service, check if client is using an active package for it.
+    // Skip when the caller explicitly opted out (isPackage === false), e.g. staff
+    // unchecked "usar pacote ativo" to charge a custom price for this visit instead.
+    if (svc?.type === 'single' && data.clientId && data.isPackage !== false) {
       const client = await ClientModel.findById(data.clientId);
       if (client) {
         const { price: prorated, packageId } = await this.calculateProratedPrice(client, data.serviceId!.toString());
@@ -960,7 +962,7 @@ export class AppointmentService {
         const totalSessions = svc.packageItems?.reduce((total, item) => total + (item.quantity || 1), 0) || 1;
         finalPrice = Math.round((svc.price / totalSessions) * 100) / 100;
       }
-      if (svc.type === 'single' && nextClientId) {
+      if (svc.type === 'single' && nextClientId && data.isPackage !== false) {
         const client = await ClientModel.findById(nextClientId);
         if (client) {
           const packagePrice = await this.calculateProratedPrice(client, nextServiceId.toString());

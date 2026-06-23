@@ -4,6 +4,15 @@ import { api, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import styles from './AppointmentForm.module.scss';
 
+function parsePrice(raw: string): number {
+  return Number(raw.trim().replace(',', '.'));
+}
+
+function formatPriceForInput(value: number): string {
+  const hasCents = Math.round(value * 100) % 100 !== 0;
+  return (hasCents ? value.toFixed(2) : String(Math.round(value))).replace('.', ',');
+}
+
 function maskPhone(raw: string) {
   const d = raw.replace(/\D/g, '').slice(0, 11);
   if (d.length <= 2) return d.length ? `(${d}` : '';
@@ -122,6 +131,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
   const [employeeId, setEmployeeId] = useState(initialEmployeeId ?? '');
   const [serviceId, setServiceId] = useState('');
   const [customDurationMinutes, setCustomDurationMinutes] = useState('');
+  const [price, setPrice] = useState('');
   const [date, setDate] = useState(initialDate ?? todayISO());
   const [startTime, setStartTime] = useState(initialTime ?? '09:00');
   const [notes, setNotes] = useState('');
@@ -155,6 +165,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       setDate(appointment.date);
       setStartTime(appointment.startTime);
       setCustomDurationMinutes(String(diffMinutes(appointment.startTime, appointment.endTime) ?? appointment.serviceId?.durationMinutes ?? 30));
+      setPrice(appointment.price != null ? formatPriceForInput(appointment.price) : '');
       setNotes(appointment.notes || '');
       setUsePackage(!!appointment.isPackage);
       if (Array.isArray(appointment.products)) setApptProducts(appointment.products);
@@ -230,6 +241,8 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
   function handleServiceChange(nextServiceId: string) {
     setServiceId(nextServiceId);
     setCustomDurationMinutes('');
+    const svc = services.find(s => s._id === nextServiceId);
+    setPrice(svc ? formatPriceForInput(svc.price) : '');
   }
 
   function selectClient(c: Client) {
@@ -296,8 +309,6 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     }
     const service = services.find(s => s._id === serviceId);
     const customDuration = customDurationMinutes.trim() ? Math.max(1, Number(customDurationMinutes)) : null;
-    const originalServiceId = appointment?.serviceId?._id || appointment?.serviceId;
-    const serviceChanged = Boolean(appointment?._id && originalServiceId !== serviceId);
 
     if (date < todayISO()) {
       setError('Não é possível agendar em uma data que já passou.');
@@ -319,11 +330,9 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       if (customDuration !== null) {
         payload.endTime = addMinutesToTime(startTime, customDuration);
       }
-      // A service swap adopts the selected service price. Other edits preserve
-      // possible billed or package-adjusted values already stored.
-      if (!appointment?._id || serviceChanged) {
-        payload.price = finalIsPackage ? 0 : (service?.price ?? 0);
-      }
+      // Package use is always free; otherwise use the (possibly edited) price field,
+      // falling back to the service's default price when left empty.
+      payload.price = finalIsPackage ? 0 : (price.trim() !== '' ? parsePrice(price) : (service?.price ?? 0));
       return payload;
     };
 
@@ -592,6 +601,23 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
               onChange={e => setCustomDurationMinutes(e.target.value)}
               placeholder={selectedService?.durationMinutes ? String(selectedService.durationMinutes) : '30'}
             />
+          </div>
+
+          <div className={styles.field} style={{ opacity: serviceId && !usePackage ? 1 : 0.5, pointerEvents: serviceId && !usePackage ? 'auto' : 'none' }}>
+            <label className={styles.label}>Valor do agendamento (R$)</label>
+            <input
+              type="text"
+              inputMode="decimal"
+              className={styles.input}
+              value={usePackage ? '0' : price}
+              onChange={e => setPrice(e.target.value)}
+              onFocus={e => e.target.select()}
+              disabled={usePackage}
+              placeholder={selectedService ? selectedService.price.toFixed(2) : '0.00'}
+            />
+            {usePackage && (
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Uso de pacote: sem cobrança.</span>
+            )}
           </div>
 
           {selectedClient && serviceId && (() => {
