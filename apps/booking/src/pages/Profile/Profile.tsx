@@ -104,7 +104,7 @@ export default function Profile() {
 
   const { data: slots = [], isFetching: slotsLoading } = useQuery<string[]>({
     queryKey: ['slots', editUnitId, apptToEdit?.employeeId, selDate],
-    queryFn: () => api.get(`/appointments/slots?unitId=${editUnitId}&employeeId=${apptToEdit?.employeeId?._id || apptToEdit?.employeeId}&date=${selDate}&durationMinutes=${apptToEdit?.serviceId?.durationMinutes || 30}`).then(r => r.data),
+    queryFn: () => api.get(`/appointments/slots?unitId=${editUnitId}&employeeId=${apptToEdit?.employeeId?._id || apptToEdit?.employeeId}&date=${selDate}&durationMinutes=${apptToEdit?.serviceId?.durationMinutes || 30}&source=guest`).then(r => r.data),
     enabled: !!editUnitId && !!apptToEdit && editStep === 'datetime',
   });
 

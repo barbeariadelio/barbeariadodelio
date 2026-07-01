@@ -2,9 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AppointmentService } from '../appointment.service';
 import { AppointmentModel } from '../appointment.model';
 import { ServiceModel } from '../../services/service.model';
+import { UnitModel } from '../../units/unit.model';
 
 vi.mock('../appointment.model');
 vi.mock('../../services/service.model');
+vi.mock('../../units/unit.model');
 
 describe('AppointmentService', () => {
   let service: AppointmentService;
@@ -96,6 +98,40 @@ describe('AppointmentService', () => {
       await service.update('appointment-1', { source: 'client', price: 1 } as any);
 
       expect(appt.price).toBe(40);
+    });
+
+    it('should reject client edits less than 30 minutes ahead on the current day', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-05-25T12:45:00-03:00'));
+
+      const appt = {
+        _id: { toString: () => 'appointment-1' },
+        isBilled: false,
+        productsBilled: false,
+        status: 'confirmed',
+        serviceId: { toString: () => 'service-1' },
+        price: 40,
+        startTime: '14:00',
+        endTime: '14:30',
+        save: vi.fn(),
+        unitId: { toString: () => 'unit-1' },
+        employeeId: { toString: () => 'employee-1' },
+        date: '2026-05-25',
+      };
+
+      (AppointmentModel.findById as any).mockResolvedValue(appt);
+      (ServiceModel.findById as any).mockResolvedValue({ type: 'single', price: 40, durationMinutes: 30 });
+      (UnitModel.findById as any).mockReturnValue({
+        select: vi.fn().mockResolvedValue({ workingDays: [1] }),
+      });
+
+      await expect(service.update('appointment-1', {
+        source: 'client',
+        date: '2026-05-25',
+        startTime: '13:00',
+      } as any)).rejects.toThrow('Agendamentos online devem ser feitos com pelo menos 30 minutos de antecedência.');
+
+      vi.useRealTimers();
     });
   });
 });

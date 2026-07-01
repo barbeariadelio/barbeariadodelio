@@ -35,6 +35,34 @@ function phoneLookupRegex(phone: string): RegExp {
   return new RegExp(phone.split('').join('.*'));
 }
 
+function getBrazilNowParts(): { todayISO: string; minutes: number } {
+  const nowBR = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+  return {
+    todayISO: `${nowBR.getFullYear()}-${String(nowBR.getMonth() + 1).padStart(2, '0')}-${String(nowBR.getDate()).padStart(2, '0')}`,
+    minutes: nowBR.getHours() * 60 + nowBR.getMinutes(),
+  };
+}
+
+function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+function assertAllowedClientScheduleTime(date: string, startTime: string, minAheadMinutes: number): void {
+  const { todayISO, minutes } = getBrazilNowParts();
+  if (date < todayISO) {
+    throw new AppError('Não é possível agendar em uma data ou hora retroativa.', 400);
+  }
+  if (date === todayISO && timeToMinutes(startTime) < minutes + minAheadMinutes) {
+    throw new AppError(
+      minAheadMinutes > 0
+        ? 'Agendamentos online devem ser feitos com pelo menos 30 minutos de antecedência.'
+        : 'Não é possível agendar em uma data ou hora retroativa.',
+      400,
+    );
+  }
+}
+
 let slotLockIndexReady: Promise<unknown> | null = null;
 
 async function acquireAppointmentSlotLock(parts: {
@@ -264,6 +292,10 @@ export class AppointmentService {
       }
     }
     
+    if (data.status !== 'blocked' && !internalOverride && data.source === 'client') {
+      assertAllowedClientScheduleTime(data.date!, data.startTime!, 30);
+    }
+
     const employee = await UserModel.findById(data.employeeId).select('vacations blockedDays');
     if (!employee) throw new NotFoundError('Employee');
 
@@ -994,6 +1026,10 @@ export class AppointmentService {
       const checkEmp  = data.employeeId || appt.employeeId;
       const checkStart = data.startTime || appt.startTime;
       const checkEnd   = data.endTime || appt.endTime;
+
+      if (!internalOverride && updateData.source === 'client') {
+        assertAllowedClientScheduleTime(checkDate, checkStart, 30);
+      }
 
       const conflict = await AppointmentModel.findOne({
         _id: { $ne: id },
