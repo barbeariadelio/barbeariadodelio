@@ -10,6 +10,10 @@ interface Unit { _id: string; name: string; apiUrl?: string; workingDays?: numbe
 interface Service { _id: string; name: string; description?: string; price: number; durationMinutes: number; isActive?: boolean; image?: string; showPrice?: boolean; showPricePrefix?: boolean; }
 type ServiceIdRef = string | { _id: string };
 interface Employee { _id: string; name: string; hasAvatar?: boolean; serviceIds?: ServiceIdRef[]; daySchedules?: { day: number; slots: { start: string; end: string }[] }[]; workSchedule?: { workDays?: number[] }; }
+interface AnySlot { time: string; employeeId: string; employeeName: string; }
+
+// Sentinel employee object used when the user picks "Qualquer Barbeiro"
+const ANY_EMPLOYEE: Employee = { _id: '__any__', name: 'Qualquer Barbeiro' };
 
 type Step = 'barber' | 'service' | 'datetime' | 'confirm';
 const STEPS: Step[] = ['barber', 'service', 'datetime', 'confirm'];
@@ -114,8 +118,13 @@ function Calendar({ value, onChange, workingDays }: { value: string; onChange: (
 }
 
 /* ── Summary sidebar ── */
-function Summary({ service, employee, date, time, notes }: { service: Service|null; employee: Employee|null; date: string; time: string; notes?: string }) {
+function Summary({ service, employee, date, time, notes, anyBarber, resolvedEmployeeName }: { service: Service|null; employee: Employee|null; date: string; time: string; notes?: string; anyBarber?: boolean; resolvedEmployeeName?: string }) {
   const hasAny = !!(service || employee || (date && date !== todayISO()) || time || notes);
+
+  const barberLabel = anyBarber
+    ? (resolvedEmployeeName ? resolvedEmployeeName : 'Qualquer disponível')
+    : employee?.name ?? null;
+
   return (
     <aside className={styles.sidebar}>
       <p className={styles.sidebarLabel}>Resumo</p>
@@ -129,10 +138,10 @@ function Summary({ service, employee, date, time, notes }: { service: Service|nu
                 {service.durationMinutes > 0 && <span className={styles.sidebarMeta}>{service.durationMinutes} min</span>}
               </div>
             )}
-            {employee && (
+            {(employee || anyBarber) && (
               <div className={styles.sidebarBlock}>
                 <span className={styles.sidebarKey}>Barbeiro</span>
-                <span className={styles.sidebarVal}>{employee.name}</span>
+                <span className={styles.sidebarVal}>{barberLabel}</span>
               </div>
             )}
             {date && (
@@ -198,6 +207,11 @@ export default function Book() {
   const [bookError, setBookError] = useState<string | null>(null);
   const [isInitializing, setIsInitializing] = useState(false);
 
+  // "Any barber" mode: user chose the sentinel card; resolvedEmployee is filled
+  // once the user picks a specific time slot (the slot carries employeeId/employeeName)
+  const [anyBarber, setAnyBarber] = useState(false);
+  const [resolvedEmployee, setResolvedEmployee] = useState<{ id: string; name: string } | null>(null);
+
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('editId');
   const targetStep = searchParams.get('step') as Step | null;
@@ -228,9 +242,12 @@ export default function Book() {
   const matchedEmployeeServices = selectedEmployeeServiceIds.length
     ? services.filter(s => selectedEmployeeServiceIds.includes(s._id))
     : services;
-  const visibleServices = selectedEmployeeServiceIds.length && matchedEmployeeServices.length === 0
+  // When anyBarber is selected we show all online services (the server will filter by employee eligibility)
+  const visibleServices = anyBarber
     ? services
-    : matchedEmployeeServices;
+    : (selectedEmployeeServiceIds.length && matchedEmployeeServices.length === 0
+        ? services
+        : matchedEmployeeServices);
 
   const { data: slots = [], isFetching: slotsLoading } = useQuery<string[]>({
     queryKey: ['slots', unitId, selectedEmployee?._id, selectedDate, selectedService?.durationMinutes, unit?.apiUrl],
@@ -238,17 +255,41 @@ export default function Book() {
       const { data } = await unitApi.get(`/appointments/slots?unitId=${unitId}&employeeId=${selectedEmployee!._id}&date=${selectedDate}&durationMinutes=${selectedService!.durationMinutes}&source=guest`, publicRequestConfig);
       return Array.isArray(data) ? data : [];
     },
-    enabled: !!unitId && !!selectedEmployee && !!selectedDate && !!selectedService && step === 'datetime',
+    enabled: !!unitId && !!selectedEmployee && selectedEmployee._id !== '__any__' && !!selectedDate && !!selectedService && step === 'datetime',
     staleTime: 60 * 1000,
   });
-  const availableSlots = useMemo(() => slots.filter(s => {
-    if (selectedDate !== todayISO()) return true;
-    const [sh, sm] = s.split(':').map(Number);
-    const slotMins = sh * 60 + sm;
+
+  const { data: anySlots = [], isFetching: anySlotsLoading } = useQuery<AnySlot[]>({
+    queryKey: ['slots-any', unitId, selectedDate, selectedService?._id, unit?.apiUrl],
+    queryFn: async () => {
+      const { data } = await unitApi.get(`/appointments/slots-any?unitId=${unitId}&serviceId=${selectedService!._id}&date=${selectedDate}&source=guest`, publicRequestConfig);
+      return Array.isArray(data) ? data : [];
+    },
+    enabled: !!unitId && anyBarber && !!selectedDate && !!selectedService && step === 'datetime',
+    staleTime: 60 * 1000,
+  });
+
+  const slotsLoadingCombined = slotsLoading || anySlotsLoading;
+
+  const availableSlots = useMemo((): AnySlot[] | string[] => {
     const now = new Date();
     const nowMins = now.getHours() * 60 + now.getMinutes();
-    return slotMins >= nowMins + 30;
-  }), [slots, selectedDate]);
+    const isToday = selectedDate === todayISO();
+
+    if (anyBarber) {
+      return anySlots.filter(s => {
+        if (!isToday) return true;
+        const [sh, sm] = s.time.split(':').map(Number);
+        return sh * 60 + sm >= nowMins + 30;
+      });
+    }
+
+    return slots.filter(s => {
+      if (!isToday) return true;
+      const [sh, sm] = s.split(':').map(Number);
+      return sh * 60 + sm >= nowMins + 30;
+    });
+  }, [slots, anySlots, anyBarber, selectedDate]);
 
   // Fetch appointment if editing
   const { data: editAppt } = useQuery<any>({
@@ -259,20 +300,43 @@ export default function Book() {
 
   // Pre-fill if editing
   useEffect(() => {
-    if (editId && editAppt && services.length > 0 && employees.length > 0 && isInitializing) {
+    if (editId && editAppt && !svcLoading && !empLoading && isInitializing) {
       const svc = services.find(s => s._id === (editAppt.serviceId?._id || editAppt.serviceId));
       const emp = employees.find(e => e._id === (editAppt.employeeId?._id || editAppt.employeeId));
       
       if (svc) setSelectedService(svc);
-      if (emp) setSelectedEmployee(emp);
       if (editAppt.date) setSelectedDate(editAppt.date);
       if (editAppt.startTime) setSelectedTime(editAppt.startTime);
       if (editAppt.notes) setNotes(editAppt.notes);
+
+      if (emp) {
+        // Employee found in the active list — select them directly (clears anyBarber)
+        setSelectedEmployee(emp);
+        setAnyBarber(false);
+        setResolvedEmployee(null);
+      } else if (editAppt.employeeId) {
+        // Employee no longer in the public list (deactivated / moved unit).
+        // Restore the name from the populated field so the confirm screen still shows it,
+        // and mark as resolved so handleBook can still submit with the right id.
+        const empId = editAppt.employeeId?._id || editAppt.employeeId;
+        const empName = editAppt.employeeId?.name ?? '';
+        setSelectedEmployee(ANY_EMPLOYEE);
+        setAnyBarber(true);
+        // Only restore resolvedEmployee when we are landing on 'confirm' — if
+        // targetStep is 'datetime' the user needs to pick a new slot, so we
+        // intentionally leave resolvedEmployee null and clear the stale time.
+        if (!targetStep || targetStep === 'confirm') {
+          setResolvedEmployee({ id: empId, name: empName });
+        } else {
+          setResolvedEmployee(null);
+          setSelectedTime('');
+        }
+      }
       
       setStep(targetStep || 'confirm');
       setIsInitializing(false);
     }
-  }, [editId, editAppt, services, employees, isInitializing, targetStep]);
+  }, [editId, editAppt, services, employees, svcLoading, empLoading, isInitializing, targetStep]);
 
   const bookMutation = useMutation({
     mutationFn: (payload: object) => editId 
@@ -309,7 +373,16 @@ export default function Book() {
 
   function goBack() {
     if (stepIdx === 0) navigate('/');
-    else setStep(STEPS[stepIdx - 1]);
+    else {
+      // Clear time/resolved-employee when leaving datetime (going back to service)
+      // OR when leaving confirm back to datetime — in both cases the previously
+      // selected slot may no longer be valid once the user re-enters that step.
+      if (step === 'datetime' || step === 'confirm') {
+        setSelectedTime('');
+        setResolvedEmployee(null);
+      }
+      setStep(STEPS[stepIdx - 1]);
+    }
   }
 
   const storedGuestName = user?.name?.trim() ?? '';
@@ -321,10 +394,18 @@ export default function Book() {
 
   function handleBook() {
     setBookError(null);
+
+    // When anyBarber mode, resolvedEmployee must be set (it's set on slot selection)
+    const effectiveEmployeeId = anyBarber ? resolvedEmployee?.id : selectedEmployee?._id;
+    if (!effectiveEmployeeId) {
+      setBookError('Nenhum barbeiro disponível para o horário selecionado.');
+      return;
+    }
+
     const payload = { 
       unitId, 
       serviceId: selectedService!._id, 
-      employeeId: selectedEmployee!._id, 
+      employeeId: effectiveEmployeeId, 
       date: selectedDate, 
       startTime: selectedTime, 
       price: selectedService!.price,
@@ -347,6 +428,10 @@ export default function Book() {
   const isBooking = bookMutation.isPending || guestMutation.isPending;
 
   if (success) {
+    const displayEmployeeName = anyBarber
+      ? (resolvedEmployee?.name ?? selectedEmployee?.name ?? '')
+      : (selectedEmployee?.name ?? '');
+
     return (
       <div className={styles.successPage}>
         <div className={styles.successRing}>
@@ -354,7 +439,7 @@ export default function Book() {
         </div>
         <h2 className={styles.successTitle}>Agendamento<br/>Confirmado</h2>
         <div className={styles.successDetails}>
-          <span>{selectedService?.name} com {selectedEmployee?.name}</span>
+          <span>{selectedService?.name} com {displayEmployeeName}</span>
           <span>{fmtDateLong(selectedDate)} às {selectedTime}</span>
           <span className={styles.successPrice}>{fmt(selectedService?.price ?? 0)}</span>
         </div>
@@ -424,7 +509,16 @@ export default function Book() {
                   <button
                     key={svc._id}
                     className={`${styles.svcRow} ${selectedService?._id === svc._id ? styles.svcRowSel : ''}`}
-                    onClick={() => { setSelectedService(svc); setStep(editId ? 'confirm' : 'datetime'); }}
+                    onClick={() => {
+                      // Clear time/resolved employee whenever service changes so stale
+                      // slot+employee from a previous service doesn't reach the payload
+                      if (svc._id !== selectedService?._id) {
+                        setSelectedTime('');
+                        setResolvedEmployee(null);
+                      }
+                      setSelectedService(svc);
+                      setStep(editId ? 'confirm' : 'datetime');
+                    }}
                   >
                     <div className={styles.svcIcon}>
                       {svc.image ? (
@@ -457,11 +551,43 @@ export default function Book() {
             {step === 'barber' && (
               <div className={styles.empGrid}>
                 {empLoading && <p className={styles.loading}>Carregando...</p>}
+
+                {/* Any barber card */}
+                <button
+                  className={`${styles.empCard} ${styles.empCardAny} ${anyBarber ? styles.empCardSel : ''}`}
+                  onClick={() => {
+                    setAnyBarber(true);
+                    setSelectedEmployee(ANY_EMPLOYEE);
+                    setResolvedEmployee(null);
+                    setSelectedTime('');
+                    setStep(editId ? 'confirm' : 'service');
+                  }}
+                >
+                  <div className={styles.empAvatarWrap}>
+                    <div className={`${styles.empAvatar} ${styles.empAvatarAny}`}>
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 1l4 4-4 4"/>
+                        <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
+                        <path d="M7 23l-4-4 4-4"/>
+                        <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+                      </svg>
+                    </div>
+                  </div>
+                  <span className={styles.empName}>Qualquer</span>
+                  <span className={styles.empRole}>Primeiro disponível</span>
+                </button>
+
                 {employees.map(emp => (
                   <button
                     key={emp._id}
-                    className={`${styles.empCard} ${selectedEmployee?._id === emp._id ? styles.empCardSel : ''}`}
-                    onClick={() => { setSelectedEmployee(emp); setStep(editId ? 'confirm' : 'service'); }}
+                    className={`${styles.empCard} ${!anyBarber && selectedEmployee?._id === emp._id ? styles.empCardSel : ''}`}
+                    onClick={() => {
+                      setAnyBarber(false);
+                      setSelectedEmployee(emp);
+                      setResolvedEmployee(null);
+                      setSelectedTime('');
+                      setStep(editId ? 'confirm' : 'service');
+                    }}
                   >
                     <div className={styles.empAvatarWrap}>
                       <div className={styles.empAvatar}>
@@ -489,11 +615,13 @@ export default function Book() {
               <div className={styles.dtWrap}>
                 <Calendar
                   value={selectedDate}
-                  onChange={d => { setSelectedDate(d); setSelectedTime(''); }}
+                  onChange={d => { setSelectedDate(d); setSelectedTime(''); setResolvedEmployee(null); }}
                   workingDays={
-                    selectedEmployee?.daySchedules && selectedEmployee.daySchedules.length > 0
-                      ? selectedEmployee.daySchedules.map(ds => ds.day)
-                      : selectedEmployee?.workSchedule?.workDays ?? unit?.workingDays
+                    anyBarber
+                      ? unit?.workingDays
+                      : (selectedEmployee?.daySchedules && selectedEmployee.daySchedules.length > 0
+                          ? selectedEmployee.daySchedules.map(ds => ds.day)
+                          : selectedEmployee?.workSchedule?.workDays ?? unit?.workingDays)
                   }
                 />
                 <div className={styles.slotsWrap}>
@@ -501,22 +629,45 @@ export default function Book() {
                     Horários disponíveis
                     {selectedDate && <span> — {fmtDateLong(selectedDate)}</span>}
                   </p>
-                  {slotsLoading ? (
+                  {slotsLoadingCombined ? (
                     <p className={styles.loading}>Verificando disponibilidade...</p>
                   ) : availableSlots.length === 0 ? (
                     <p className={styles.slotsEmpty}>Nenhum horário disponível para este dia.</p>
                   ) : (
-                    <div className={styles.slotsGrid}>
-                      {availableSlots.map(s => (
-                        <button
-                          key={s}
-                          className={`${styles.slot} ${selectedTime === s ? styles.slotSel : ''}`}
-                          onClick={() => setSelectedTime(s)}
-                        >{s}</button>
-                      ))}
-                    </div>
+                    <>
+                      <div className={styles.slotsGrid}>
+                        {anyBarber
+                          ? (availableSlots as AnySlot[]).map(s => (
+                              <button
+                                key={`${s.time}-${s.employeeId}`}
+                                className={`${styles.slot} ${selectedTime === s.time && resolvedEmployee?.id === s.employeeId ? styles.slotSel : ''}`}
+                                onClick={() => {
+                                  setSelectedTime(s.time);
+                                  setResolvedEmployee({ id: s.employeeId, name: s.employeeName });
+                                }}
+                              >{s.time}</button>
+                            ))
+                          : (availableSlots as string[]).map(s => (
+                              <button
+                                key={s}
+                                className={`${styles.slot} ${selectedTime === s ? styles.slotSel : ''}`}
+                                onClick={() => setSelectedTime(s)}
+                              >{s}</button>
+                            ))
+                        }
+                      </div>
+                      {selectedTime && anyBarber && resolvedEmployee && (
+                        <p className={styles.resolvedBarberNote}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                          Barbeiro: <strong>{resolvedEmployee.name}</strong>
+                        </p>
+                      )}
+                    </>
                   )}
-                  {selectedTime && (
+                  {/* Only show "Continuar" when there is a fully resolved selection:
+                      - normal mode: a time is selected
+                      - anyBarber mode: a time AND a resolved employee are both set */}
+                  {selectedTime && (!anyBarber || resolvedEmployee) && (
                     <button className={styles.continueBtn} onClick={() => setStep('confirm')}>
                       Continuar
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
@@ -536,7 +687,7 @@ export default function Book() {
                   {([
                     ['Serviço', selectedService?.name],
                     ['Duração', selectedService?.durationMinutes ? `${selectedService.durationMinutes} min` : null],
-                    ['Barbeiro', selectedEmployee?.name],
+                    ['Barbeiro', anyBarber ? (resolvedEmployee?.name ?? 'A definir') : selectedEmployee?.name],
                     ['Data', fmtDateLong(selectedDate)],
                     ['Horário', selectedTime],
                   ] as [string, string | null | undefined][]).filter(([, v]) => !!v).map(([label, val]) => (
@@ -601,7 +752,7 @@ export default function Book() {
                 {bookError && <div className={styles.error}>{bookError}</div>}
                 <button
                   className={styles.confirmBtn}
-                  disabled={isBooking || !selectedTime || (!editId && !canSubmitGuest)}
+                  disabled={isBooking || !selectedTime || (anyBarber && !resolvedEmployee) || (!editId && !canSubmitGuest)}
                   onClick={handleBook}
                 >
                   {isBooking ? 'Agendando...' : 'Confirmar Agendamento'}
@@ -615,7 +766,7 @@ export default function Book() {
             )}
 
           </main>
-          <Summary service={selectedService} employee={selectedEmployee} date={selectedDate} time={selectedTime} notes={notes} />
+          <Summary service={selectedService} employee={selectedEmployee} date={selectedDate} time={selectedTime} notes={notes} anyBarber={anyBarber} resolvedEmployeeName={resolvedEmployee?.name} />
         </div>
         )}
       </div>

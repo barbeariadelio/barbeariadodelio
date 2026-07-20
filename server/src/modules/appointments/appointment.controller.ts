@@ -73,6 +73,26 @@ export async function getSlots(req: Request, res: Response, next: NextFunction):
   } catch (e) { next(e); }
 }
 
+export async function getSlotsByAnyEmployee(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { unitId, serviceId, date, source } = req.query as Record<string, string>;
+    if (!unitId || !serviceId || !date) {
+      ok(res, []);
+      return;
+    }
+    // Validate date format (YYYY-MM-DD) to avoid malformed strings reaching the service
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      ok(res, []);
+      return;
+    }
+    const bufferMins = source === 'guest' ? 30 : 0;
+    // getAvailableSlotsForAnyEmployee throws NotFoundError when serviceId doesn't exist,
+    // letting next(e) return a proper 404 instead of silently returning []
+    const slots = await service.getAvailableSlotsForAnyEmployee(unitId, serviceId, date, bufferMins);
+    ok(res, slots);
+  } catch (e) { next(e); }
+}
+
 export async function createAppointment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const data = req.body;

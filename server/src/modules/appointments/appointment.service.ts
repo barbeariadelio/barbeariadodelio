@@ -1051,6 +1051,95 @@ export class AppointmentService {
     return this.findById(saved._id.toString());
   }
 
+  async getAvailableSlotsForAnyEmployee(
+    unitId: string,
+    serviceId: string,
+    date: string,
+    bufferMins = 0,
+  ): Promise<{ time: string; employeeId: string; employeeName: string }[]> {
+    // Validate ObjectId format before hitting the DB to avoid a Mongoose CastError
+    // (which would surface as a 500 instead of a meaningful 404)
+    if (!mongoose.Types.ObjectId.isValid(serviceId)) throw new NotFoundError('Service');
+    if (!mongoose.Types.ObjectId.isValid(unitId)) return [];
+
+    const svc = await ServiceModel.findById(serviceId)
+      .select('durationMinutes isOnline isActive unitId')
+      .lean();
+    if (!svc) throw new NotFoundError('Service');
+    if (svc.isActive === false || svc.isOnline !== true) return [];
+    if (svc.unitId.toString() !== unitId) return [];
+
+    const durationMinutes = (svc as any).durationMinutes ?? 30;
+
+    // Fix #4: project vacations and blockedDays so we can pre-filter before fan-out,
+    // avoiding unnecessary DB round-trips for unavailable employees
+    const employees = await UserModel.find({
+      unitId,
+      role: 'employee',
+      isActive: true,
+      allowOnlineBooking: { $ne: false },
+    })
+      .select('_id name serviceIds vacations blockedDays')
+      .lean();
+
+    // Pre-filter: employees on vacation or with the date blocked don't need a slot query
+    const employeesAvailableOnDate = (employees as any[]).filter(emp => {
+      if (emp.blockedDays?.includes(date)) return false;
+      if (emp.vacations?.some((v: { start: string; end: string }) => date >= v.start && date <= v.end)) return false;
+      return true;
+    });
+
+    // Filter employees that offer this service (if they have serviceIds restrictions)
+    const eligible = employeesAvailableOnDate.filter((emp: any) => {
+      if (!emp.serviceIds || emp.serviceIds.length === 0) return true;
+      return emp.serviceIds.map((id: any) => id.toString()).includes(serviceId);
+    });
+
+    if (eligible.length === 0) return [];
+
+    // Fix #1+#2: shuffle eligible employees before fan-out so that the first-wins
+    // deduplication distributes bookings evenly rather than always favouring the
+    // same employee. Uses Fisher-Yates so the shuffle is unbiased.
+    const shuffled = [...eligible];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    // Fetch slots for all employees in parallel.
+    // Each call is individually caught: if an employee was deleted between the
+    // initial query and this fan-out (race condition), or if the unit no longer
+    // exists, we treat that employee as having no available slots rather than
+    // letting a single failure abort the entire request.
+    const results = await Promise.all(
+      shuffled.map(async (emp: any) => {
+        try {
+          const slots = await this.getAvailableSlots(unitId, emp._id.toString(), date, durationMinutes, bufferMins);
+          return slots.map(time => ({
+            time,
+            employeeId: emp._id.toString(),
+            employeeName: emp.name as string,
+          }));
+        } catch {
+          return [];
+        }
+      }),
+    );
+
+    // Merge: deduplicate by time keeping first available employee from the shuffled
+    // order, then sort chronologically
+    const seen = new Map<string, { time: string; employeeId: string; employeeName: string }>();
+    for (const empSlots of results) {
+      for (const slot of empSlots) {
+        if (!seen.has(slot.time)) {
+          seen.set(slot.time, slot);
+        }
+      }
+    }
+
+    return [...seen.values()].sort((a, b) => a.time.localeCompare(b.time));
+  }
+
   private generateSlots(start: string, end: string, intervalMin: number): string[] {
     const slots: string[] = [];
     const [sh, sm] = start.split(':').map(Number);
