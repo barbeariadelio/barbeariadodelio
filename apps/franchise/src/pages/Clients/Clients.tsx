@@ -569,7 +569,7 @@ export default function Clients() {
           {isLoading && <p className={styles.empty}>Carregando...</p>}
           {!isLoading && clients.length === 0 && <p className={styles.empty}>Nenhum cliente encontrado.</p>}
           <div className={styles.clientList}>
-            {clients.map(client => (
+            {[...clients].reverse().map(client => (
               <div key={client._id} className={`${styles.clientRow} ${selectedId === client._id ? styles.selected : ''}`} onClick={() => handleSelect(client._id)}>
                 <div className={styles.avatar}>{client.name[0].toUpperCase()}</div>
                 <div className={styles.clientInfo}>

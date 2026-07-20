@@ -565,7 +565,7 @@ export default function Clients() {
           )}
 
           <div className={styles.clientList}>
-            {clients.map(client => (
+            {[...clients].reverse().map(client => (
               <div
                 key={client._id}
                 className={`${styles.clientRow} ${selectedId === client._id ? styles.selected : ''}`}
