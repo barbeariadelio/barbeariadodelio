@@ -565,7 +565,7 @@ export default function Clients() {
           )}
 
           <div className={styles.clientList}>
-            {[...clients].reverse().map(client => (
+            {clients.map(client => (
               <div
                 key={client._id}
                 className={`${styles.clientRow} ${selectedId === client._id ? styles.selected : ''}`}
@@ -808,7 +808,7 @@ export default function Clients() {
                   <p className={styles.empty}>Nenhum atendimento registrado.</p>
                 )}
                 <div className={styles.historyList}>
-                  {appointments.map(appt => (
+                  {[...appointments].reverse().map(appt => (
                     <div key={appt._id} className={styles.historyRow}>
                       <div className={styles.historyInfo}>
                         <span className={styles.historyDate}>{formatDate(appt.date)} — {appt.startTime}</span>
@@ -883,7 +883,7 @@ export default function Clients() {
               }
               return (
                 <div className={styles.historyList}>
-                  {salesAppts.map(appt => {
+                  {[...salesAppts].reverse().map(appt => {
                     const total = appt.products!.reduce((s, p) => s + p.quantity * p.unitPrice, 0);
                     return (
                       <div key={appt._id} className={styles.historyRow} style={{ alignItems: 'flex-start' }}>

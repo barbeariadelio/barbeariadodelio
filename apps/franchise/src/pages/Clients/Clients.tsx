@@ -569,7 +569,7 @@ export default function Clients() {
           {isLoading && <p className={styles.empty}>Carregando...</p>}
           {!isLoading && clients.length === 0 && <p className={styles.empty}>Nenhum cliente encontrado.</p>}
           <div className={styles.clientList}>
-            {[...clients].reverse().map(client => (
+            {clients.map(client => (
               <div key={client._id} className={`${styles.clientRow} ${selectedId === client._id ? styles.selected : ''}`} onClick={() => handleSelect(client._id)}>
                 <div className={styles.avatar}>{client.name[0].toUpperCase()}</div>
                 <div className={styles.clientInfo}>
@@ -776,7 +776,7 @@ export default function Clients() {
               <>
                 {appointments.length === 0 && <p className={styles.empty}>Nenhum atendimento registrado.</p>}
                 <div className={styles.historyList}>
-                  {appointments.map(appt => (
+                  {[...appointments].reverse().map(appt => (
                     <div key={appt._id} className={styles.historyRow}>
                       <div className={styles.historyInfo}>
                         <span className={styles.historyDate}>{formatDate(appt.date)} — {appt.startTime}</span>
@@ -835,7 +835,7 @@ export default function Clients() {
               if (salesAppts.length === 0) return <p className={styles.empty}>Nenhuma venda de produto registrada.</p>;
               return (
                 <div className={styles.historyList}>
-                  {salesAppts.map(appt => {
+                  {[...salesAppts].reverse().map(appt => {
                     const total = appt.products!.reduce((s, p) => s + p.quantity * p.unitPrice, 0);
                     return (
                       <div key={appt._id} className={styles.historyRow} style={{ alignItems: 'flex-start' }}>
