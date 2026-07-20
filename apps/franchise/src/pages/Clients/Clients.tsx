@@ -776,7 +776,7 @@ export default function Clients() {
               <>
                 {appointments.length === 0 && <p className={styles.empty}>Nenhum atendimento registrado.</p>}
                 <div className={styles.historyList}>
-                  {[...appointments].reverse().map(appt => (
+                  {appointments.map(appt => (
                     <div key={appt._id} className={styles.historyRow}>
                       <div className={styles.historyInfo}>
                         <span className={styles.historyDate}>{formatDate(appt.date)} — {appt.startTime}</span>
@@ -835,7 +835,7 @@ export default function Clients() {
               if (salesAppts.length === 0) return <p className={styles.empty}>Nenhuma venda de produto registrada.</p>;
               return (
                 <div className={styles.historyList}>
-                  {[...salesAppts].reverse().map(appt => {
+                  {salesAppts.map(appt => {
                     const total = appt.products!.reduce((s, p) => s + p.quantity * p.unitPrice, 0);
                     return (
                       <div key={appt._id} className={styles.historyRow} style={{ alignItems: 'flex-start' }}>
