@@ -18,12 +18,24 @@ export class ClientService {
 
   async search(unitId: string, query: string, pagination?: { skip: number, limit: number }): Promise<IClient[]> {
     const safeQuery = escapeRegex(query);
+    const orConditions: Record<string, unknown>[] = [
+      { name: { $regex: safeQuery, $options: 'i' } },
+      { phone: { $regex: safeQuery, $options: 'i' } },
+    ];
+
+    // Phones are always stored digits-only (see ClientForm/AppointmentForm),
+    // but staff naturally type/search with the masked format the UI displays
+    // back to them, e.g. "(11) 99999-8888". Also match against the
+    // digits-only version of the query so a masked phone still finds the
+    // client instead of silently returning nothing.
+    const digitsOnly = query.replace(/\D/g, '');
+    if (digitsOnly && digitsOnly !== safeQuery) {
+      orConditions.push({ phone: { $regex: escapeRegex(digitsOnly), $options: 'i' } });
+    }
+
     let q = ClientModel.find({
       unitId,
-      $or: [
-        { name: { $regex: safeQuery, $options: 'i' } },
-        { phone: { $regex: safeQuery, $options: 'i' } },
-      ],
+      $or: orConditions,
     }).populate(populateOptions).sort({ name: 1 });
 
     if (pagination) {
@@ -40,7 +52,30 @@ export class ClientService {
   }
 
   async create(data: Partial<IClient>): Promise<IClient> {
-    return ClientModel.create(data);
+    const phoneDigits = (data.phone || '').replace(/\D/g, '');
+
+    // Guard against duplicate registrations: if a client with this phone
+    // already exists in the unit (e.g. staff couldn't find them via search
+    // and hit "Cadastrar novo cliente"), reuse the existing record instead
+    // of creating an unlinked duplicate that would hide future appointments
+    // from the client's own account.
+    if (phoneDigits && data.unitId) {
+      const existing = await ClientModel.findOne({ unitId: data.unitId, phone: phoneDigits });
+      if (existing) return existing;
+    }
+
+    const clientData: Partial<IClient> = phoneDigits ? { ...data, phone: phoneDigits } : data;
+
+    // Auto-link to a matching user account by phone (mirrors the guest
+    // self-booking flow), so appointments booked by staff for this client
+    // are visible in the client's own account from the start.
+    if (!clientData.userId && phoneDigits) {
+      const { UserModel } = await import('../auth/auth.model');
+      const user = await UserModel.findOne({ phone: phoneDigits });
+      if (user) clientData.userId = user._id as any;
+    }
+
+    return ClientModel.create(clientData);
   }
 
   async update(id: string, data: Partial<IClient>): Promise<IClient> {
@@ -123,6 +158,11 @@ export class ClientService {
     if (keepFields.phone && source.phone) target.phone = source.phone;
     if (keepFields.email && source.email) target.email = source.email;
     if (keepFields.notes && source.notes) target.notes = source.notes;
+
+    // Carry over the user-account link if the surviving record doesn't have
+    // one yet, otherwise appointments merged from `source` above would still
+    // be invisible in the client's own account after the merge.
+    if (!target.userId && source.userId) target.userId = source.userId;
 
     await target.save();
     await ClientModel.findByIdAndDelete(sourceId);

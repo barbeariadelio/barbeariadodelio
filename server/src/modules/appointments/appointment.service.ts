@@ -31,9 +31,12 @@ function sanitize(str?: string): string {
   return str.replace(/<[^>]*>?/gm, '').trim();
 }
 
-function phoneLookupRegex(phone: string): RegExp {
-  return new RegExp(phone.split('').join('.*'));
-}
+// NOTE: intentionally NOT a regex. An earlier version built
+// `new RegExp(phone.split('').join('.*'))`, an unanchored pattern that
+// matches ANY phone containing those digits in order (e.g. "12345" would
+// match "11923415678"). Since phones are always stored digits-only, an exact
+// string match is both correct and safe — a false match here hands out a
+// login token / links an appointment to the wrong account.
 
 function getBrazilNowParts(): { todayISO: string; minutes: number } {
   const nowBR = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
@@ -95,6 +98,42 @@ async function releaseAppointmentSlotLock(lockId: string): Promise<void> {
   await mongoose.connection.collection<any>('appointment_slot_locks').deleteOne({ _id: lockId }).catch(() => null);
 }
 
+// Serializes billing mutations (transaction dedup checks + package session
+// counter increments/decrements) per client, so two appointments for the
+// same client can't be completed/un-completed concurrently and race on the
+// same `Client.packages[].itemLimits[].used` counter or the same
+// "does a transaction already exist" check. Reuses the same TTL-locked
+// collection as the slot lock, under a distinct key namespace.
+async function acquireAppointmentBillingLock(clientId: string): Promise<string> {
+  const collection = mongoose.connection.collection<any>('appointment_slot_locks');
+  slotLockIndexReady ??= collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(() => null);
+  await slotLockIndexReady;
+
+  const lockId = `billing:${clientId}`;
+  const maxAttempts = 20;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      await collection.insertOne({
+        _id: lockId,
+        expiresAt: new Date(Date.now() + 30 * 1000),
+        createdAt: new Date(),
+      });
+      return lockId;
+    } catch (error: any) {
+      if (error?.code !== 11000) throw error;
+      // Another billing operation for this client is in flight — these
+      // holds are brief (a handful of quick DB ops), so a short backoff and
+      // retry is preferable to failing a legitimate concurrent request.
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
+  }
+  throw new AppError('Este cliente já está com outro faturamento em processamento. Tente novamente em instantes.', 409);
+}
+
+async function releaseAppointmentBillingLock(lockId: string): Promise<void> {
+  await mongoose.connection.collection<any>('appointment_slot_locks').deleteOne({ _id: lockId }).catch(() => null);
+}
+
 import { IService } from '../services/service.model';
 import { IClient } from '../clients/client.model';
 
@@ -141,7 +180,19 @@ export class AppointmentService {
   }
 
   async findByUserId(userId: string): Promise<IAppointment[]> {
-    const clients = await ClientModel.find({ userId: new mongoose.Types.ObjectId(userId) });
+    const user = await UserModel.findById(userId).select('phone').lean();
+
+    const orConditions: Record<string, unknown>[] = [{ userId: new mongoose.Types.ObjectId(userId) }];
+    if (user?.phone) {
+      // Fallback for client records created by staff that never got linked to
+      // this user's account (e.g. a duplicate registered because the phone
+      // search couldn't find the existing client). Only matches records that
+      // aren't already linked to a *different* user, so we never leak
+      // someone else's appointments.
+      orConditions.push({ userId: { $exists: false }, phone: user.phone });
+    }
+
+    const clients = await ClientModel.find({ $or: orConditions });
     const clientIds = clients.map(c => c._id);
     return AppointmentModel.find({ clientId: { $in: clientIds } })
       .populate('serviceId', 'name price')
@@ -306,96 +357,115 @@ export class AppointmentService {
       throw new AppError('Profissional indisponível: Em período de férias.', 400);
     }
 
-    if (data.status !== 'blocked') {
-      const conflict = await AppointmentModel.findOne({
-        unitId: data.unitId,
-        employeeId: data.employeeId,
-        date: data.date,
-        status: { $nin: ['cancelled'] },
-        $or: [
-          { startTime: { $lt: data.endTime, $gte: data.startTime } },
-          { endTime: { $gt: data.startTime, $lte: data.endTime } },
-          { startTime: { $lte: data.startTime }, endTime: { $gte: data.endTime } },
-        ],
-      });
-      if (conflict) throw new AppError('Horário já ocupado por outro agendamento.', 409);
-    }
-    
-    const svc = await ServiceModel.findById(data.serviceId);
+    // Staff/admin scheduling used to check for conflicts and then create the
+    // appointment with no lock in between (unlike guestBook, below, which
+    // already had this protection) — two concurrent requests for the same
+    // employee/date/time could both pass the conflict check before either
+    // inserted, double-booking the slot. Acquire the same slot lock here.
+    const needsSlotLock = data.status !== 'blocked';
+    const lockId = needsSlotLock
+      ? await acquireAppointmentSlotLock({
+          unitId: data.unitId!.toString(),
+          employeeId: data.employeeId!.toString(),
+          date: data.date!,
+          startTime: data.startTime!,
+        })
+      : undefined;
 
-    let finalPrice = internalOverride && data.price != null ? data.price : (svc?.price ?? data.price ?? 0);
-    let usedPackageId = undefined;
-    let isPackage = data.isPackage || svc?.type === 'package';
+    try {
+      if (data.status !== 'blocked') {
+        const conflict = await AppointmentModel.findOne({
+          unitId: data.unitId,
+          employeeId: data.employeeId,
+          date: data.date,
+          status: { $nin: ['cancelled'] },
+          $or: [
+            { startTime: { $lt: data.endTime, $gte: data.startTime } },
+            { endTime: { $gt: data.startTime, $lte: data.endTime } },
+            { startTime: { $lte: data.startTime }, endTime: { $gte: data.endTime } },
+          ],
+        });
+        if (conflict) throw new AppError('Horário já ocupado por outro agendamento.', 409);
+      }
 
-    // For package-type services, always store the per-session prorated price
-    // and auto-enroll the client in the package if they don't have it yet
-    if (svc?.type === 'package' && data.clientId) {
-      const totalSessions = svc.packageItems?.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1;
-      finalPrice = Math.round((svc.price / totalSessions) * 100) / 100;
+      const svc = await ServiceModel.findById(data.serviceId);
 
-      const client = await ClientModel.findById(data.clientId);
-      if (client) {
-        const alreadyHas = client.packages?.some(
-          p => p.packageId.toString() === svc._id!.toString() && p.active
-        );
-        if (!alreadyHas) {
-          let expiresAt: Date | undefined;
-          const validity = (svc as any).packageValidity;
-          if (validity?.type && validity.type !== 'none' && validity.value) {
-            const exp = new Date();
-            if (validity.type === 'days')   exp.setDate(exp.getDate() + validity.value);
-            else if (validity.type === 'weeks')  exp.setDate(exp.getDate() + validity.value * 7);
-            else if (validity.type === 'months') exp.setMonth(exp.getMonth() + validity.value);
-            else if (validity.type === 'years')  exp.setFullYear(exp.getFullYear() + validity.value);
-            expiresAt = exp;
+      let finalPrice = internalOverride && data.price != null ? data.price : (svc?.price ?? data.price ?? 0);
+      let usedPackageId = undefined;
+      let isPackage = data.isPackage || svc?.type === 'package';
+
+      // For package-type services, always store the per-session prorated price
+      // and auto-enroll the client in the package if they don't have it yet
+      if (svc?.type === 'package' && data.clientId) {
+        const totalSessions = svc.packageItems?.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1;
+        finalPrice = Math.round((svc.price / totalSessions) * 100) / 100;
+
+        const client = await ClientModel.findById(data.clientId);
+        if (client) {
+          const alreadyHas = client.packages?.some(
+            p => p.packageId.toString() === svc._id!.toString() && p.active
+          );
+          if (!alreadyHas) {
+            let expiresAt: Date | undefined;
+            const validity = (svc as any).packageValidity;
+            if (validity?.type && validity.type !== 'none' && validity.value) {
+              const exp = new Date();
+              if (validity.type === 'days')   exp.setDate(exp.getDate() + validity.value);
+              else if (validity.type === 'weeks')  exp.setDate(exp.getDate() + validity.value * 7);
+              else if (validity.type === 'months') exp.setMonth(exp.getMonth() + validity.value);
+              else if (validity.type === 'years')  exp.setFullYear(exp.getFullYear() + validity.value);
+              expiresAt = exp;
+            }
+            client.packages = client.packages || [];
+            client.packages.push({
+              packageId: svc._id as any,
+              startDate: new Date(),
+              active: true,
+              expiresAt,
+              itemLimits: svc.packageItems?.map(pi => ({
+                serviceId: pi.serviceId,
+                quantity: pi.quantity,
+                used: 0,
+              })) || [],
+            });
+            await client.save();
           }
-          client.packages = client.packages || [];
-          client.packages.push({
-            packageId: svc._id as any,
-            startDate: new Date(),
-            active: true,
-            expiresAt,
-            itemLimits: svc.packageItems?.map(pi => ({
-              serviceId: pi.serviceId,
-              quantity: pi.quantity,
-              used: 0,
-            })) || [],
-          });
-          await client.save();
+        }
+      } else if (svc?.type === 'package') {
+        const totalSessions = svc.packageItems?.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1;
+        finalPrice = Math.round((svc.price / totalSessions) * 100) / 100;
+      }
+
+      // If it's a single service, check if client is using an active package for it.
+      // Skip when the caller explicitly opted out (isPackage === false), e.g. staff
+      // unchecked "usar pacote ativo" to charge a custom price for this visit instead.
+      if (svc?.type === 'single' && data.clientId && data.isPackage !== false) {
+        const client = await ClientModel.findById(data.clientId);
+        if (client) {
+          const { price: prorated, packageId } = await this.calculateProratedPrice(client, data.serviceId!.toString());
+          if (packageId) {
+            finalPrice = prorated;
+            usedPackageId = packageId;
+            isPackage = true;
+          }
         }
       }
-    } else if (svc?.type === 'package') {
-      const totalSessions = svc.packageItems?.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1;
-      finalPrice = Math.round((svc.price / totalSessions) * 100) / 100;
-    }
 
-    // If it's a single service, check if client is using an active package for it.
-    // Skip when the caller explicitly opted out (isPackage === false), e.g. staff
-    // unchecked "usar pacote ativo" to charge a custom price for this visit instead.
-    if (svc?.type === 'single' && data.clientId && data.isPackage !== false) {
-      const client = await ClientModel.findById(data.clientId);
-      if (client) {
-        const { price: prorated, packageId } = await this.calculateProratedPrice(client, data.serviceId!.toString());
-        if (packageId) {
-          finalPrice = prorated;
-          usedPackageId = packageId;
-          isPackage = true;
-        }
-      }
+      const apptData = {
+        ...data,
+        price: finalPrice,
+        status: data.status || 'confirmed',
+        isPackage,
+        usedPackageId,
+        // If it's a package type service but NOT a use of an existing package, it's a sale
+        notes: svc?.type === 'package' && !usedPackageId ? `Venda de Pacote: ${svc.name}${data.notes ? ' | ' + data.notes : ''}` : data.notes
+      };
+      const created = await AppointmentModel.create(apptData);
+      invalidateSlotCache(data.unitId!.toString(), data.employeeId!.toString(), data.date!);
+      return created;
+    } finally {
+      if (lockId) await releaseAppointmentSlotLock(lockId);
     }
-
-    const apptData = { 
-      ...data, 
-      price: finalPrice,
-      status: data.status || 'confirmed',
-      isPackage,
-      usedPackageId,
-      // If it's a package type service but NOT a use of an existing package, it's a sale
-      notes: svc?.type === 'package' && !usedPackageId ? `Venda de Pacote: ${svc.name}${data.notes ? ' | ' + data.notes : ''}` : data.notes
-    };
-    const created = await AppointmentModel.create(apptData);
-    invalidateSlotCache(data.unitId!.toString(), data.employeeId!.toString(), data.date!);
-    return created;
   }
 
   async guestBook(payload: {
@@ -421,15 +491,17 @@ export class AppointmentService {
     }
 
     const cleanPhone = guestPhone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      throw new AppError('Informe um telefone válido.', 400);
+    }
     const guestEmail = `guest_${cleanPhone}_${unitId}@delio.guest`;
-    const phoneRegex = phoneLookupRegex(cleanPhone);
 
     // Batch 1: all independent reads in parallel
     const [svc, existingClient, userByEmail, userByPhone, employee] = await Promise.all([
       ServiceModel.findById(serviceId),
-      ClientModel.findOne({ phone: phoneRegex, unitId }),
+      ClientModel.findOne({ phone: cleanPhone, unitId }),
       UserModel.findOne({ email: guestEmail }),
-      UserModel.findOne({ phone: phoneRegex }),
+      UserModel.findOne({ phone: cleanPhone }),
       UserModel.findById(employeeId).select('unitId role isActive allowOnlineBooking serviceIds vacations blockedDays').lean(),
     ]);
 
@@ -504,7 +576,7 @@ export class AppointmentService {
           });
         } catch (error: any) {
           if (error?.code === 11000) {
-            userAccount = await UserModel.findOne({ $or: [{ email: guestEmail }, { phone: phoneRegex }] });
+            userAccount = await UserModel.findOne({ $or: [{ email: guestEmail }, { phone: cleanPhone }] });
           }
           if (!userAccount) throw error;
         }
@@ -631,6 +703,21 @@ export class AppointmentService {
 
     const { TransactionModel } = await import('../finance/transaction.model');
 
+    // The billing logic below does several read-modify-write operations on
+    // the client's package session counters (`limit.used`) and relies on
+    // "does a transaction already exist for this appointment?" checks to
+    // avoid double-billing. Both are check-then-act and were previously
+    // unprotected: two concurrent completions of appointments for the same
+    // client (e.g. a double-click, or two staff members finishing two
+    // sessions at once) could both read the same counter/absence-of-transaction
+    // before either write landed, silently losing an increment/decrement or
+    // creating duplicate income/commission transactions. Serialize billing
+    // per client with the same short-lived lock used for slot booking.
+    const billingLockId = appt.clientId
+      ? await acquireAppointmentBillingLock(appt.clientId.toString())
+      : undefined;
+
+    try {
     if (status === 'completed') {
       // Step 2: fetch with populate only for the financial logic
       const populated = await AppointmentModel.findById(id).populate<{
@@ -916,6 +1003,9 @@ export class AppointmentService {
     }
 
     return appt;
+    } finally {
+      if (billingLockId) await releaseAppointmentBillingLock(billingLockId);
+    }
   }
 
   async delete(id: string, options?: { mode?: 'single' | 'this-and-future' }): Promise<void> {

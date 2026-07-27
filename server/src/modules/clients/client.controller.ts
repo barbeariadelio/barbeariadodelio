@@ -117,6 +117,17 @@ export async function mergeClient(req: AuthRequest, res: Response, next: NextFun
     const { targetClientId, keepFields = {} } = req.body;
     if (!targetClientId) throw new AppError('targetClientId is required', 400);
 
+    // The target must belong to the same unit too — otherwise a staff member
+    // could merge (and thereby move appointment history, packages, and
+    // account linkage) into a client belonging to a different unit/tenant.
+    const target = await service.findById(targetClientId);
+    if (!isOwnerOrFranchisor && target.unitId?.toString() !== req.user!.unitId?.toString()) {
+      throw new AppError('Access denied to this unit', 403);
+    }
+    if (source.unitId?.toString() !== target.unitId?.toString()) {
+      throw new AppError('Não é possível mesclar clientes de unidades diferentes.', 400);
+    }
+
     const result = await service.mergeClients(req.params.id, targetClientId, keepFields);
     const uid = result.unitId?.toString();
     if (uid) sseService.emit(uid, 'clients:change');

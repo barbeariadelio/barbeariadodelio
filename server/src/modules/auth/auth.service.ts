@@ -57,14 +57,17 @@ export class AuthService {
         throw new AppError('Informe seu nome e um telefone válido.', 400);
       }
 
-      // Flexible search: match digits regardless of formatting in the DB
-      const phoneRegex = new RegExp(cleanPhone.split('').join('.*'));
-      
+      // Exact match on the normalized (digits-only) phone — phones are always
+      // stored digits-only, so this is safe. (Previously used an unanchored
+      // regex built from the digits with `.*` between each one, which matched
+      // ANY phone containing those digits in order — e.g. "12345" would match
+      // "11923415678" — letting a caller land a token for someone else's
+      // account. Never loosen this back to a subsequence/regex match.)
       // Prioritize 'client' role to ensure booking history is correctly retrieved
-      let user = await UserModel.findOne({ phone: phoneRegex, role: 'client' });
-      
+      let user = await UserModel.findOne({ phone: cleanPhone, role: 'client' });
+
       if (!user) {
-        user = await UserModel.findOne({ phone: phoneRegex });
+        user = await UserModel.findOne({ phone: cleanPhone });
       }
 
       if (!user) {
@@ -84,7 +87,7 @@ export class AuthService {
 
         // Link existing Client record (internally created) or create a new one
         const { ClientModel } = await import('../clients/client.model');
-        const existingClient = await ClientModel.findOne({ phone: { $regex: cleanPhone.split('').join('.*') } });
+        const existingClient = await ClientModel.findOne({ phone: cleanPhone });
         if (existingClient) {
           existingClient.userId = user._id as any;
           await existingClient.save();
@@ -112,7 +115,7 @@ export class AuthService {
         // Ensure any existing Client records for this phone are linked to this user
         const { ClientModel } = await import('../clients/client.model');
         await ClientModel.updateMany(
-          { phone: { $regex: cleanPhone.split('').join('.*') }, userId: { $exists: false } },
+          { phone: cleanPhone, userId: { $exists: false } },
           { $set: { userId: user._id } }
         );
       }
