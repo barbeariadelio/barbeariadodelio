@@ -125,6 +125,15 @@ export async function registerProductSale(req: AuthRequest, res: Response, next:
   } catch (e) { next(e); }
 }
 
+export async function settleVoucher(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const appScope = req.headers['x-app-scope'] as string | undefined;
+    const jwtUnitId = req.user!.unitId;
+    const transaction = await service.settleVoucher(req.params.id, req.user!.id, req.user!.role, appScope, jwtUnitId);
+    ok(res, transaction);
+  } catch (e) { next(e); }
+}
+
 export async function updateTransaction(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const appScope = req.headers['x-app-scope'] as string | undefined;

@@ -21,7 +21,7 @@ interface Props {
 }
 
 interface ConfirmState {
-  type: 'delete';
+  type: 'delete' | 'settle';
   vale: Transaction;
 }
 
@@ -94,6 +94,14 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
     },
   });
 
+  const settleVale = useMutation({
+    mutationFn: (id: string) => api.patch(`/finance/transactions/${id}/settle-voucher`),
+    onSuccess: () => {
+      invalidateFinance();
+      setConfirm(null);
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount) return;
@@ -111,7 +119,8 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
 
   function handleConfirm() {
     if (!confirm) return;
-    deleteVale.mutate(confirm.vale._id);
+    if (confirm.type === 'delete') deleteVale.mutate(confirm.vale._id);
+    else settleVale.mutate(confirm.vale._id);
   }
 
   const getDeductedAmount = (vale: Transaction) => Math.min(
@@ -120,7 +129,7 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
   );
   const totalPending = vales.reduce((sum, vale) => sum + Math.max(0, vale.amount - getDeductedAmount(vale)), 0);
   const totalDiscounted = vales.reduce((sum, vale) => sum + getDeductedAmount(vale), 0);
-  const isPending = deleteVale.isPending;
+  const isPending = deleteVale.isPending || settleVale.isPending;
 
   return (
     <div className={styles.container}>
@@ -128,18 +137,20 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
         <div className={styles.modalOverlay} onClick={() => !isPending && setConfirm(null)}>
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
             <p className={styles.modalText}>
-              <>Excluir o vale de <strong>{formatCurrency(confirm.vale.amount)}</strong>? Esta acao nao pode ser desfeita.</>
+              {confirm.type === 'delete'
+                ? <>Excluir o vale de <strong>{formatCurrency(confirm.vale.amount)}</strong>? Esta acao nao pode ser desfeita.</>
+                : <>Marcar o vale de <strong>{formatCurrency(confirm.vale.amount)}</strong> como quitado fora do pagamento (dinheiro, acerto direto etc.)? Ele deixa de ser abatido automaticamente no proximo pagamento.</>}
             </p>
             <div className={styles.modalActions}>
               <button className={styles.modalCancel} onClick={() => setConfirm(null)} disabled={isPending}>
                 Cancelar
               </button>
               <button
-                className={styles.modalConfirmRed}
+                className={confirm.type === 'delete' ? styles.modalConfirmRed : styles.modalConfirmGreen}
                 onClick={handleConfirm}
                 disabled={isPending}
               >
-                {isPending ? 'Aguarde...' : 'Excluir'}
+                {isPending ? 'Aguarde...' : confirm.type === 'delete' ? 'Excluir' : 'Quitar'}
               </button>
             </div>
           </div>
@@ -220,6 +231,15 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
             <div className={styles.valeRight}>
               <span className={`${styles.valeAmount} ${isSettled ? styles.valeAmountDiscounted : ''}`}>{formatCurrency(remainingAmount)}</span>
               {deductedAmount > 0 && <small>de {formatCurrency(v.amount)}</small>}
+              {!isSettled && (
+                <button
+                  className={styles.discountBtn}
+                  onClick={() => setConfirm({ type: 'settle', vale: v })}
+                  title="Marcar como quitado fora do pagamento"
+                >
+                  Quitar
+                </button>
+              )}
               {deductedAmount === 0 && (
                 <button
                   className={styles.deleteBtn}
