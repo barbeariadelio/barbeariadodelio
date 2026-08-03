@@ -134,7 +134,7 @@ interface RemunerationSummaryItem {
 interface Transaction {
   _id: string;
   unitId: string | { _id: string; name: string };
-  type: 'income' | 'expense' | 'royalty' | 'commission';
+  type: 'income' | 'expense' | 'royalty';
   category: string;
   amount: number;
   description: string;
@@ -1209,7 +1209,7 @@ export default function Finance() {
                   <span className={styles.txAmount} style={{ color: TYPE_COLORS[tx.type] }}>
                     {tx.type === 'expense' ? '−' : '+'}{formatCurrency(tx.amount)}
                   </span>
-                  {!(tx.appointmentId || tx.subscriptionId || tx.type === 'commission') && (
+                  {!(tx.appointmentId || tx.subscriptionId || (tx.type as string) === 'commission') && (
                     <div className={styles.txActions}>
                       <button className={styles.actionBtn} onClick={() => { setEditingTx(tx); setShowForm(true); }}>
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
