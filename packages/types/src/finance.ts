@@ -6,6 +6,7 @@ export interface Transaction {
   _id: string;
   unitId: string;
   appointmentId?: string;
+  subscriptionId?: string;
   employeeId?: string;
   type: TransactionType;
   category: TransactionCategory;
@@ -14,6 +15,11 @@ export interface Transaction {
   date: string;
   paymentMethod?: PaymentMethod;
   isPaid?: boolean;
+  deductedAmount?: number;
+  voucherAllocations?: Array<{
+    voucherId: string;
+    amount: number;
+  }>;
   createdBy: string;
   createdAt: string;
 }

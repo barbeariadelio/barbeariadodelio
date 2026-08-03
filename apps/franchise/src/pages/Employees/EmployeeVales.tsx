@@ -11,6 +11,7 @@ interface Transaction {
   description: string;
   date: string;
   isPaid?: boolean;
+  deductedAmount?: number;
 }
 
 interface Props {
@@ -20,7 +21,7 @@ interface Props {
 }
 
 interface ConfirmState {
-  type: 'discount' | 'delete';
+  type: 'delete';
   vale: Transaction;
 }
 
@@ -93,15 +94,6 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
     },
   });
 
-  const discountVale = useMutation({
-    mutationFn: (id: string) =>
-      api.patch(`/finance/transactions/${id}`, { isPaid: true, appointmentId: null }),
-    onSuccess: () => {
-      invalidateFinance();
-      setConfirm(null);
-    },
-  });
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount) return;
@@ -119,16 +111,16 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
 
   function handleConfirm() {
     if (!confirm) return;
-    if (confirm.type === 'discount') {
-      discountVale.mutate(confirm.vale._id);
-    } else {
-      deleteVale.mutate(confirm.vale._id);
-    }
+    deleteVale.mutate(confirm.vale._id);
   }
 
-  const totalPending = vales.filter(v => !v.isPaid).reduce((sum, v) => sum + v.amount, 0);
-  const totalDiscounted = vales.filter(v => v.isPaid).reduce((sum, v) => sum + v.amount, 0);
-  const isPending = discountVale.isPending || deleteVale.isPending;
+  const getDeductedAmount = (vale: Transaction) => Math.min(
+    vale.amount,
+    vale.deductedAmount ?? (vale.isPaid ? vale.amount : 0),
+  );
+  const totalPending = vales.reduce((sum, vale) => sum + Math.max(0, vale.amount - getDeductedAmount(vale)), 0);
+  const totalDiscounted = vales.reduce((sum, vale) => sum + getDeductedAmount(vale), 0);
+  const isPending = deleteVale.isPending;
 
   return (
     <div className={styles.container}>
@@ -136,21 +128,18 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
         <div className={styles.modalOverlay} onClick={() => !isPending && setConfirm(null)}>
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
             <p className={styles.modalText}>
-              {confirm.type === 'discount'
-                ? <>Descontar <strong>{formatCurrency(confirm.vale.amount)}</strong> do pagamento semanal do funcionario?</>
-                : <>Excluir o vale de <strong>{formatCurrency(confirm.vale.amount)}</strong>? Esta acao nao pode ser desfeita.</>
-              }
+              <>Excluir o vale de <strong>{formatCurrency(confirm.vale.amount)}</strong>? Esta acao nao pode ser desfeita.</>
             </p>
             <div className={styles.modalActions}>
               <button className={styles.modalCancel} onClick={() => setConfirm(null)} disabled={isPending}>
                 Cancelar
               </button>
               <button
-                className={confirm.type === 'discount' ? styles.modalConfirmGreen : styles.modalConfirmRed}
+                className={styles.modalConfirmRed}
                 onClick={handleConfirm}
                 disabled={isPending}
               >
-                {isPending ? 'Aguarde...' : confirm.type === 'discount' ? 'Descontar' : 'Excluir'}
+                {isPending ? 'Aguarde...' : 'Excluir'}
               </button>
             </div>
           </div>
@@ -206,7 +195,7 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
         </div>
         {totalDiscounted > 0 && (
           <div className={styles.summaryRow}>
-            <span>Descontado da semana:</span>
+          <span>Abatido em pagamentos:</span>
             <span className={styles.discountedValue}>{formatCurrency(totalDiscounted)}</span>
           </div>
         )}
@@ -215,27 +204,23 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
       <div className={styles.list}>
         {isLoading && <p className={styles.empty}>Carregando vales...</p>}
         {!isLoading && vales.length === 0 && <p className={styles.empty}>Nenhum vale registrado para este funcionario.</p>}
-        {vales.map(v => (
-          <div key={v._id} className={`${styles.valeRow} ${v.isPaid ? styles.valeRowDiscounted : ''}`}>
+          {vales.map(v => {
+            const deductedAmount = getDeductedAmount(v);
+            const remainingAmount = Math.max(0, v.amount - deductedAmount);
+            const isSettled = remainingAmount === 0;
+            return (
+            <div key={v._id} className={`${styles.valeRow} ${isSettled ? styles.valeRowDiscounted : ''}`}>
             <div className={styles.valeInfo}>
               <div className={styles.valeDescRow}>
                 <span className={styles.valeDesc}>{v.description.replace('Vale: ', '')}</span>
-                {v.isPaid && <span className={styles.discountedBadge}>Descontado</span>}
+                {deductedAmount > 0 && <span className={styles.discountedBadge}>{isSettled ? 'Quitado' : 'Parcialmente abatido'}</span>}
               </div>
               <span className={styles.valeDate}>{formatDate(v.date)}</span>
             </div>
             <div className={styles.valeRight}>
-              <span className={`${styles.valeAmount} ${v.isPaid ? styles.valeAmountDiscounted : ''}`}>{formatCurrency(v.amount)}</span>
-              {!v.isPaid && (
-                <button
-                  className={styles.discountBtn}
-                  onClick={() => setConfirm({ type: 'discount', vale: v })}
-                  title="Descontar da semana"
-                >
-                  - Descontar
-                </button>
-              )}
-              {!v.isPaid && (
+              <span className={`${styles.valeAmount} ${isSettled ? styles.valeAmountDiscounted : ''}`}>{formatCurrency(remainingAmount)}</span>
+              {deductedAmount > 0 && <small>de {formatCurrency(v.amount)}</small>}
+              {deductedAmount === 0 && (
                 <button
                   className={styles.deleteBtn}
                   onClick={() => setConfirm({ type: 'delete', vale: v })}
@@ -246,7 +231,8 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
               )}
             </div>
           </div>
-        ))}
+            );
+          })}
       </div>
     </div>
   );

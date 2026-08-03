@@ -305,7 +305,7 @@ export default function Commissions() {
   const unpaid = commissions.filter(c => !c.isPaid);
   const paid   = commissions.filter(c => c.isPaid);
   const currentEmpSummary = summary.find(s => s.employeeId === detailEmpId);
-  const weeklyValeDiscount = currentEmpSummary?.valesDiscountedAmount ?? 0;
+  const weeklyValeDiscount = currentEmpSummary?.valesAmount ?? 0;
   const selectedGrossTotal = unpaid.filter(c => selected.has(c._id)).reduce((s, c) => s + c.amount, 0);
   const selectedTotal = selected.size > 0 ? Math.max(0, selectedGrossTotal - weeklyValeDiscount) : 0;
   const totalPending  = currentEmpSummary?.pendingAmount ?? Math.max(0, unpaid.reduce((s, c) => s + c.amount, 0) - weeklyValeDiscount);

@@ -4,6 +4,7 @@ import type { TransactionType, TransactionCategory } from '@barber/types';
 export interface ITransaction extends Document {
   unitId: mongoose.Types.ObjectId;
   appointmentId?: mongoose.Types.ObjectId;
+  subscriptionId?: mongoose.Types.ObjectId;
   employeeId?: mongoose.Types.ObjectId;
   type: TransactionType;
   category: TransactionCategory;
@@ -13,12 +14,18 @@ export interface ITransaction extends Document {
   paymentMethod?: 'money' | 'debit' | 'credit' | 'pix' | 'package' | 'other';
   createdBy: mongoose.Types.ObjectId;
   isPaid?: boolean;
+  deductedAmount?: number;
+  voucherAllocations?: {
+    voucherId: mongoose.Types.ObjectId;
+    amount: number;
+  }[];
 }
 
 const transactionSchema = new Schema<ITransaction>(
   {
     unitId:        { type: Schema.Types.ObjectId, ref: 'Unit', required: true },
     appointmentId: { type: Schema.Types.ObjectId, ref: 'Appointment' },
+    subscriptionId: { type: Schema.Types.ObjectId, ref: 'Subscription' },
     employeeId:    { type: Schema.Types.ObjectId, ref: 'User' },
     type:     { type: String, enum: ['income', 'expense', 'royalty', 'commission'], required: true },
     category: { type: String, enum: ['service', 'product', 'salary', 'rent', 'voucher', 'commission', 'package_use', 'package_sale', 'sale', 'other'], required: true },
@@ -28,12 +35,18 @@ const transactionSchema = new Schema<ITransaction>(
     paymentMethod: { type: String, enum: ['money', 'debit', 'credit', 'pix', 'package', 'other'] },
     createdBy:   { type: Schema.Types.ObjectId, ref: 'User', required: true },
     isPaid:      { type: Boolean, default: false },
+    deductedAmount: { type: Number, min: 0, default: 0 },
+    voucherAllocations: [{
+      voucherId: { type: Schema.Types.ObjectId, ref: 'Transaction', required: true },
+      amount: { type: Number, min: 0, required: true },
+    }],
   },
   { timestamps: true },
 );
 
 transactionSchema.index({ unitId: 1, date: 1 });
 transactionSchema.index({ appointmentId: 1, type: 1 });
+transactionSchema.index({ subscriptionId: 1, type: 1 });
 transactionSchema.index({ employeeId: 1, type: 1, isPaid: 1 });
 transactionSchema.index({ unitId: 1, type: 1, category: 1 });
 

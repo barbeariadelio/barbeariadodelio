@@ -105,6 +105,26 @@ export async function createTransaction(req: AuthRequest, res: Response, next: N
   } catch (e) { next(e); }
 }
 
+export async function registerProductSale(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { unitId: bodyUnitId, items, paymentMethod = 'other', date } = req.body;
+    const requestedUnitId = bodyUnitId || req.user!.unitId;
+    const appScope = req.headers['x-app-scope'] as string | undefined;
+    const jwtUnitId = req.user!.unitId;
+    const transactions = await service.registerProductSale(
+      req.user!.id,
+      req.user!.role,
+      requestedUnitId,
+      items,
+      paymentMethod,
+      date,
+      appScope,
+      jwtUnitId,
+    );
+    created(res, transactions);
+  } catch (e) { next(e); }
+}
+
 export async function updateTransaction(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const appScope = req.headers['x-app-scope'] as string | undefined;

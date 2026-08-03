@@ -3,6 +3,7 @@ import { TransactionModel, ITransaction } from './transaction.model';
 import { UnitModel } from '../units/unit.model';
 import { AppointmentModel } from '../appointments/appointment.model';
 import { UserModel, IUser } from '../auth/auth.model';
+import { ProductModel } from '../inventory/product.model';
 import type { FinanceSummary, TransactionCategory } from '@barber/types';
 import { sharedCache } from '../../shared/utils/cache';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
@@ -59,6 +60,38 @@ interface ApptLean {
 interface UnitLean {
   _id: mongoose.Types.ObjectId;
   name: string;
+}
+
+let paymentLockIndexReady: Promise<unknown> | null = null;
+
+async function acquirePaymentLock(unitId: string, employeeId: string): Promise<string | undefined> {
+  // Unit tests and one-off scripts may instantiate the service before Mongo is
+  // connected. Requests are served only after the application connection is ready.
+  if (mongoose.connection.readyState !== 1) return undefined;
+
+  const collection = mongoose.connection.collection<any>('finance_payment_locks');
+  paymentLockIndexReady ??= collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(() => null);
+  await paymentLockIndexReady;
+
+  const lockId = `${unitId}:${employeeId}`;
+  try {
+    await collection.insertOne({
+      _id: lockId,
+      expiresAt: new Date(Date.now() + 2 * 60 * 1000),
+      createdAt: new Date(),
+    });
+    return lockId;
+  } catch (error: any) {
+    if (error?.code === 11000) {
+      throw new AppError('JÃ¡ existe um pagamento deste funcionÃ¡rio em processamento. Aguarde alguns segundos e tente novamente.', 409);
+    }
+    throw error;
+  }
+}
+
+async function releasePaymentLock(lockId?: string): Promise<void> {
+  if (!lockId || mongoose.connection.readyState !== 1) return;
+  await mongoose.connection.collection<any>('finance_payment_locks').deleteOne({ _id: lockId }).catch(() => null);
 }
 
 export class FinanceService {
@@ -247,7 +280,7 @@ export class FinanceService {
       commissionTxQuery['date'] = { ...(start ? { $gte: start } : {}), ...(end ? { $lte: end } : {}) };
     }
 
-    type TxRow = { employeeId?: mongoose.Types.ObjectId; appointmentId?: mongoose.Types.ObjectId; amount: number; date?: string; isPaid?: boolean };
+    type TxRow = { employeeId?: mongoose.Types.ObjectId; appointmentId?: mongoose.Types.ObjectId; amount: number; date?: string; isPaid?: boolean; deductedAmount?: number };
     type ApptRevenueRow = { employeeId?: mongoose.Types.ObjectId; price?: number; isBilled?: boolean; billingSkipped?: boolean };
 
     const commissionTxs = await TransactionModel.find(commissionTxQuery).select('employeeId appointmentId amount date isPaid').lean() as TxRow[];
@@ -272,11 +305,12 @@ export class FinanceService {
       category: 'voucher',
       employeeId: { $in: employees.map(e => e._id) },
     };
-    if (start || end) {
-      valesQuery['date'] = { ...(start ? { $gte: start } : {}), ...(end ? { $lte: end } : {}) };
+    if (end) {
+      // A previous-period voucher remains an outstanding balance and must be
+      // visible in a later payment period. Future vouchers are excluded.
+      valesQuery['date'] = { $lte: end };
     }
-
-    const valesTxs = await TransactionModel.find(valesQuery).select('employeeId appointmentId amount date isPaid').lean() as TxRow[];
+    const valesTxs = await TransactionModel.find(valesQuery).select('employeeId appointmentId amount date isPaid deductedAmount').lean() as TxRow[];
 
     // Build map seeded with all employees (guarantees every employee appears)
     const empMap = new Map<string, { name: string; avatar?: string; grossRevenue: number; total: number; paid: number; unpaid: number; vales: number; valesDiscounted: number }>(
@@ -306,30 +340,27 @@ export class FinanceService {
       }
     }
 
-    // Vales: split into pending (not discounted) and discounted (manually marked isPaid=true)
+    // Vales keep their outstanding balance even when their issue date is in a
+    // prior selected period. Legacy isPaid records are treated as fully settled.
     for (const tx of valesTxs) {
       const empId = tx.employeeId?.toString();
       if (!empId) continue;
       const entry = empMap.get(empId);
       if (!entry) continue;
-      if (tx.isPaid) {
-        entry.valesDiscounted += tx.amount;
-      } else {
-        entry.vales += tx.amount;
-      }
+      const deducted = Math.min(tx.amount, Math.max(0, tx.deductedAmount ?? (tx.isPaid ? tx.amount : 0)));
+      entry.vales += Math.max(0, tx.amount - deducted);
+      entry.valesDiscounted += deducted;
     }
 
     return Array.from(empMap.entries()).map(([id, d]) => {
-      const valeAgainstUnpaid = Math.min(d.unpaid, d.valesDiscounted);
-      const remainingVale = Math.max(0, d.valesDiscounted - valeAgainstUnpaid);
       return {
         employeeId: id,
         name: d.name,
         avatar: d.avatar,
         grossRevenue: d.grossRevenue,
         totalAmount: d.total,
-        paidAmount: Math.max(0, d.paid - remainingVale),
-        pendingAmount: Math.max(0, d.unpaid - valeAgainstUnpaid),
+        paidAmount: d.paid,
+        pendingAmount: Math.max(0, d.unpaid - d.vales),
         valesAmount: d.vales,
         valesDiscountedAmount: d.valesDiscounted,
         commissionRate: employees.find(e => e._id.toString() === id)?.commissionRate ?? 0,
@@ -355,6 +386,9 @@ export class FinanceService {
     const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
     if (unitIds.length === 0) throw new ForbiddenError('Acesso negado para esta unidade.');
 
+    const paymentLockId = await acquirePaymentLock(unitIds[0], employeeId);
+    try {
+
     const commissionObjectIds = commissionIds.map(id => new mongoose.Types.ObjectId(id));
     const selectedCommissions = await TransactionModel.find({
       _id: { $in: commissionObjectIds },
@@ -374,50 +408,72 @@ export class FinanceService {
       throw new AppError('Nenhuma comissão pendente válida foi encontrada para pagamento.', 400);
     }
 
-    const commissionDates = [...new Set(selectedCommissions.map(tx => tx.date).filter((d): d is string => Boolean(d)))].sort();
-    const periodStart = start || commissionDates[0];
-    const periodEnd = end || commissionDates[commissionDates.length - 1];
-
-    const hasSalaryPaymentInPeriod = periodStart || periodEnd
-      ? await TransactionModel.exists({
-          unitId: { $in: unitIds },
-          employeeId: new mongoose.Types.ObjectId(employeeId),
-          type: 'expense',
-          category: 'salary',
-          date: { ...(periodStart ? { $gte: periodStart } : {}), ...(periodEnd ? { $lte: periodEnd } : {}) },
-        })
-      : null;
-
-    const discountedValesTotal = (periodStart || periodEnd) && !hasSalaryPaymentInPeriod
-      ? await TransactionModel.aggregate<{ total: number }>([
-        {
-          $match: {
-            unitId: { $in: unitIds.map(id => new mongoose.Types.ObjectId(id)) },
-            employeeId: new mongoose.Types.ObjectId(employeeId),
-            type: 'expense',
-            category: 'voucher',
-            isPaid: true,
-            date: { ...(periodStart ? { $gte: periodStart } : {}), ...(periodEnd ? { $lte: periodEnd } : {}) },
-          },
-        },
-        { $group: { _id: null, total: { $sum: '$amount' } } },
-      ]).then(rows => rows[0]?.total ?? 0)
-      : 0;
-
     const commissionTotal = selectedCommissions.reduce((sum, tx) => sum + tx.amount, 0);
-    const recalculatedAmount = Math.round(Math.max(0, commissionTotal - discountedValesTotal) * 100) / 100;
+    const vouchers = await TransactionModel.find({
+      unitId: { $in: unitIds },
+      employeeId: new mongoose.Types.ObjectId(employeeId),
+      type: 'expense',
+      category: 'voucher',
+      isPaid: { $ne: true },
+      date: { $lte: date },
+    }).select('_id amount deductedAmount date createdAt').sort({ date: 1, createdAt: 1 }).lean() as Array<{
+      _id: mongoose.Types.ObjectId;
+      amount: number;
+      deductedAmount?: number;
+    }>;
+
+    let remainingCommissionAmount = commissionTotal;
+    const voucherAllocations: Array<{ voucherId: mongoose.Types.ObjectId; amount: number }> = [];
+
+    for (const voucher of vouchers) {
+      if (remainingCommissionAmount <= 0) break;
+
+      const alreadyDeducted = Math.max(0, voucher.deductedAmount ?? 0);
+      const outstandingAmount = Math.max(0, voucher.amount - alreadyDeducted);
+      const deduction = Math.min(outstandingAmount, remainingCommissionAmount);
+      if (deduction <= 0) continue;
+
+      const currentBalanceFilter = alreadyDeducted === 0
+        ? { $or: [{ deductedAmount: 0 }, { deductedAmount: { $exists: false } }] }
+        : { deductedAmount: alreadyDeducted };
+      const isFullyDeducted = deduction === outstandingAmount;
+      const result = await TransactionModel.updateOne(
+        {
+          _id: voucher._id,
+          isPaid: { $ne: true },
+          ...currentBalanceFilter,
+        },
+        {
+          $inc: { deductedAmount: deduction },
+          ...(isFullyDeducted ? { $set: { isPaid: true } } : {}),
+        },
+      );
+
+      if (result.modifiedCount !== 1) {
+        throw new AppError('O saldo de um vale foi alterado durante o pagamento. Revise os valores e tente novamente.', 409);
+      }
+
+      voucherAllocations.push({ voucherId: voucher._id, amount: deduction });
+      remainingCommissionAmount -= deduction;
+    }
+
+    const recalculatedAmount = Math.round(Math.max(0, remainingCommissionAmount) * 100) / 100;
 
     // Mark selected commissions as paid
-    await TransactionModel.updateMany(
+    const paidCommissions = await TransactionModel.updateMany(
       {
         _id: { $in: selectedCommissions.map(tx => tx._id) },
         unitId: { $in: unitIds },
         employeeId: new mongoose.Types.ObjectId(employeeId),
         type: 'commission',
         category: 'commission',
+        isPaid: { $ne: true },
       },
       { $set: { isPaid: true } },
     );
+    if (paidCommissions.modifiedCount !== selectedCommissions.length) {
+      throw new AppError('As comissÃµes selecionadas jÃ¡ foram processadas em outro pagamento. Atualize a tela e tente novamente.', 409);
+    }
 
     // Create a salary/payment expense transaction
     const payment = await TransactionModel.create({
@@ -429,13 +485,27 @@ export class FinanceService {
       description,
       date,
       createdBy: new mongoose.Types.ObjectId(userId),
+      voucherAllocations,
     });
 
     this.invalidateSummaryCache();
     return payment;
+    } finally {
+      await releasePaymentLock(paymentLockId);
+    }
   }
 
   async create(data: Partial<ITransaction>, userId: string, role: string, requestedUnitId?: string, appScope?: string, jwtUnitId?: string): Promise<ITransaction> {
+    if (
+      data.type === 'royalty' ||
+      data.category === 'salary' ||
+      data.category === 'commission' ||
+      data.category === 'product' ||
+      data.category === 'package_sale' ||
+      data.category === 'package_use'
+    ) {
+      throw new ForbiddenError('Este tipo de lanÃ§amento Ã© gerado somente pelo fluxo operacional correspondente.');
+    }
     const unitIds = await this.resolveUnitIds(userId, role, requestedUnitId, appScope, jwtUnitId);
     if (!requestedUnitId || requestedUnitId === 'all' || unitIds.length === 0) {
       throw new ForbiddenError('Acesso negado para esta unidade.');
@@ -447,9 +517,81 @@ export class FinanceService {
     return transaction;
   }
 
+  async registerProductSale(
+    userId: string,
+    role: string,
+    requestedUnitId: string,
+    items: Array<{ productId: string; quantity: number }>,
+    paymentMethod: string,
+    date: string,
+    appScope?: string,
+    jwtUnitId?: string,
+  ): Promise<ITransaction[]> {
+    if (!items.length || items.some(item => !Number.isInteger(item.quantity) || item.quantity <= 0)) {
+      throw new AppError('Informe ao menos um produto com quantidade positiva.', 400);
+    }
+
+    const unitIds = await this.resolveUnitIds(userId, role, requestedUnitId, appScope, jwtUnitId);
+    if (unitIds.length !== 1) throw new ForbiddenError('Acesso negado para esta unidade.');
+    const unitId = unitIds[0];
+    const reserved: Array<{ productId: mongoose.Types.ObjectId; quantity: number }> = [];
+
+    try {
+      const sales = [] as Array<{ productId: mongoose.Types.ObjectId; quantity: number; name: string; price: number }>;
+      for (const item of items) {
+        if (!mongoose.Types.ObjectId.isValid(item.productId)) {
+          throw new AppError('Produto invÃ¡lido.', 400);
+        }
+        const productId = new mongoose.Types.ObjectId(item.productId);
+        const product = await ProductModel.findOneAndUpdate(
+          { _id: productId, unitId, isActive: true, stockQuantity: { $gte: item.quantity } },
+          { $inc: { stockQuantity: -item.quantity } },
+          { new: true },
+        );
+        if (!product) {
+          throw new AppError('Estoque insuficiente ou produto indisponÃ­vel para a venda.', 400);
+        }
+        reserved.push({ productId, quantity: item.quantity });
+        sales.push({ productId, quantity: item.quantity, name: product.name, price: product.price });
+      }
+
+      const transactions: ITransaction[] = [];
+      for (const sale of sales) {
+        const transaction = await TransactionModel.create({
+          unitId,
+          type: 'income',
+          category: 'product',
+          amount: Math.round(sale.price * sale.quantity * 100) / 100,
+          description: `Produto: ${sale.name} (x${sale.quantity})`,
+          date,
+          paymentMethod: paymentMethod || 'other',
+          createdBy: new mongoose.Types.ObjectId(userId),
+        });
+        transactions.push(transaction);
+      }
+
+      this.invalidateSummaryCache();
+      return transactions;
+    } catch (error) {
+      await Promise.all(reserved.map(item =>
+        ProductModel.updateOne(
+          { _id: item.productId, unitId },
+          { $inc: { stockQuantity: item.quantity } },
+        ),
+      ));
+      throw error;
+    }
+  }
+
   async update(id: string, data: Partial<ITransaction>, userId: string, role: string, appScope?: string, jwtUnitId?: string): Promise<ITransaction | null> {
-    const tx = await TransactionModel.findById(id).select('unitId');
+    const tx = await TransactionModel.findById(id).select('unitId category appointmentId subscriptionId type');
     if (!tx) return null;
+    if (tx.appointmentId || tx.subscriptionId || tx.type === 'commission') {
+      throw new ForbiddenError('LanÃ§amentos gerados pelo sistema nÃ£o podem ser alterados por esta rota.');
+    }
+    if (tx.category === 'voucher' && data.isPaid !== undefined) {
+      throw new AppError('O desconto de vale ocorre somente ao registrar o pagamento do funcionÃ¡rio.', 400);
+    }
     const unitIds = await this.resolveUnitIds(userId, role, tx.unitId.toString(), appScope, jwtUnitId);
     if (!unitIds.includes(tx.unitId.toString())) {
       throw new ForbiddenError('Acesso negado para esta unidade.');
@@ -470,6 +612,9 @@ export class FinanceService {
   async delete(id: string, userId: string, role: string, appScope?: string, jwtUnitId?: string): Promise<void> {
     const tx = await TransactionModel.findById(id);
     if (!tx) return;
+    if (tx.appointmentId || tx.subscriptionId || tx.type === 'commission') {
+      throw new ForbiddenError('LanÃ§amentos gerados pelo sistema nÃ£o podem ser excluÃ­dos por esta rota.');
+    }
     const unitIds = await this.resolveUnitIds(userId, role, tx.unitId.toString(), appScope, jwtUnitId);
     if (!unitIds.includes(tx.unitId.toString())) {
       throw new ForbiddenError('Acesso negado para esta unidade.');
@@ -690,7 +835,7 @@ export class FinanceService {
             count: prev.count + 1,
           });
         }
-      } else if (t.type === 'expense' || t.type === 'commission') {
+      } else if (t.type === 'expense') {
         totalExpense += t.amount;
         unit.expense += t.amount;
         day.expense += t.amount;
