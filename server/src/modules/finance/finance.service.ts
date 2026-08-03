@@ -500,7 +500,6 @@ export class FinanceService {
       data.type === 'royalty' ||
       data.category === 'salary' ||
       data.category === 'commission' ||
-      data.category === 'product' ||
       data.category === 'package_sale' ||
       data.category === 'package_use'
     ) {

@@ -7,8 +7,8 @@ import { createTransactionSchema, registerProductSaleSchema, updateTransactionSc
 
 export const financeRoutes = Router();
 
-financeRoutes.get('/summary', authenticate, requireRoles('owner', 'cashier'), requireSameUnit(), getSummary);
-financeRoutes.get('/transactions', authenticate, requireRoles('owner', 'cashier'), requireSameUnit(), listTransactions);
+financeRoutes.get('/summary', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), getSummary);
+financeRoutes.get('/transactions', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), listTransactions);
 financeRoutes.post('/transactions', authenticate, requireRoles('owner', 'cashier'), requireSameUnit(), validate(createTransactionSchema), createTransaction);
 financeRoutes.post('/sales', authenticate, requireRoles('owner', 'cashier'), requireSameUnit(), validate(registerProductSaleSchema), registerProductSale);
 financeRoutes.patch('/transactions/:id', authenticate, requireRoles('owner', 'cashier'), requireSameUnit(), validate(updateTransactionSchema), updateTransaction);
