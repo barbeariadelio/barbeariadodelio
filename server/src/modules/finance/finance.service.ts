@@ -609,6 +609,7 @@ export class FinanceService {
       data.type === 'royalty' ||
       data.category === 'salary' ||
       data.category === 'commission' ||
+      data.category === 'product' ||
       data.category === 'package_sale' ||
       data.category === 'package_use'
     ) {
@@ -715,44 +716,6 @@ export class FinanceService {
     // Note: updating royalty logic could be complex if amount changes, for now we just update the tx.
     this.invalidateSummaryCache();
     return transaction;
-  }
-
-  async settleVoucher(id: string, userId: string, role: string, appScope?: string, jwtUnitId?: string): Promise<ITransaction> {
-    const tx = await TransactionModel.findById(id).select('unitId employeeId category type amount deductedAmount isPaid');
-    if (!tx) throw new AppError('Vale nÃ£o encontrado.', 404);
-    if (tx.type !== 'expense' || tx.category !== 'voucher') {
-      throw new AppError('Esta ação é vÃ¡lida somente para vales.', 400);
-    }
-    if (tx.isPaid) {
-      throw new AppError('Este vale jÃ¡ estÃ¡ quitado.', 400);
-    }
-    const unitIds = await this.resolveUnitIds(userId, role, tx.unitId.toString(), appScope, jwtUnitId);
-    if (!unitIds.includes(tx.unitId.toString())) {
-      throw new ForbiddenError('Acesso negado para esta unidade.');
-    }
-
-    const employeeId = tx.employeeId?.toString();
-    const paymentLockId = employeeId ? await acquirePaymentLock(tx.unitId.toString(), employeeId) : undefined;
-    try {
-      const alreadyDeducted = Math.max(0, tx.deductedAmount ?? 0);
-      const outstanding = Math.max(0, tx.amount - alreadyDeducted);
-      const currentBalanceFilter = alreadyDeducted === 0
-        ? { $or: [{ deductedAmount: 0 }, { deductedAmount: { $exists: false } }] }
-        : { deductedAmount: alreadyDeducted };
-
-      const settled = await TransactionModel.findOneAndUpdate(
-        { _id: tx._id, isPaid: { $ne: true }, ...currentBalanceFilter },
-        { $inc: { deductedAmount: outstanding }, $set: { isPaid: true } },
-        { new: true },
-      );
-      if (!settled) {
-        throw new AppError('O saldo do vale foi alterado nesse meio tempo. Atualize a tela e tente novamente.', 409);
-      }
-      this.invalidateSummaryCache();
-      return settled;
-    } finally {
-      await releasePaymentLock(paymentLockId);
-    }
   }
 
   async delete(id: string, userId: string, role: string, appScope?: string, jwtUnitId?: string): Promise<void> {
