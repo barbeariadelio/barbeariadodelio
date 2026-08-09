@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getSummary, listTransactions, createTransaction, registerProductSale, updateTransaction, deleteTransaction, listRemunerations, registerPayment, getRemunerationsSummary, settleVoucher } from './finance.controller';
+import { getSummary, listTransactions, createTransaction, registerProductSale, updateTransaction, deleteTransaction, listRemunerations, registerPayment, previewPayment, getRemunerationsSummary, settleVoucher } from './finance.controller';
 import { authenticate } from '../../shared/middlewares/auth.middleware';
 import { requireRoles, requireSameUnit } from '../../shared/middlewares/rbac.middleware';
 import { validate } from '../../shared/utils/validate';
@@ -16,4 +16,5 @@ financeRoutes.patch('/transactions/:id/settle-voucher', authenticate, requireRol
 financeRoutes.delete('/transactions/:id', authenticate, requireRoles('owner', 'cashier'), requireSameUnit(), deleteTransaction);
 financeRoutes.get('/remunerations/summary', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), getRemunerationsSummary);
 financeRoutes.get('/remunerations', authenticate, requireRoles('owner', 'employee', 'cashier'), requireSameUnit(), listRemunerations);
+financeRoutes.post('/payment/preview', authenticate, requireRoles('owner', 'cashier'), previewPayment);
 financeRoutes.post('/payment', authenticate, requireRoles('owner', 'cashier'), registerPayment);

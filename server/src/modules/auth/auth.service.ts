@@ -63,11 +63,14 @@ export class AuthService {
       // ANY phone containing those digits in order — e.g. "12345" would match
       // "11923415678" — letting a caller land a token for someone else's
       // account. Never loosen this back to a subsequence/regex match.)
-      // Prioritize 'client' role to ensure booking history is correctly retrieved
+      // Only a client account may be used by the public booking flow.
       let user = await UserModel.findOne({ phone: cleanPhone, role: 'client' });
 
       if (!user) {
-        user = await UserModel.findOne({ phone: cleanPhone });
+        const internalAccount = await UserModel.findOne({ phone: cleanPhone });
+        if (internalAccount) {
+          throw new AppError('Este telefone estÃ¡ vinculado a uma conta interna. Use outro telefone para o agendamento pÃºblico.', 409);
+        }
       }
 
       if (!user) {

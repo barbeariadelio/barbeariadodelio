@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { authenticate } from '../../shared/middlewares/auth.middleware';
+import { requireRoles } from '../../shared/middlewares/rbac.middleware';
 import { uploadAvatar, uploadServiceImage } from './upload.controller';
 
 const upload = multer({
@@ -13,5 +14,8 @@ const upload = multer({
 });
 
 export const uploadRoutes = Router();
-uploadRoutes.post('/avatar', authenticate, upload.single('file'), uploadAvatar);
-uploadRoutes.post('/service-image', authenticate, upload.single('file'), uploadServiceImage);
+// Both are only ever called from the employee/service management forms
+// (owner or cashier managing someone else's record) — never by an employee
+// or client uploading their own picture.
+uploadRoutes.post('/avatar', authenticate, requireRoles('owner', 'cashier'), upload.single('file'), uploadAvatar);
+uploadRoutes.post('/service-image', authenticate, requireRoles('owner', 'cashier'), upload.single('file'), uploadServiceImage);

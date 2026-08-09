@@ -46,6 +46,7 @@ export default function Sales() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [checking, setChecking] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   // History filters
   const [fromDate, setFromDate] = useState('');
@@ -101,25 +102,13 @@ export default function Sales() {
     if (cart.length === 0 || !unitId) return;
     setChecking(true);
     setSuccessMsg('');
+    setErrorMsg('');
     try {
-      const today = todayISO();
-
-      await Promise.all(cart.map(i =>
-        api.post('/finance/transactions', {
-          unitId,
-          type: 'income',
-          category: 'product',
-          amount: i.product.price * i.qty,
-          description: `Produto: ${i.product.name} (x${i.qty})`,
-          date: today,
-        })
-      ));
-
-      await Promise.all(cart.map(i =>
-        api.put(`/products/${i.product._id}`, {
-          stockQuantity: i.product.stockQuantity - i.qty,
-        })
-      ));
+      await api.post('/finance/sales', {
+        unitId,
+        items: cart.map(i => ({ productId: i.product._id, quantity: i.qty })),
+        date: todayISO(),
+      });
 
       await qc.invalidateQueries({ queryKey: ['products', unitId] });
       await qc.invalidateQueries({ queryKey: ['sales-history', unitId] });
@@ -127,8 +116,8 @@ export default function Sales() {
       setCart([]);
       setSuccessMsg(`Venda registrada: ${fmt(total)}`);
       setTimeout(() => setSuccessMsg(''), 4000);
-    } catch {
-      // Errors are intentionally swallowed; the UI just re-enables checkout
+    } catch (error: any) {
+      setErrorMsg(error?.response?.data?.message || 'Erro ao registrar venda. Tente novamente.');
     } finally {
       setChecking(false);
     }
@@ -185,6 +174,12 @@ export default function Sales() {
             {successMsg && (
               <div style={{ background: '#d1fae5', border: '1px solid #6ee7b7', borderRadius: '6px', padding: '0.5rem 0.75rem', fontSize: '0.8125rem', color: '#065f46', marginBottom: '0.75rem', fontWeight: 600 }}>
                 {successMsg}
+              </div>
+            )}
+
+            {errorMsg && (
+              <div style={{ background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '6px', padding: '0.5rem 0.75rem', fontSize: '0.8125rem', color: '#991b1b', marginBottom: '0.75rem', fontWeight: 600 }}>
+                {errorMsg}
               </div>
             )}
 

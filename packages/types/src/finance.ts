@@ -24,6 +24,27 @@ export interface Transaction {
   createdAt: string;
 }
 
+export interface PaymentPreviewVoucher {
+  voucherId: string;
+  description: string;
+  date: string;
+  outstandingAmount: number;
+  deduction: number;
+}
+
+/**
+ * What an employee payment will record, computed by the same server-side
+ * routine that performs the write. Screens must display these numbers rather
+ * than recomputing "commissions minus advances" on their own.
+ */
+export interface PaymentPreview {
+  commissionCount: number;
+  commissionTotal: number;
+  voucherDeduction: number;
+  netAmount: number;
+  vouchers: PaymentPreviewVoucher[];
+}
+
 export interface FinanceSummary {
   totalIncome: number;
   totalExpense: number;

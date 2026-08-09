@@ -145,6 +145,16 @@ export default function Profile() {
     setEditStep('confirm');
   };
 
+  // The selections above also carry labels used to render the confirmation
+  // screen (employeeName, serviceName, price). The API accepts only the fields
+  // a client is allowed to change and answers 403 on anything else rather than
+  // ignoring it, so strip them before sending. Price in particular is never
+  // the client's to set — the server recalculates it from the chosen service.
+  const CLIENT_EDITABLE_FIELDS = ['serviceId', 'employeeId', 'date', 'startTime', 'notes'];
+
+  const toApiPayload = (update: Record<string, unknown>) =>
+    Object.fromEntries(Object.entries(update).filter(([field]) => CLIENT_EDITABLE_FIELDS.includes(field)));
+
   if (!user) {
     return (
       <div className={styles.noAuth}>
@@ -309,7 +319,7 @@ export default function Profile() {
                 </div>
                 <div className={styles.modalActions} style={{ marginTop: '1.5rem', display: 'flex', gap: '0.5rem' }}>
                   <button className={styles.modalCancelBtn} style={{ flex: 1 }} onClick={() => setEditStep('choice')}>Voltar</button>
-                  <button className={styles.modalConfirmBtn} style={{ flex: 1 }} onClick={() => updateMutation.mutate(pendingUpdate)} disabled={updateMutation.isPending}>
+                  <button className={styles.modalConfirmBtn} style={{ flex: 1 }} onClick={() => updateMutation.mutate(toApiPayload(pendingUpdate))} disabled={updateMutation.isPending}>
                     {updateMutation.isPending ? 'Salvando...' : 'Confirmar'}
                   </button>
                 </div>

@@ -1,8 +1,17 @@
 import { UserModel, IUser } from '../auth/auth.model';
-import { NotFoundError } from '../../shared/errors/AppError';
+import { NotFoundError, ForbiddenError } from '../../shared/errors/AppError';
 import { sharedCache } from '../../shared/utils/cache';
 import { invalidateEmployeeSlotCache } from '../../shared/cache/slotCache';
 import bcrypt from 'bcryptjs';
+
+// Changing these grants privilege or moves the account across the unit
+// boundary — only the owner (full administrative access) may set them.
+// Everyone else may still edit the rest of an employee's own-unit record.
+const OWNER_ONLY_EMPLOYEE_FIELDS = ['role', 'unitId', 'isActive', 'allowedApps'];
+// Never accepted from client input at all, regardless of role: the hash is
+// always derived server-side from `password`, and tokenVersion is an
+// internal session-invalidation counter.
+const NEVER_CLIENT_SETTABLE_FIELDS = ['passwordHash', 'passwordPlain', 'tokenVersion'];
 
 const SCHEDULE_EMPLOYEE_ORDER: Record<string, string[]> = {
   '69fa463aa078044937f7024e': ['Delio', 'Keu', 'Neto', 'Maicon', 'Alessio', 'Henrique'],
@@ -166,8 +175,15 @@ export class EmployeeService {
     return UserModel.findById(emp._id).select('-passwordHash').lean() as unknown as Promise<IUser>;
   }
 
-  async update(id: string, data: any): Promise<IUser> {
+  async update(id: string, data: any, requesterRole?: string): Promise<IUser> {
     const updateData = { ...data };
+    for (const field of NEVER_CLIENT_SETTABLE_FIELDS) delete updateData[field];
+    if (requesterRole !== 'owner') {
+      const forbiddenField = OWNER_ONLY_EMPLOYEE_FIELDS.find(field => updateData[field] !== undefined);
+      if (forbiddenField) {
+        throw new ForbiddenError(`Somente o dono pode alterar o campo "${forbiddenField}".`);
+      }
+    }
     if (!updateData.avatar) delete updateData.avatar;
     if (updateData.password) {
       updateData.passwordHash = await bcrypt.hash(updateData.password, 10);

@@ -1,6 +1,11 @@
 import { ClientModel, IClient } from './client.model';
-import { NotFoundError } from '../../shared/errors/AppError';
+import { NotFoundError, ForbiddenError } from '../../shared/errors/AppError';
 import { escapeRegex } from '../../shared/utils/regex';
+
+// Reassigning a client to a different unit, or re-linking it to a different
+// login account, moves the record (and its full history) across the unit
+// boundary — only the owner (full administrative access) may do that.
+const OWNER_ONLY_CLIENT_FIELDS = ['unitId', 'userId'];
 
 const populateOptions = {
   path: 'packages.packageId',
@@ -78,7 +83,13 @@ export class ClientService {
     return ClientModel.create(clientData);
   }
 
-  async update(id: string, data: Partial<IClient>): Promise<IClient> {
+  async update(id: string, data: Partial<IClient>, requesterRole?: string): Promise<IClient> {
+    if (requesterRole !== 'owner') {
+      const forbiddenField = OWNER_ONLY_CLIENT_FIELDS.find(field => (data as Record<string, unknown>)[field] !== undefined);
+      if (forbiddenField) {
+        throw new ForbiddenError(`Somente o dono pode alterar o campo "${forbiddenField}".`);
+      }
+    }
     const client = await ClientModel.findByIdAndUpdate(id, data, { new: true, runValidators: true });
     if (!client) throw new NotFoundError('Client');
     return client;

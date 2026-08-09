@@ -25,7 +25,7 @@ appointmentRoutes.get('/slots-any', getSlotsByAnyEmployee);
 appointmentRoutes.get('/my', authenticate, getMyAppointments);
 appointmentRoutes.get('/client/:clientId', authenticate, requireRoles('owner', 'employee', 'client', 'cashier'), getClientAppointments);
 appointmentRoutes.get('/:id', authenticate, getAppointment);
-appointmentRoutes.post('/', authenticate, requireRoles('owner', 'cashier', 'client'), validate(createAppointmentSchema), createAppointment);
+appointmentRoutes.post('/', authenticate, requireRoles('owner', 'employee', 'cashier', 'client'), validate(createAppointmentSchema), createAppointment);
 appointmentRoutes.post('/guest', validate(guestBookSchema), guestBookAppointment);
 appointmentRoutes.patch('/:id/status', authenticate, requireRoles('owner', 'client', 'cashier'), updateAppointmentStatus);
 appointmentRoutes.patch('/:id', authenticate, requireRoles('owner', 'client', 'cashier'), updateAppointment);

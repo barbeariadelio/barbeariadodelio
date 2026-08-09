@@ -52,9 +52,9 @@ class NotificationService {
     return docs;
   }
 
-  async markAsRead(id: string, userId: string) {
-    return NotificationModel.findByIdAndUpdate(
-      id,
+  async markAsRead(id: string, userId: string, unitId: string) {
+    return NotificationModel.findOneAndUpdate(
+      { _id: id, unitId },
       { $addToSet: { readBy: userId } },
       { new: true },
     );

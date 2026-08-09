@@ -1,5 +1,5 @@
 import { ProductModel, IProduct } from './product.model';
-import { NotFoundError } from '../../shared/errors/AppError';
+import { NotFoundError, ForbiddenError } from '../../shared/errors/AppError';
 
 export class ProductService {
   async findByUnit(unitId: string, pagination?: { skip: number, limit: number }): Promise<IProduct[]> {
@@ -24,7 +24,12 @@ export class ProductService {
     return ProductModel.create(data);
   }
 
-  async update(id: string, data: Partial<IProduct>): Promise<IProduct> {
+  async update(id: string, data: Partial<IProduct>, requesterRole?: string): Promise<IProduct> {
+    // Moving a product to a different unit is an administrative action —
+    // only the owner may do it; a unit-scoped cashier just edits in place.
+    if (requesterRole !== 'owner' && data.unitId !== undefined) {
+      throw new ForbiddenError('Somente o dono pode mover este produto para outra unidade.');
+    }
     const product = await ProductModel.findByIdAndUpdate(id, data, { new: true, runValidators: true });
     if (!product) throw new NotFoundError('Product');
     return product;

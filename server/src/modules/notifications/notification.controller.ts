@@ -15,7 +15,9 @@ export async function listNotifications(req: AuthRequest, res: Response, next: N
 export async function markRead(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;
-    const notif = await service.markAsRead(id, req.user!.id);
+    const unitId = req.user?.unitId;
+    if (!unitId) return ok(res, null);
+    const notif = await service.markAsRead(id, req.user!.id, unitId);
     ok(res, notif);
   } catch (e) { next(e); }
 }

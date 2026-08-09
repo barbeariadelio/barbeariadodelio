@@ -4,7 +4,7 @@ import { UnitModel } from '../units/unit.model';
 import { AppointmentModel } from '../appointments/appointment.model';
 import { UserModel, IUser } from '../auth/auth.model';
 import { ProductModel } from '../inventory/product.model';
-import type { FinanceSummary, TransactionCategory } from '@barber/types';
+import type { FinanceSummary, PaymentPreview, TransactionCategory } from '@barber/types';
 import { sharedCache } from '../../shared/utils/cache';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import { toDate } from 'date-fns-tz';
@@ -60,6 +60,35 @@ interface ApptLean {
 interface UnitLean {
   _id: mongoose.Types.ObjectId;
   name: string;
+}
+
+interface PayableCommission {
+  _id: mongoose.Types.ObjectId;
+  appointmentId?: mongoose.Types.ObjectId;
+  amount: number;
+  date?: string;
+}
+
+interface DeductibleVoucher {
+  _id: mongoose.Types.ObjectId;
+  amount: number;
+  deductedAmount?: number;
+  description?: string;
+  date?: string;
+}
+
+interface VoucherDeductionPlanItem {
+  voucher: DeductibleVoucher;
+  /** Balance already deducted when the plan was built — used as an optimistic guard on write. */
+  previousDeducted: number;
+  outstanding: number;
+  deduction: number;
+}
+
+interface VoucherDeductionPlan {
+  items: VoucherDeductionPlanItem[];
+  deductedTotal: number;
+  netAmount: number;
 }
 
 let paymentLockIndexReady: Promise<unknown> | null = null;
@@ -368,6 +397,125 @@ export class FinanceService {
     });
   }
 
+  // ── Employee payment ─────────────────────────────────────────────────────
+  // `previewPayment` and `registerPayment` share the three helpers below, so
+  // the amount a screen shows before confirming is by construction the amount
+  // that gets written. The screens used to recompute "commissions minus
+  // outstanding advances" themselves and had drifted from this file in three
+  // separate ways: summing the gross commissions and ignoring vouchers
+  // entirely, quoting the whole period's balance instead of the selected rows,
+  // and picking vouchers by the report's date filter instead of the payment
+  // date. Keep the arithmetic here — a screen that reimplements it will drift
+  // again, and the manager pays out cash against that number.
+
+  private async loadPayableCommissions(
+    unitIds: string[],
+    employeeId: string,
+    commissionIds: string[],
+  ): Promise<PayableCommission[]> {
+    const commissionObjectIds = commissionIds
+      .filter(id => mongoose.Types.ObjectId.isValid(id))
+      .map(id => new mongoose.Types.ObjectId(id));
+    if (commissionObjectIds.length === 0) return [];
+
+    const rows = await TransactionModel.find({
+      _id: { $in: commissionObjectIds },
+      unitId: { $in: unitIds },
+      employeeId: new mongoose.Types.ObjectId(employeeId),
+      type: 'commission',
+      category: 'commission',
+      isPaid: { $ne: true },
+    }).select('_id appointmentId amount date').lean();
+    return rows as unknown as PayableCommission[];
+  }
+
+  private async loadDeductibleVouchers(
+    unitIds: string[],
+    employeeId: string,
+    date: string,
+  ): Promise<DeductibleVoucher[]> {
+    // Outstanding advances are a running balance, not a period metric: every
+    // unsettled voucher up to the payment date is recovered, including ones
+    // issued before the period being paid. Future-dated vouchers are excluded.
+    const rows = await TransactionModel.find({
+      unitId: { $in: unitIds },
+      employeeId: new mongoose.Types.ObjectId(employeeId),
+      type: 'expense',
+      category: 'voucher',
+      isPaid: { $ne: true },
+      date: { $lte: date },
+    }).select('_id amount deductedAmount description date createdAt').sort({ date: 1, createdAt: 1 }).lean();
+    return rows as unknown as DeductibleVoucher[];
+  }
+
+  /**
+   * Pure. Both payment paths must sum through this: adding floats and rounding
+   * at different points can shift the plan by a cent, which would let the
+   * preview and the write disagree — the exact class of bug this split exists
+   * to prevent.
+   */
+  private sumCommissionAmounts(commissions: PayableCommission[]): number {
+    return Math.round(commissions.reduce((sum, tx) => sum + tx.amount, 0) * 100) / 100;
+  }
+
+  /** Pure: allocates the commission total across outstanding vouchers, oldest first. */
+  private planVoucherDeductions(vouchers: DeductibleVoucher[], commissionTotal: number): VoucherDeductionPlan {
+    let remaining = commissionTotal;
+    const items: VoucherDeductionPlanItem[] = [];
+
+    for (const voucher of vouchers) {
+      if (remaining <= 0) break;
+
+      const previousDeducted = Math.max(0, voucher.deductedAmount ?? 0);
+      const outstanding = Math.max(0, voucher.amount - previousDeducted);
+      const deduction = Math.min(outstanding, remaining);
+      if (deduction <= 0) continue;
+
+      items.push({ voucher, previousDeducted, outstanding, deduction });
+      remaining -= deduction;
+    }
+
+    const deductedTotal = items.reduce((sum, item) => sum + item.deduction, 0);
+    return {
+      items,
+      deductedTotal: Math.round(deductedTotal * 100) / 100,
+      netAmount: Math.round(Math.max(0, remaining) * 100) / 100,
+    };
+  }
+
+  async previewPayment(
+    userId: string,
+    role: string,
+    unitId: string,
+    employeeId: string,
+    commissionIds: string[],
+    date: string,
+    appScope?: string,
+    jwtUnitId?: string,
+  ): Promise<PaymentPreview> {
+    const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
+    if (unitIds.length === 0) throw new ForbiddenError('Acesso negado para esta unidade.');
+
+    const selectedCommissions = await this.loadPayableCommissions(unitIds, employeeId, commissionIds);
+    const commissionTotal = this.sumCommissionAmounts(selectedCommissions);
+    const vouchers = await this.loadDeductibleVouchers(unitIds, employeeId, date);
+    const plan = this.planVoucherDeductions(vouchers, commissionTotal);
+
+    return {
+      commissionCount: selectedCommissions.length,
+      commissionTotal,
+      voucherDeduction: plan.deductedTotal,
+      netAmount: plan.netAmount,
+      vouchers: plan.items.map(item => ({
+        voucherId: item.voucher._id.toString(),
+        description: item.voucher.description ?? 'Vale',
+        date: item.voucher.date ?? '',
+        outstandingAmount: Math.round(item.outstanding * 100) / 100,
+        deduction: Math.round(item.deduction * 100) / 100,
+      })),
+    };
+  }
+
   async registerPayment(
     userId: string,
     role: string,
@@ -379,117 +527,78 @@ export class FinanceService {
     date: string,
     appScope?: string,
     jwtUnitId?: string,
-    start?: string,
-    end?: string,
   ): Promise<ITransaction> {
-    void amount; // The ledger total is recalculated below from selected commissions.
+    void amount; // The ledger total is recalculated below from the selected commissions.
     const unitIds = await this.resolveUnitIds(userId, role, unitId, appScope, jwtUnitId);
     if (unitIds.length === 0) throw new ForbiddenError('Acesso negado para esta unidade.');
 
     const paymentLockId = await acquirePaymentLock(unitIds[0], employeeId);
     try {
-
-    const commissionObjectIds = commissionIds.map(id => new mongoose.Types.ObjectId(id));
-    const selectedCommissions = await TransactionModel.find({
-      _id: { $in: commissionObjectIds },
-      unitId: { $in: unitIds },
-      employeeId: new mongoose.Types.ObjectId(employeeId),
-      type: 'commission',
-      category: 'commission',
-      isPaid: { $ne: true },
-    }).select('_id appointmentId amount date').lean() as Array<{
-      _id: mongoose.Types.ObjectId;
-      appointmentId?: mongoose.Types.ObjectId;
-      amount: number;
-      date?: string;
-    }>;
-
-    if (selectedCommissions.length === 0) {
-      throw new AppError('Nenhuma comissão pendente válida foi encontrada para pagamento.', 400);
-    }
-
-    const commissionTotal = selectedCommissions.reduce((sum, tx) => sum + tx.amount, 0);
-    const vouchers = await TransactionModel.find({
-      unitId: { $in: unitIds },
-      employeeId: new mongoose.Types.ObjectId(employeeId),
-      type: 'expense',
-      category: 'voucher',
-      isPaid: { $ne: true },
-      date: { $lte: date },
-    }).select('_id amount deductedAmount date createdAt').sort({ date: 1, createdAt: 1 }).lean() as Array<{
-      _id: mongoose.Types.ObjectId;
-      amount: number;
-      deductedAmount?: number;
-    }>;
-
-    let remainingCommissionAmount = commissionTotal;
-    const voucherAllocations: Array<{ voucherId: mongoose.Types.ObjectId; amount: number }> = [];
-
-    for (const voucher of vouchers) {
-      if (remainingCommissionAmount <= 0) break;
-
-      const alreadyDeducted = Math.max(0, voucher.deductedAmount ?? 0);
-      const outstandingAmount = Math.max(0, voucher.amount - alreadyDeducted);
-      const deduction = Math.min(outstandingAmount, remainingCommissionAmount);
-      if (deduction <= 0) continue;
-
-      const currentBalanceFilter = alreadyDeducted === 0
-        ? { $or: [{ deductedAmount: 0 }, { deductedAmount: { $exists: false } }] }
-        : { deductedAmount: alreadyDeducted };
-      const isFullyDeducted = deduction === outstandingAmount;
-      const result = await TransactionModel.updateOne(
-        {
-          _id: voucher._id,
-          isPaid: { $ne: true },
-          ...currentBalanceFilter,
-        },
-        {
-          $inc: { deductedAmount: deduction },
-          ...(isFullyDeducted ? { $set: { isPaid: true } } : {}),
-        },
-      );
-
-      if (result.modifiedCount !== 1) {
-        throw new AppError('O saldo de um vale foi alterado durante o pagamento. Revise os valores e tente novamente.', 409);
+      const selectedCommissions = await this.loadPayableCommissions(unitIds, employeeId, commissionIds);
+      if (selectedCommissions.length === 0) {
+        throw new AppError('Nenhuma comissão pendente válida foi encontrada para pagamento.', 400);
       }
 
-      voucherAllocations.push({ voucherId: voucher._id, amount: deduction });
-      remainingCommissionAmount -= deduction;
-    }
+      const commissionTotal = this.sumCommissionAmounts(selectedCommissions);
+      const vouchers = await this.loadDeductibleVouchers(unitIds, employeeId, date);
+      const plan = this.planVoucherDeductions(vouchers, commissionTotal);
 
-    const recalculatedAmount = Math.round(Math.max(0, remainingCommissionAmount) * 100) / 100;
+      const voucherAllocations: Array<{ voucherId: mongoose.Types.ObjectId; amount: number }> = [];
+      for (const item of plan.items) {
+        const currentBalanceFilter = item.previousDeducted === 0
+          ? { $or: [{ deductedAmount: 0 }, { deductedAmount: { $exists: false } }] }
+          : { deductedAmount: item.previousDeducted };
+        const isFullyDeducted = item.deduction === item.outstanding;
+        const result = await TransactionModel.updateOne(
+          {
+            _id: item.voucher._id,
+            isPaid: { $ne: true },
+            ...currentBalanceFilter,
+          },
+          {
+            $inc: { deductedAmount: item.deduction },
+            ...(isFullyDeducted ? { $set: { isPaid: true } } : {}),
+          },
+        );
 
-    // Mark selected commissions as paid
-    const paidCommissions = await TransactionModel.updateMany(
-      {
-        _id: { $in: selectedCommissions.map(tx => tx._id) },
-        unitId: { $in: unitIds },
+        if (result.modifiedCount !== 1) {
+          throw new AppError('O saldo de um vale foi alterado durante o pagamento. Revise os valores e tente novamente.', 409);
+        }
+
+        voucherAllocations.push({ voucherId: item.voucher._id, amount: item.deduction });
+      }
+
+      // Mark selected commissions as paid
+      const paidCommissions = await TransactionModel.updateMany(
+        {
+          _id: { $in: selectedCommissions.map(tx => tx._id) },
+          unitId: { $in: unitIds },
+          employeeId: new mongoose.Types.ObjectId(employeeId),
+          type: 'commission',
+          category: 'commission',
+          isPaid: { $ne: true },
+        },
+        { $set: { isPaid: true } },
+      );
+      if (paidCommissions.modifiedCount !== selectedCommissions.length) {
+        throw new AppError('As comissÃµes selecionadas jÃ¡ foram processadas em outro pagamento. Atualize a tela e tente novamente.', 409);
+      }
+
+      // Create a salary/payment expense transaction
+      const payment = await TransactionModel.create({
+        unitId: unitIds[0],
         employeeId: new mongoose.Types.ObjectId(employeeId),
-        type: 'commission',
-        category: 'commission',
-        isPaid: { $ne: true },
-      },
-      { $set: { isPaid: true } },
-    );
-    if (paidCommissions.modifiedCount !== selectedCommissions.length) {
-      throw new AppError('As comissÃµes selecionadas jÃ¡ foram processadas em outro pagamento. Atualize a tela e tente novamente.', 409);
-    }
+        type: 'expense',
+        category: 'salary',
+        amount: plan.netAmount,
+        description,
+        date,
+        createdBy: new mongoose.Types.ObjectId(userId),
+        voucherAllocations,
+      });
 
-    // Create a salary/payment expense transaction
-    const payment = await TransactionModel.create({
-      unitId: unitIds[0],
-      employeeId: new mongoose.Types.ObjectId(employeeId),
-      type: 'expense',
-      category: 'salary',
-      amount: recalculatedAmount,
-      description,
-      date,
-      createdBy: new mongoose.Types.ObjectId(userId),
-      voucherAllocations,
-    });
-
-    this.invalidateSummaryCache();
-    return payment;
+      this.invalidateSummaryCache();
+      return payment;
     } finally {
       await releasePaymentLock(paymentLockId);
     }

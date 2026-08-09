@@ -72,13 +72,19 @@ async function acquireAppointmentSlotLock(parts: {
   unitId: string;
   employeeId: string;
   date: string;
-  startTime: string;
-}): Promise<string> {
+}): Promise<string | undefined> {
+  // Unit tests and one-off scripts may instantiate the service before Mongo is
+  // connected. Requests are served only after the application connection is ready.
+  if (mongoose.connection.readyState !== 1) return undefined;
+
   const collection = mongoose.connection.collection<any>('appointment_slot_locks');
   slotLockIndexReady ??= collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(() => null);
   await slotLockIndexReady;
 
-  const lockId = `${parts.unitId}:${parts.employeeId}:${parts.date}:${parts.startTime}`;
+  // The lock spans the employee's day rather than only an exact start time.
+  // Otherwise two overlapping requests with different starts can both pass
+  // the conflict check before either appointment is inserted.
+  const lockId = `${parts.unitId}:${parts.employeeId}:${parts.date}`;
   try {
     await collection.insertOne({
       _id: lockId,
@@ -94,7 +100,8 @@ async function acquireAppointmentSlotLock(parts: {
   }
 }
 
-async function releaseAppointmentSlotLock(lockId: string): Promise<void> {
+async function releaseAppointmentSlotLock(lockId?: string): Promise<void> {
+  if (!lockId || mongoose.connection.readyState !== 1) return;
   await mongoose.connection.collection<any>('appointment_slot_locks').deleteOne({ _id: lockId }).catch(() => null);
 }
 
@@ -104,7 +111,9 @@ async function releaseAppointmentSlotLock(lockId: string): Promise<void> {
 // same `Client.packages[].itemLimits[].used` counter or the same
 // "does a transaction already exist" check. Reuses the same TTL-locked
 // collection as the slot lock, under a distinct key namespace.
-async function acquireAppointmentBillingLock(clientId: string): Promise<string> {
+async function acquireAppointmentBillingLock(clientId: string): Promise<string | undefined> {
+  if (mongoose.connection.readyState !== 1) return undefined;
+
   const collection = mongoose.connection.collection<any>('appointment_slot_locks');
   slotLockIndexReady ??= collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(() => null);
   await slotLockIndexReady;
@@ -130,7 +139,43 @@ async function acquireAppointmentBillingLock(clientId: string): Promise<string> 
   throw new AppError('Este cliente já está com outro faturamento em processamento. Tente novamente em instantes.', 409);
 }
 
-async function releaseAppointmentBillingLock(lockId: string): Promise<void> {
+async function releaseAppointmentBillingLock(lockId?: string): Promise<void> {
+  if (!lockId || mongoose.connection.readyState !== 1) return;
+  await mongoose.connection.collection<any>('appointment_slot_locks').deleteOne({ _id: lockId }).catch(() => null);
+}
+
+// Client has no unique index on (unitId, phone) — some already exist as
+// duplicates from before this lock existed, so adding one now would break on
+// deploy. This serializes guest bookings by the same phone at the same unit
+// so "find existing client, else create" can't race and create a new
+// duplicate going forward, without touching the schema or existing data.
+async function acquireGuestClientLock(unitId: string, phone: string): Promise<string | undefined> {
+  if (mongoose.connection.readyState !== 1) return undefined;
+
+  const collection = mongoose.connection.collection<any>('appointment_slot_locks');
+  slotLockIndexReady ??= collection.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 }).catch(() => null);
+  await slotLockIndexReady;
+
+  const lockId = `guest-client:${unitId}:${phone}`;
+  const maxAttempts = 20;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      await collection.insertOne({
+        _id: lockId,
+        expiresAt: new Date(Date.now() + 15 * 1000),
+        createdAt: new Date(),
+      });
+      return lockId;
+    } catch (error: any) {
+      if (error?.code !== 11000) throw error;
+      await new Promise(resolve => setTimeout(resolve, 150));
+    }
+  }
+  throw new AppError('Muitas tentativas de agendamento para este telefone ao mesmo tempo. Tente novamente em instantes.', 409);
+}
+
+async function releaseGuestClientLock(lockId?: string): Promise<void> {
+  if (!lockId || mongoose.connection.readyState !== 1) return;
   await mongoose.connection.collection<any>('appointment_slot_locks').deleteOne({ _id: lockId }).catch(() => null);
 }
 
@@ -207,16 +252,25 @@ export class AppointmentService {
     date: string,
     durationMinutes: number,
     bufferMins = 0,
+    excludeAppointmentId?: string,
   ): Promise<string[]> {
-    const cached = getSlotCache(unitId, employeeId, date, durationMinutes, bufferMins);
-    if (cached) return cached;
+    // Rescheduling checks availability while the appointment being moved is
+    // still in the DB under its old time — exclude it, or a client could
+    // never move their own booking to any slot overlapping its current one.
+    // This narrower, appointment-specific query is never cached: the shared
+    // cache has no concept of "minus this one appointment".
+    if (!excludeAppointmentId) {
+      const cached = getSlotCache(unitId, employeeId, date, durationMinutes, bufferMins);
+      if (cached) return cached;
+    }
 
     const [employee, unit] = await Promise.all([
       UserModel.findById(employeeId).select('unitId workSchedule daySchedules vacations blockedDays').lean(),
-      UnitModel.findById(unitId).select('slotInterval workingDays').lean(),
+      UnitModel.findById(unitId).select('slotInterval workingDays isActive').lean(),
     ]);
     if (!employee) throw new NotFoundError('Employee');
     if (!unit) throw new NotFoundError('Unit');
+    if (unit.isActive === false) return [];
     if (employee.unitId?.toString() !== unitId) return [];
 
     // Check if the day is a working day for the unit
@@ -250,6 +304,7 @@ export class AppointmentService {
       employeeId,
       date,
       status: { $nin: ['cancelled'] },
+      ...(excludeAppointmentId ? { _id: { $ne: new mongoose.Types.ObjectId(excludeAppointmentId) } } : {}),
     }).select('startTime endTime').lean();
 
     const gridStep = slotInterval > 0 ? slotInterval : 15;
@@ -296,7 +351,9 @@ export class AppointmentService {
       });
     });
 
-    setSlotCache(unitId, employeeId, date, durationMinutes, result, bufferMins);
+    if (!excludeAppointmentId) {
+      setSlotCache(unitId, employeeId, date, durationMinutes, result, bufferMins);
+    }
     return result;
   }
 
@@ -347,8 +404,17 @@ export class AppointmentService {
       assertAllowedClientScheduleTime(data.date!, data.startTime!, 30);
     }
 
-    const employee = await UserModel.findById(data.employeeId).select('vacations blockedDays');
+    const employee = await UserModel.findById(data.employeeId).select('unitId role isActive serviceIds vacations blockedDays');
     if (!employee) throw new NotFoundError('Employee');
+
+    if (!internalOverride && data.source === 'client') {
+      if (employee.unitId?.toString() !== data.unitId?.toString() || employee.role !== 'employee' || employee.isActive === false) {
+        throw new AppError('Profissional indisponÃ­vel para agendamento online.', 400);
+      }
+      if (employee.serviceIds?.length && data.serviceId && !employee.serviceIds.some((id: any) => id.toString() === data.serviceId!.toString())) {
+        throw new AppError('Este profissional nÃ£o realiza o serviÃ§o selecionado.', 400);
+      }
+    }
 
     if (!internalOverride && employee.blockedDays?.includes(data.date!)) {
       throw new AppError('Profissional indisponível: Dia bloqueado.', 400);
@@ -357,23 +423,36 @@ export class AppointmentService {
       throw new AppError('Profissional indisponível: Em período de férias.', 400);
     }
 
+    if (!internalOverride && data.source === 'client' && data.status !== 'blocked') {
+      const durationMinutes = timeToMinutes(data.endTime!) - timeToMinutes(data.startTime!);
+      const availableSlots = await this.getAvailableSlots(
+        data.unitId!.toString(),
+        data.employeeId!.toString(),
+        data.date!,
+        durationMinutes,
+        30,
+      );
+      if (!availableSlots.includes(data.startTime!)) {
+        throw new AppError('HorÃ¡rio indisponÃ­vel para agendamento online.', 400);
+      }
+    }
+
     // Staff/admin scheduling used to check for conflicts and then create the
     // appointment with no lock in between (unlike guestBook, below, which
     // already had this protection) — two concurrent requests for the same
     // employee/date/time could both pass the conflict check before either
     // inserted, double-booking the slot. Acquire the same slot lock here.
-    const needsSlotLock = data.status !== 'blocked';
+    const needsSlotLock = Boolean(data.startTime && data.endTime);
     const lockId = needsSlotLock
       ? await acquireAppointmentSlotLock({
           unitId: data.unitId!.toString(),
           employeeId: data.employeeId!.toString(),
           date: data.date!,
-          startTime: data.startTime!,
         })
       : undefined;
 
     try {
-      if (data.status !== 'blocked') {
+      if (needsSlotLock) {
         const conflict = await AppointmentModel.findOne({
           unitId: data.unitId,
           employeeId: data.employeeId,
@@ -394,44 +473,9 @@ export class AppointmentService {
       let usedPackageId = undefined;
       let isPackage = data.isPackage || svc?.type === 'package';
 
-      // For package-type services, always store the per-session prorated price
-      // and auto-enroll the client in the package if they don't have it yet
-      if (svc?.type === 'package' && data.clientId) {
-        const totalSessions = svc.packageItems?.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1;
-        finalPrice = Math.round((svc.price / totalSessions) * 100) / 100;
-
-        const client = await ClientModel.findById(data.clientId);
-        if (client) {
-          const alreadyHas = client.packages?.some(
-            p => p.packageId.toString() === svc._id!.toString() && p.active
-          );
-          if (!alreadyHas) {
-            let expiresAt: Date | undefined;
-            const validity = (svc as any).packageValidity;
-            if (validity?.type && validity.type !== 'none' && validity.value) {
-              const exp = new Date();
-              if (validity.type === 'days')   exp.setDate(exp.getDate() + validity.value);
-              else if (validity.type === 'weeks')  exp.setDate(exp.getDate() + validity.value * 7);
-              else if (validity.type === 'months') exp.setMonth(exp.getMonth() + validity.value);
-              else if (validity.type === 'years')  exp.setFullYear(exp.getFullYear() + validity.value);
-              expiresAt = exp;
-            }
-            client.packages = client.packages || [];
-            client.packages.push({
-              packageId: svc._id as any,
-              startDate: new Date(),
-              active: true,
-              expiresAt,
-              itemLimits: svc.packageItems?.map(pi => ({
-                serviceId: pi.serviceId,
-                quantity: pi.quantity,
-                used: 0,
-              })) || [],
-            });
-            await client.save();
-          }
-        }
-      } else if (svc?.type === 'package') {
+      // A package becomes active only when its sale is billed in updateStatus.
+      // Booking it must not grant sessions before the payment is confirmed.
+      if (svc?.type === 'package') {
         const totalSessions = svc.packageItems?.reduce((acc, item) => acc + (item.quantity || 1), 0) || 1;
         finalPrice = Math.round((svc.price / totalSessions) * 100) / 100;
       }
@@ -502,7 +546,7 @@ export class AppointmentService {
       ClientModel.findOne({ phone: cleanPhone, unitId }),
       UserModel.findOne({ email: guestEmail }),
       UserModel.findOne({ phone: cleanPhone }),
-      UserModel.findById(employeeId).select('unitId role isActive allowOnlineBooking serviceIds vacations blockedDays').lean(),
+      UserModel.findById(employeeId).select('unitId role isActive allowOnlineBooking serviceIds vacations blockedDays workSchedule daySchedules').lean(),
     ]);
 
     if (!svc) throw new AppError('Service not found', 404);
@@ -519,6 +563,18 @@ export class AppointmentService {
       throw new AppError('Profissional indisponível para agendamento online.', 400);
     }
 
+    // A public booking can create or reuse only a client account. Reusing an
+    // employee/cashier/owner account merely because the phone is the same
+    // would link the guest client record to an internal identity.
+    const internalAccount = [userByEmail, userByPhone].find(account => account && account.role !== 'client');
+    if (internalAccount) {
+      throw new AppError('Este telefone estÃ¡ vinculado a uma conta interna. Use outro telefone para o agendamento.', 409);
+    }
+
+    if (employee.serviceIds?.length && !employee.serviceIds.some((id: any) => id.toString() === serviceId)) {
+      throw new AppError('Este profissional nÃ£o realiza o serviÃ§o selecionado.', 400);
+    }
+
     if (employee.blockedDays?.includes(date)) {
       throw new AppError('Profissional indisponível: Dia bloqueado.', 400);
     }
@@ -526,9 +582,17 @@ export class AppointmentService {
       throw new AppError('Profissional indisponível: Em período de férias.', 400);
     }
 
+    // Never trust a slot selected by the browser: it must still fit the unit
+    // calendar, the employee schedule and the service duration at confirmation.
+    const availableSlots = await this.getAvailableSlots(unitId, employeeId, date, svc.durationMinutes || 30, 30);
+    if (!availableSlots.includes(startTime)) {
+      throw new AppError('HorÃ¡rio indisponÃ­vel para agendamento online.', 400);
+    }
+
     const endTime = calcEndTime(startTime, svc.durationMinutes || 30);
 
-    const lockId = await acquireAppointmentSlotLock({ unitId, employeeId, date, startTime });
+    const lockId = await acquireAppointmentSlotLock({ unitId, employeeId, date });
+    const clientLockId = await acquireGuestClientLock(unitId, cleanPhone);
 
     try {
       // Re-check inside the lock so simultaneous confirmations cannot reserve the same slot.
@@ -578,6 +642,9 @@ export class AppointmentService {
           if (error?.code === 11000) {
             userAccount = await UserModel.findOne({ $or: [{ email: guestEmail }, { phone: cleanPhone }] });
           }
+          if (userAccount && userAccount.role !== 'client') {
+            throw new AppError('Este telefone estÃ¡ vinculado a uma conta interna. Use outro telefone para o agendamento.', 409);
+          }
           if (!userAccount) throw error;
         }
       }
@@ -612,24 +679,6 @@ export class AppointmentService {
 
       const finalIsPackage = isUsingPackage || isBuyingPackage;
 
-      if (svc.type === 'package') {
-        const alreadyHas = client.packages?.some(p => p.packageId.toString() === serviceId && p.active);
-        if (!alreadyHas) {
-          client.packages = client.packages || [];
-          client.packages.push({
-            packageId: svc._id as any,
-            startDate: new Date(),
-            active: true,
-            itemLimits: svc.packageItems?.map(pi => ({
-              serviceId: pi.serviceId,
-              quantity: pi.quantity,
-              used: 0,
-            })) || []
-          });
-          await client.save();
-        }
-      }
-
       const appointment = await AppointmentModel.create({
         clientId: client._id,
         employeeId,
@@ -660,6 +709,7 @@ export class AppointmentService {
       };
     } finally {
       await releaseAppointmentSlotLock(lockId);
+      await releaseGuestClientLock(clientLockId);
     }
   }
 
@@ -947,7 +997,7 @@ export class AppointmentService {
 
       // Restore product stock before deleting transactions
       const products = (appt as any).products as Array<{ productId: mongoose.Types.ObjectId; quantity: number }> | undefined;
-      if (products && products.length > 0) {
+      if ((appt as any).productsBilled && products && products.length > 0) {
         const { ProductModel } = await import('../inventory/product.model');
         for (const item of products) {
           await ProductModel.findByIdAndUpdate(item.productId, { $inc: { stockQuantity: item.quantity } });
@@ -1119,6 +1169,29 @@ export class AppointmentService {
 
       if (!internalOverride && updateData.source === 'client') {
         assertAllowedClientScheduleTime(checkDate, checkStart, 30);
+        const targetEmployee = await UserModel.findById(checkEmp).select('unitId role isActive serviceIds');
+        const targetServiceId = data.serviceId || appt.serviceId;
+        if (
+          !targetEmployee ||
+          targetEmployee.unitId?.toString() !== appt.unitId.toString() ||
+          targetEmployee.role !== 'employee' ||
+          targetEmployee.isActive === false ||
+          (targetEmployee.serviceIds?.length && !targetEmployee.serviceIds.some((serviceId: any) => serviceId.toString() === targetServiceId?.toString()))
+        ) {
+          throw new AppError('Profissional indisponÃ­vel para o serviÃ§o selecionado.', 400);
+        }
+        const durationMinutes = timeToMinutes(checkEnd) - timeToMinutes(checkStart);
+        const availableSlots = await this.getAvailableSlots(
+          appt.unitId.toString(),
+          checkEmp.toString(),
+          checkDate,
+          durationMinutes,
+          30,
+          id,
+        );
+        if (!availableSlots.includes(checkStart)) {
+          throw new AppError('HorÃ¡rio indisponÃ­vel para agendamento online.', 400);
+        }
       }
 
       const conflict = await AppointmentModel.findOne({

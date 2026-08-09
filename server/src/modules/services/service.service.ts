@@ -1,5 +1,5 @@
 import { ServiceModel, IService } from './service.model';
-import { NotFoundError } from '../../shared/errors/AppError';
+import { NotFoundError, ForbiddenError } from '../../shared/errors/AppError';
 import { sharedCache } from '../../shared/utils/cache';
 
 export class ServiceService {
@@ -41,7 +41,12 @@ export class ServiceService {
     return svc;
   }
 
-  async update(id: string, data: Partial<IService>): Promise<IService> {
+  async update(id: string, data: Partial<IService>, requesterRole?: string): Promise<IService> {
+    // Moving a service to a different unit is an administrative action —
+    // only the owner may do it; a unit-scoped cashier just edits in place.
+    if (requesterRole !== 'owner' && data.unitId !== undefined) {
+      throw new ForbiddenError('Somente o dono pode mover este serviço para outra unidade.');
+    }
     const svc = await ServiceModel.findByIdAndUpdate(id, data, { new: true, runValidators: true });
     if (!svc) throw new NotFoundError('Service');
     sharedCache.delete(`services:${svc.unitId}:false`);

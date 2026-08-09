@@ -40,7 +40,7 @@ export async function updateProduct(req: AuthRequest, res: Response, next: NextF
     if (scopedUnitId && existing.unitId?.toString() !== scopedUnitId) {
       throw new AppError('Access denied to this unit', 403);
     }
-    const product = await service.update(req.params.id, req.body);
+    const product = await service.update(req.params.id, req.body, req.user?.role);
     ok(res, product);
   } catch (e) { next(e); }
 }

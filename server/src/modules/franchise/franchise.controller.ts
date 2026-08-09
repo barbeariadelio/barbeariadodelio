@@ -15,14 +15,14 @@ export async function getFranchise(req: AuthRequest, res: Response, next: NextFu
 export async function getFranchiseUnits(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const franchiseId = req.params.id;
-    const units = await service.getUnits(franchiseId);
+    const units = await service.getUnits(franchiseId, req.user!.id);
     ok(res, units);
   } catch (e) { next(e); }
 }
 
 export async function addUnit(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const franchise = await service.addUnit(req.params.id, req.body.unitId);
+    const franchise = await service.addUnit(req.params.id, req.body.unitId, req.user!.id);
     ok(res, franchise);
   } catch (e) { next(e); }
 }
@@ -39,7 +39,7 @@ export async function createFranchise(req: AuthRequest, res: Response, next: Nex
 
 export async function updateFranchise(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const franchise = await service.update(req.params.id, req.body);
+    const franchise = await service.update(req.params.id, req.body, req.user!.id);
     ok(res, franchise);
   } catch (e) { next(e); }
 }

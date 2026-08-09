@@ -36,7 +36,9 @@ export async function listTransactions(req: AuthRequest, res: Response, next: Ne
       : ((req.user!.unitId as string) || rawQueryUnitId);
     if (!unitId) { ok(res, { data: [], total: 0 }); return; }
     const { page, limit } = parsePagination(req.query);
-    const employeeId = req.query.employeeId as string;
+    // An employee only ever sees their own commissions/vouchers/salary here —
+    // never the rest of the unit's ledger (other staff's pay, rent, revenue).
+    const employeeId = role === 'employee' ? req.user!.id : (req.query.employeeId as string);
     const category = req.query.category as string;
     const start = req.query.start as string | undefined;
     const end = req.query.end as string | undefined;
@@ -77,10 +79,30 @@ export async function getRemunerationsSummary(req: AuthRequest, res: Response, n
   } catch (e) { next(e); }
 }
 
+export async function previewPayment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { role } = req.user!;
+    const { employeeId, commissionIds, date, unitId: bodyUnitId } = req.body;
+    const rawQueryUnitId = Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string);
+    const unitId = bodyUnitId || rawQueryUnitId || (req.user!.unitId as string);
+    if (!employeeId || !commissionIds?.length || !date) {
+      res.status(400).json({ message: 'Campos obrigatórios: employeeId, commissionIds, date.' });
+      return;
+    }
+    const appScope = req.headers['x-app-scope'] as string | undefined;
+    const jwtUnitId = req.user!.unitId;
+    const preview = await service.previewPayment(req.user!.id, role, unitId, employeeId, commissionIds, date, appScope, jwtUnitId);
+    ok(res, preview);
+  } catch (e) { next(e); }
+}
+
 export async function registerPayment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const { role } = req.user!;
-    const { employeeId, commissionIds, amount = 0, description, date, unitId: bodyUnitId, start, end } = req.body;
+    // `amount` is accepted for backwards compatibility but ignored: the ledger
+    // total is recalculated server-side from the selected commissions minus
+    // outstanding vouchers. Callers should show `POST /finance/payment/preview`.
+    const { employeeId, commissionIds, amount = 0, description, date, unitId: bodyUnitId } = req.body;
     const rawQueryUnitId = Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string);
     const unitId = bodyUnitId || rawQueryUnitId || (req.user!.unitId as string);
     if (!employeeId || !commissionIds?.length || !date) {
@@ -90,7 +112,7 @@ export async function registerPayment(req: AuthRequest, res: Response, next: Nex
     const appScope = req.headers['x-app-scope'] as string | undefined;
     const jwtUnitId = req.user!.unitId;
     const desc = description || `Pagamento de comissões (${commissionIds.length} atend.)`;
-    const payment = await service.registerPayment(req.user!.id, role, unitId, employeeId, commissionIds, amount, desc, date, appScope, jwtUnitId, start, end);
+    const payment = await service.registerPayment(req.user!.id, role, unitId, employeeId, commissionIds, amount, desc, date, appScope, jwtUnitId);
     created(res, payment);
   } catch (e) { next(e); }
 }

@@ -40,8 +40,8 @@ const unitSchema = new Schema<IUnit>(
       }, { _id: false }),
       default: () => ({ start: '08:00', end: '20:00' }),
     },
-    slotInterval:       { type: Number, default: 0 },
-    calendarGrid:       { type: Number, default: 15 },
+    slotInterval:       { type: Number, min: 0, default: 0 },
+    calendarGrid:       { type: Number, min: 1, default: 15 },
   },
   { timestamps: true },
 );

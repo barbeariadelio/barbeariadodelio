@@ -18,7 +18,7 @@ const productSchema = new Schema<IProduct>(
     description:   String,
     price:         { type: Number, required: true, min: 0 },
     costPrice:     { type: Number, required: true, min: 0 },
-    stockQuantity: { type: Number, required: true, default: 0 },
+    stockQuantity: { type: Number, required: true, min: 0, default: 0 },
     minStock:      { type: Number, required: true, default: 5 },
     unitId:        { type: Schema.Types.ObjectId, ref: 'Unit', required: true },
     category:      String,

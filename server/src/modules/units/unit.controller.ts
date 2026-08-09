@@ -3,6 +3,7 @@ import type { IUnit } from './unit.model';
 import { UnitService } from './unit.service';
 import { AuthRequest } from '../../shared/middlewares/auth.middleware';
 import { ok, created } from '../../shared/utils/responseHelper';
+import { AppError } from '../../shared/errors/AppError';
 
 const service = new UnitService();
 
@@ -61,6 +62,27 @@ export async function listUnits(req: AuthRequest, res: Response, next: NextFunct
   } catch (e) { next(e); }
 }
 
+// A unit belongs to an owner directly (unit.ownerId), because it is the unit
+// the caller's own token is scoped to, or via a franchise they are a
+// franchisor of.
+//
+// The token check is not redundant. In production both units carry the *same*
+// ownerId, so the second owner account — whose token is scoped to the unit it
+// actually runs — satisfied neither of the other two rules and could not edit
+// its own unit. Repointing ownerId would instead have dropped that unit out of
+// the first owner's listUnits(), and there is no franchise document to bridge
+// them. resolveUnitId() in the RBAC layer already treats the token's unitId as
+// the authoritative scope; this mirrors it. Setting a user's unitId is itself
+// owner-only, so this grants nothing an owner could not already reach.
+async function ownerCanManageUnit(ownerId: string, unit: IUnit, jwtUnitId?: string): Promise<boolean> {
+  if (unit.ownerId?.toString() === ownerId) return true;
+  if (jwtUnitId && jwtUnitId === unit._id.toString()) return true;
+  const { FranchiseModel } = await import('../franchise/franchise.model');
+  const { default: mongoose } = await import('mongoose');
+  const franchise = await FranchiseModel.findOne({ franchisors: new mongoose.Types.ObjectId(ownerId) });
+  return Boolean(franchise?.units.some(u => u.toString() === unit._id.toString()));
+}
+
 async function resolveCashierUnits(userId: string, primaryUnitId?: string): Promise<IUnit[]> {
   const { UserModel } = await import('../auth/auth.model');
   const { FranchiseModel } = await import('../franchise/franchise.model');
@@ -101,6 +123,22 @@ async function resolveCashierUnits(userId: string, primaryUnitId?: string): Prom
 export async function getUnit(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const id = req.params.unitId || req.params.id;
+    const { role, id: userId, unitId: jwtUnitId } = req.user!;
+
+    // requireSameUnit() only checks that the caller HAS a unit — it never
+    // compares it to the resource being fetched. Do that here: an owner can
+    // view any unit, a cashier only the units resolveCashierUnits() actually
+    // authorizes them for (which may be more than one), and an employee only
+    // their own JWT unit.
+    if (role === 'cashier') {
+      const authorizedUnits = await resolveCashierUnits(userId, jwtUnitId);
+      if (!authorizedUnits.some(u => u._id.toString() === id)) {
+        throw new AppError('Acesso negado para esta unidade.', 403);
+      }
+    } else if (role !== 'owner' && id !== jwtUnitId) {
+      throw new AppError('Acesso negado para esta unidade.', 403);
+    }
+
     const unit = await service.findById(id);
     ok(res, unit);
   } catch (e) { next(e); }
@@ -116,6 +154,15 @@ export async function createUnit(req: AuthRequest, res: Response, next: NextFunc
 export async function updateUnit(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const id = req.params.unitId || req.params.id;
+
+    // requireRoles('owner') alone isn't enough — there is more than one
+    // real owner account, one per unit, and requireSameUnit() doesn't check
+    // that this owner actually owns *this* unit.
+    const existing = await service.findById(id);
+    if (!(await ownerCanManageUnit(req.user!.id, existing, req.user!.unitId))) {
+      throw new AppError('Acesso negado para esta unidade.', 403);
+    }
+
     const unit = await service.update(id, req.body);
     ok(res, unit);
   } catch (e) { next(e); }

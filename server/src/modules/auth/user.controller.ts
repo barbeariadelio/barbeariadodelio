@@ -1,5 +1,6 @@
 import { Response, NextFunction } from 'express';
 import { UserService } from './user.service';
+import { UserModel } from './auth.model';
 import { AuthRequest } from '../../shared/middlewares/auth.middleware';
 import { resolveUnitId } from '../../shared/middlewares/rbac.middleware';
 import { ok, created } from '../../shared/utils/responseHelper';
@@ -117,9 +118,19 @@ export async function updateAccount(req: AuthRequest, res: Response, next: NextF
     if (!isPrivileged && isSelf) {
       const allowedSelfFields = ['theme', 'name', 'phone', 'avatar'];
       const invalidKeys = bodyKeys.filter(k => !allowedSelfFields.includes(k));
-      
+
       if (invalidKeys.length > 0) {
         throw new AppError(`Usuários comuns não podem alterar: ${invalidKeys.join(', ')}`, 403);
+      }
+    }
+
+    // A cashier editing someone else (not self, no restricted fields — those
+    // already 403'd above) was never checked against unit boundaries, so it
+    // could tamper with an account in another unit.
+    if (!isPrivileged && !isSelf) {
+      const targetUser = await UserModel.findById(targetUserId).select('unitId');
+      if (!targetUser || targetUser.unitId?.toString() !== req.user!.unitId?.toString()) {
+        throw new AppError('Acesso negado para este usuário.', 403);
       }
     }
 

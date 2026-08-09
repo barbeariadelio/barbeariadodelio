@@ -79,14 +79,6 @@ const TransactionSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 
-const TaskSchema = new mongoose.Schema({
-  title: String, description: String,
-  status:   { type: String, enum: ['todo', 'doing', 'done'], default: 'todo' },
-  priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
-  dueDate: String,
-  system: { type: String, enum: ['admin', 'franchise'], required: true },
-}, { timestamps: true });
-
 const UserModel        = mongoose.model('User',        UserSchema);
 const FranchiseModel   = mongoose.model('Franchise',   FranchiseSchema);
 const UnitModel        = mongoose.model('Unit',        UnitSchema);
@@ -95,7 +87,6 @@ const ClientModel      = mongoose.model('Client',      ClientSchema);
 const ProductModel     = mongoose.model('Product',     ProductSchema);
 const AppointmentModel = mongoose.model('Appointment', AppointmentSchema);
 const TransactionModel = mongoose.model('Transaction', TransactionSchema);
-const TaskModel        = mongoose.model('Task',        TaskSchema);
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -138,7 +129,6 @@ async function seed() {
         ProductModel.deleteMany({ unitId: { $in: seedUnitIds } }),
         AppointmentModel.deleteMany({ unitId: { $in: seedUnitIds } }),
         TransactionModel.deleteMany({ unitId: { $in: seedUnitIds } }),
-        TaskModel.deleteMany({ system: { $in: ['admin', 'franchise'] } }),
       ]);
       console.log('🗑️  Dados de exemplo removidos — reinserindo...\n');
     }
@@ -367,30 +357,11 @@ async function seed() {
 
   console.log('💰 Transações criadas');
 
-  // ── TAREFAS ─────────────────────────────────────────────────────────────
-  await TaskModel.insertMany([
-    // Admin
-    { title: 'Renovar contrato de aluguel',       description: 'Entrar em contato com a imobiliária antes do vencimento em junho', system: 'admin', status: 'todo',  priority: 'high',   dueDate: d(15) },
-    { title: 'Contratar novo barbeiro',            description: 'Publicar vaga e realizar entrevistas para cobrir a demanda de sábados', system: 'admin', status: 'doing', priority: 'high',   dueDate: d(20) },
-    { title: 'Reunião mensal com franqueadora',    description: 'Preparar relatório de faturamento e métricas do mês',                system: 'admin', status: 'todo',  priority: 'medium', dueDate: d(7)  },
-    { title: 'Revisar metas do trimestre',         description: 'Analisar indicadores e definir metas para o próximo trimestre',      system: 'admin', status: 'todo',  priority: 'medium', dueDate: d(10) },
-    { title: 'Atualizar cardápio de serviços',     description: 'Revisar preços e adicionar novos serviços ao menu',                   system: 'admin', status: 'done',  priority: 'low',    dueDate: d(-3) },
-    // Franchise
-    { title: 'Repor estoque de pomadas',           description: 'Pedir 20 unidades da pomada matte e 10 do óleo de barba',            system: 'franchise', status: 'todo',  priority: 'high',   dueDate: d(3)  },
-    { title: 'Manutenção das cadeiras',            description: 'Cadeira 2 com hidráulico com folga, chamar técnico',                  system: 'franchise', status: 'doing', priority: 'medium', dueDate: d(5)  },
-    { title: 'Limpeza dos ar-condicionados',       description: 'Agendada para o próximo mês com técnico credenciado',                 system: 'franchise', status: 'todo',  priority: 'low',    dueDate: d(18) },
-    { title: 'Treinamento de atendimento',         description: 'Equipe passará por reciclagem de atendimento ao cliente',             system: 'franchise', status: 'done',  priority: 'medium', dueDate: d(-3) },
-    { title: 'Instalar nova iluminação',           description: 'Substituir lâmpadas antigas por LED na área de atendimento',          system: 'franchise', status: 'todo',  priority: 'low',    dueDate: d(25) },
-  ]);
-
-  console.log('✅ Tarefas criadas');
-
   // ── RESUMO ──────────────────────────────────────────────────────────────
   const counts = await Promise.all([
     AppointmentModel.countDocuments(),
     TransactionModel.countDocuments(),
     ProductModel.countDocuments(),
-    TaskModel.countDocuments(),
     ClientModel.countDocuments(),
     ServiceModel.countDocuments(),
   ]);
@@ -398,9 +369,9 @@ async function seed() {
   console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
   console.log('🌱  Seed concluído!\n');
   console.log('📊  Dados inseridos:');
-  console.log(`    • ${counts[4]} clientes  • ${counts[5]} serviços`);
+  console.log(`    • ${counts[3]} clientes  • ${counts[4]} serviços`);
   console.log(`    • ${counts[2]} produtos  • ${counts[0]} agendamentos`);
-  console.log(`    • ${counts[1]} transações  • ${counts[3]} tarefas`);
+  console.log(`    • ${counts[1]} transações`);
   console.log('\n🔑  Logins:');
   console.log('    delio@barbeariadelio.com.br   →  admin123  (franchisor)');
   console.log('    admin@barbeariadelio.com.br   →  admin123  (owner/admin)');

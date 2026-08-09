@@ -64,8 +64,8 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/finance" element={<Finance />} />
-          <Route path="/inventory" element={<Inventory />} />
-          <Route path="/sales" element={<Sales />} />
+          <Route path="/inventory" element={<ProtectedRoute roles={['owner', 'cashier']}><Inventory /></ProtectedRoute>} />
+          <Route path="/sales" element={<ProtectedRoute roles={['owner', 'cashier']}><Sales /></ProtectedRoute>} />
           <Route path="/commissions" element={<Commissions />} />
           <Route path="/employees" element={<ProtectedRoute roles={['owner']}><Employees /></ProtectedRoute>} />
           <Route path="/services" element={<ProtectedRoute roles={['owner']}><Services /></ProtectedRoute>} />

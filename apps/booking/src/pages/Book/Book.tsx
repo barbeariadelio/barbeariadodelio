@@ -250,9 +250,12 @@ export default function Book() {
         : matchedEmployeeServices);
 
   const { data: slots = [], isFetching: slotsLoading } = useQuery<string[]>({
-    queryKey: ['slots', unitId, selectedEmployee?._id, selectedDate, selectedService?.durationMinutes, unit?.apiUrl],
+    queryKey: ['slots', unitId, selectedEmployee?._id, selectedDate, selectedService?.durationMinutes, unit?.apiUrl, editId],
     queryFn: async () => {
-      const { data } = await unitApi.get(`/appointments/slots?unitId=${unitId}&employeeId=${selectedEmployee!._id}&date=${selectedDate}&durationMinutes=${selectedService!.durationMinutes}&source=guest`, publicRequestConfig);
+      // Editing an existing appointment: exclude it from the conflict check,
+      // or its own current time window never shows up as available again.
+      const excludeParam = editId ? `&excludeAppointmentId=${editId}` : '';
+      const { data } = await unitApi.get(`/appointments/slots?unitId=${unitId}&employeeId=${selectedEmployee!._id}&date=${selectedDate}&durationMinutes=${selectedService!.durationMinutes}&source=guest${excludeParam}`, publicRequestConfig);
       return Array.isArray(data) ? data : [];
     },
     enabled: !!unitId && !!selectedEmployee && selectedEmployee._id !== '__any__' && !!selectedDate && !!selectedService && step === 'datetime',
@@ -408,12 +411,19 @@ export default function Book() {
       employeeId: effectiveEmployeeId, 
       date: selectedDate, 
       startTime: selectedTime, 
-      price: selectedService!.price,
       notes: notes.trim() || undefined
     };
 
     if (editId) {
-      bookMutation.mutate(payload);
+      // PATCH accepts a narrower set than POST: unitId is create-only, and the
+      // API rejects an unexpected field with 403 instead of ignoring it.
+      bookMutation.mutate({
+        serviceId: payload.serviceId,
+        employeeId: payload.employeeId,
+        date: payload.date,
+        startTime: payload.startTime,
+        notes: payload.notes,
+      });
       return;
     }
 

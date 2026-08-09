@@ -33,6 +33,21 @@ import { uploadRoutes } from './modules/upload/upload.routes';
 
 const app = express();
 
+// Coolify fronts the container with Traefik on the internal Docker network, so
+// every connection arrives from a private address and the real client is only
+// in X-Forwarded-For. Without this, req.ip is that one proxy address for
+// everybody: the rate limiters below would share a single counter across the
+// entire user base (ten guest bookings per 15 minutes for all customers
+// combined, not per customer) and access logs would record the proxy instead
+// of the caller.
+//
+// Trusting address ranges rather than a hop count is deliberate. Only private
+// ranges are trusted, so a public client cannot forge X-Forwarded-For to dodge
+// its own limit, and the setting stays correct whether the proxy chain is one
+// hop (Traefik alone) or two (a CDN in front of it) — a numeric value would
+// silently point at the wrong entry if that ever changed.
+app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
+
 // --- Security & Utility Middlewares ---
 const r2PublicHost = process.env.R2_PUBLIC_URL
   ? new URL(process.env.R2_PUBLIC_URL).origin
@@ -68,8 +83,24 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-app.use('/auth/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 20 })); // Stricter for login
-app.use('/api', limiter);
+const publicAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: 'Muitas tentativas de acesso. Tente novamente mais tarde.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const publicBookingLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: 'Muitas tentativas de agendamento. Tente novamente mais tarde.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/auth/login', publicAuthLimiter);
+app.use('/auth/booking-login', publicAuthLimiter);
+app.use('/appointments/guest', publicBookingLimiter);
+app.use(limiter);
 
 // --- Logging & Correlation ID ---
 app.use(rtracer.expressMiddleware());

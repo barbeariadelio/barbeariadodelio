@@ -64,7 +64,7 @@ export async function updateClient(req: AuthRequest, res: Response, next: NextFu
       throw new AppError('Access denied to this unit', 403);
     }
 
-    const updated = await service.update(req.params.id, req.body);
+    const updated = await service.update(req.params.id, req.body, req.user!.role);
     const uid = updated.unitId?.toString();
     if (uid) sseService.emit(uid, 'clients:change');
     ok(res, updated);

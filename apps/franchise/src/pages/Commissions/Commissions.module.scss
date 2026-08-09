@@ -712,3 +712,39 @@
   font-size: 0.8125rem;
   font-style: italic;
 }
+/* ── Payment breakdown (server-computed: commissions − vales = cash) ── */
+.payBreakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.7rem 0.85rem;
+  margin-top: 0.15rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+}
+
+.payBreakdownRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.payBreakdownDeduction {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.payBreakdownTotal {
+  margin-top: 0.2rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--border-default);
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: var(--text-primary);
+
+  span:last-child { color: #16a34a; }
+}

@@ -61,14 +61,16 @@ export async function getAppointment(req: AuthRequest, res: Response, next: Next
 
 export async function getSlots(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { unitId, employeeId, date, durationMinutes, source } = req.query as Record<string, string>;
+    const { unitId, employeeId, date, durationMinutes, source, excludeAppointmentId } = req.query as Record<string, string>;
     if (!unitId || !employeeId || !date) {
       ok(res, []);
       return;
     }
     const duration = Number(durationMinutes) || 30;
     const bufferMins = source === 'guest' ? 30 : 0;
-    const slots = await service.getAvailableSlots(unitId, employeeId, date, duration, bufferMins);
+    // When rescheduling, the appointment being moved still occupies its old
+    // time in the DB — exclude it so its own window doesn't read as booked.
+    const slots = await service.getAvailableSlots(unitId, employeeId, date, duration, bufferMins, excludeAppointmentId || undefined);
     ok(res, slots);
   } catch (e) { next(e); }
 }
@@ -95,7 +97,19 @@ export async function getSlotsByAnyEmployee(req: Request, res: Response, next: N
 
 export async function createAppointment(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = req.body;
+    let data = req.body as Record<string, unknown>;
+
+    if (req.user!.role === 'client') {
+      const allowedClientFields = new Set(['unitId', 'serviceId', 'employeeId', 'date', 'startTime', 'notes']);
+      const forbiddenField = Object.keys(data).find(field => !allowedClientFields.has(field));
+      if (forbiddenField) {
+        throw new AppError(`Clientes nÃ£o podem definir o campo interno \"${forbiddenField}\".`, 403);
+      }
+
+      data = Object.fromEntries(
+        Object.entries(data).filter(([field]) => allowedClientFields.has(field)),
+      );
+    }
 
     // If unitId not in body, use the authenticated user's unitId
     if (!data.unitId && req.user?.unitId) {
@@ -107,10 +121,12 @@ export async function createAppointment(req: AuthRequest, res: Response, next: N
     //   the controller will create a client record in the target unit automatically.
     // Staff-managed booking (clientId explicitly supplied): employee/franchisee/cashier
     //   may only manage appointments that belong to their own unit.
-    const isSelfBooking = !data.clientId;
     const isRestrictedStaff = ['employee', 'cashier'].includes(req.user!.role);
-    if (!isSelfBooking && isRestrictedStaff && data.unitId !== req.user!.unitId?.toString()) {
+    if (isRestrictedStaff && data.unitId !== req.user!.unitId?.toString()) {
       throw new AppError('Cannot create appointment for another unit', 403);
+    }
+    if (req.user!.role === 'employee' && data.employeeId !== req.user!.id) {
+      throw new AppError('FuncionÃ¡rios sÃ³ podem alterar a prÃ³pria agenda.', 403);
     }
 
     // For blocked slots, no client lookup needed
@@ -314,8 +330,17 @@ export async function updateAppointment(req: AuthRequest, res: Response, next: N
       }
     }
 
-    const updateData = { ...req.body } as Record<string, unknown>;
+    let updateData = { ...req.body } as Record<string, unknown>;
     if (req.user!.role === 'client') {
+      const allowedClientFields = new Set(['serviceId', 'employeeId', 'date', 'startTime', 'notes']);
+      const forbiddenField = Object.keys(updateData).find(field => !allowedClientFields.has(field));
+      if (forbiddenField) {
+        throw new AppError(`Clientes nÃ£o podem alterar o campo interno \"${forbiddenField}\".`, 403);
+      }
+
+      updateData = Object.fromEntries(
+        Object.entries(updateData).filter(([field]) => allowedClientFields.has(field)),
+      );
       updateData.source = 'client';
     } else {
       delete updateData.source;

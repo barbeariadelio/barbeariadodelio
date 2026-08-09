@@ -81,7 +81,7 @@ export async function updateEmployee(req: AuthRequest, res: Response, next: Next
       throw new AppError('Access denied to this unit', 403);
     }
 
-    const updated = await service.update(req.params.id, req.body);
+    const updated = await service.update(req.params.id, req.body, req.user!.role);
     ok(res, updated);
   } catch (e) { next(e); }
 }

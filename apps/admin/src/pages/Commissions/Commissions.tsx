@@ -43,20 +43,21 @@ interface PaymentHistoryItem {
   date: string;
 }
 
+/** Mirrors PaymentPreview in @barber/types — computed by the server, never here. */
+interface PaymentPreview {
+  commissionCount: number;
+  commissionTotal: number;
+  voucherDeduction: number;
+  netAmount: number;
+  vouchers: Array<{ voucherId: string; description: string; date: string; outstandingAmount: number; deduction: number }>;
+}
+
 function formatCurrency(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 }
 
 function formatDate(iso: string) {
   return iso.split('-').reverse().join('/');
-}
-
-function formatBR(n: number) {
-  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
-}
-
-function parseBR(s: string) {
-  return parseFloat(s.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
 }
 
 function toISO(d: Date) {
@@ -137,7 +138,6 @@ export default function Commissions() {
   const [detailEmpName, setDetailEmpName] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showPayForm, setShowPayForm] = useState(false);
-  const [payAmount, setPayAmount] = useState('');
   const [payDate, setPayDate] = useState(toISO(new Date()));
   const [payDesc, setPayDesc] = useState('');
   const [payError, setPayError] = useState<string | null>(null);
@@ -305,11 +305,38 @@ export default function Commissions() {
   const unpaid = commissions.filter(c => !c.isPaid);
   const paid   = commissions.filter(c => c.isPaid);
   const currentEmpSummary = summary.find(s => s.employeeId === detailEmpId);
-  const weeklyValeDiscount = currentEmpSummary?.valesAmount ?? 0;
   const selectedGrossTotal = unpaid.filter(c => selected.has(c._id)).reduce((s, c) => s + c.amount, 0);
-  const selectedTotal = selected.size > 0 ? Math.max(0, selectedGrossTotal - weeklyValeDiscount) : 0;
-  const totalPending  = currentEmpSummary?.pendingAmount ?? Math.max(0, unpaid.reduce((s, c) => s + c.amount, 0) - weeklyValeDiscount);
-  const aPagar = currentEmpSummary?.pendingAmount ?? totalPending;
+
+  // Exactly the ids handleSubmit will send, so the preview can never quote a
+  // different set of commissions than the one actually paid.
+  const commissionIdsToPay = useMemo(
+    () => [...(selected.size > 0 ? Array.from(selected) : unpaid.map(c => c._id))].sort(),
+    [selected, unpaid],
+  );
+
+  // The payout is whatever the server says it is. Deducting outstanding
+  // advances here by hand is what made this screen disagree with the ledger.
+  const { data: preview, isError: previewFailed } = useQuery<PaymentPreview>({
+    queryKey: ['payment-preview', detailEmpId, unitId, payDate, commissionIdsToPay],
+    queryFn: async () => {
+      const { data } = await api.post('/finance/payment/preview', {
+        employeeId: detailEmpId,
+        unitId,
+        commissionIds: commissionIdsToPay,
+        date: payDate,
+      });
+      return data;
+    },
+    enabled: !isEmployee && !!detailEmpId && commissionIdsToPay.length > 0,
+  });
+
+  const aPagar = preview?.netAmount ?? currentEmpSummary?.pendingAmount ?? 0;
+  const valeDeduction = preview?.voucherDeduction ?? 0;
+  // Derived rather than read from `isPending`: a disabled React Query stays
+  // `pending` forever. On failure we let the payment proceed — the server
+  // computes the real figure regardless, and blocking payroll on a failed
+  // read-only call would be worse than hiding the breakdown.
+  const previewPending = commissionIdsToPay.length > 0 && !preview && !previewFailed;
 
   function toggleSelect(id: string) {
     setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -319,8 +346,6 @@ export default function Commissions() {
     if (selected.size === 0) {
       setSelected(new Set(unpaid.map(c => c._id)));
     }
-    const amount = Math.max(0, aPagar);
-    setPayAmount(formatBR(amount));
     setPayDesc('Pagamento semanal de comissões');
     setPayError(null);
     setShowPayForm(true);
@@ -328,15 +353,23 @@ export default function Commissions() {
 
   const registerPayment = useMutation({
     mutationFn: (payload: any) => api.post('/finance/payment', payload),
-    onSuccess: () => {
+    onSuccess: res => {
       qc.invalidateQueries({ queryKey: ['commissions-detail'] });
       qc.invalidateQueries({ queryKey: ['commissions-summary'] });
       qc.invalidateQueries({ queryKey: ['commission-payments'] });
       qc.invalidateQueries({ queryKey: ['finance-summary'] });
+      qc.invalidateQueries({ queryKey: ['payment-preview'] });
+      qc.invalidateQueries({ queryKey: ['employee-vales'] });
       setShowPayForm(false);
       setSelected(new Set());
-      setPaySuccess('Pagamento registrado com sucesso!');
-      setTimeout(() => setPaySuccess(null), 4000);
+      // Report the amount actually recorded, not the one the screen predicted.
+      const recorded: unknown = res?.data?.amount;
+      setPaySuccess(
+        typeof recorded === 'number'
+          ? `Pagamento registrado — ${formatCurrency(recorded)} em dinheiro.`
+          : 'Pagamento registrado com sucesso!',
+      );
+      setTimeout(() => setPaySuccess(null), 5000);
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.message || 'Erro ao registrar pagamento. Tente novamente.';
@@ -346,10 +379,15 @@ export default function Commissions() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const amount = parseBR(payAmount);
-    const commissionIds = selected.size > 0 ? Array.from(selected) : unpaid.map(c => c._id);
-    if (commissionIds.length === 0) return;
-    registerPayment.mutate({ employeeId: detailEmpId, unitId, commissionIds, amount, description: payDesc, date: payDate, start: filterStart, end: filterEnd });
+    if (commissionIdsToPay.length === 0) return;
+    setPayError(null);
+    registerPayment.mutate({
+      employeeId: detailEmpId,
+      unitId,
+      commissionIds: commissionIdsToPay,
+      description: payDesc,
+      date: payDate,
+    });
   }
 
   function openDetail(empId: string, empName: string) {
@@ -614,7 +652,7 @@ export default function Commissions() {
                   <div className={styles.summaryDivider} />
                   <div className={styles.summaryItem}>
                     <span className={styles.summaryVal}>{selected.size} sel.</span>
-                    <span className={styles.summaryLbl}>{formatCurrency(selectedTotal)}</span>
+                    <span className={styles.summaryLbl}>{formatCurrency(selectedGrossTotal)}</span>
                   </div>
                 </>
               )}
@@ -629,7 +667,7 @@ export default function Commissions() {
               <span className={styles.selectBarHint}>
                 {selected.size === 0
                   ? 'Selecione as comissões abaixo para registrar um pagamento'
-                  : `${selected.size} de ${unpaid.length} selecionada${selected.size !== 1 ? 's' : ''} · ${formatCurrency(selectedTotal)}`}
+                  : `${selected.size} de ${unpaid.length} selecionada${selected.size !== 1 ? 's' : ''} · ${formatCurrency(selectedGrossTotal)}`}
               </span>
               <button className={styles.selectAllBtn} onClick={() => setSelected(new Set(unpaid.map(c => c._id)))}>Selecionar todas</button>
               {selected.size > 0 && <button className={styles.clearBtn} onClick={() => setSelected(new Set())}>Limpar</button>}
@@ -640,14 +678,7 @@ export default function Commissions() {
             <form className={styles.form} onSubmit={handleSubmit}>
               <div className={styles.formRow}>
                 <div className={styles.field}>
-                  <label>Valor pago (R$)</label>
-                  <input type="text" inputMode="decimal" value={payAmount}
-                    onChange={e => setPayAmount(e.target.value.replace(/[^0-9,]/g, ''))}
-                    onBlur={() => { const n = parseBR(payAmount); if (n > 0) setPayAmount(formatBR(n)); }}
-                    required />
-                </div>
-                <div className={styles.field}>
-                  <label>Data</label>
+                  <label>Data do pagamento</label>
                   <input type="date" value={payDate} onChange={e => setPayDate(e.target.value)} required />
                 </div>
               </div>
@@ -655,12 +686,32 @@ export default function Commissions() {
                 <label>Descrição</label>
                 <input type="text" value={payDesc} onChange={e => setPayDesc(e.target.value)} />
               </div>
-              <div className={styles.payFormSummary}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-                {selected.size} comissão{selected.size !== 1 ? 'ões' : ''} serão marcadas como pagas — total {formatCurrency(selectedTotal)}
+              <div className={styles.payBreakdown}>
+                <div className={styles.payBreakdownRow}>
+                  <span>Comissões selecionadas ({preview?.commissionCount ?? commissionIdsToPay.length})</span>
+                  <span>{formatCurrency(preview?.commissionTotal ?? selectedGrossTotal)}</span>
+                </div>
+                {valeDeduction > 0 && (
+                  <div className={`${styles.payBreakdownRow} ${styles.payBreakdownDeduction}`}>
+                    <span>Vales abatidos ({preview?.vouchers.length ?? 0})</span>
+                    <span>− {formatCurrency(valeDeduction)}</span>
+                  </div>
+                )}
+                <div className={`${styles.payBreakdownRow} ${styles.payBreakdownTotal}`}>
+                  <span>A pagar em dinheiro</span>
+                  {/* Only the server's figure — the period-wide fallback would
+                      overstate a partial selection, the original bug. */}
+                  <span>{preview ? formatCurrency(preview.netAmount) : previewFailed ? '—' : 'calculando...'}</span>
+                </div>
               </div>
+              {valeDeduction > 0 && (
+                <div className={styles.payFormSummary}>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  As comissões serão marcadas como pagas integralmente; {formatCurrency(valeDeduction)} quitam vales em aberto e não saem do caixa.
+                </div>
+              )}
               {payError && (
                 <div className={styles.payFormError}>
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -671,7 +722,7 @@ export default function Commissions() {
               )}
               <div className={styles.formActions}>
                 <button type="button" className={styles.cancelBtn} onClick={() => setShowPayForm(false)}>Cancelar</button>
-                <button type="submit" className={styles.submitBtn} disabled={registerPayment.isPending || selected.size === 0}>
+                <button type="submit" className={styles.submitBtn} disabled={registerPayment.isPending || selected.size === 0 || previewPending}>
                   {registerPayment.isPending ? 'Salvando...' : 'Confirmar Pagamento'}
                 </button>
               </div>

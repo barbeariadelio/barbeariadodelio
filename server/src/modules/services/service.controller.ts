@@ -43,7 +43,7 @@ export async function updateService(req: AuthRequest, res: Response, next: NextF
     if (scopedUnitId && existing.unitId?.toString() !== scopedUnitId) {
       throw new AppError('Access denied to this unit', 403);
     }
-    const svc = await service.update(req.params.id, req.body);
+    const svc = await service.update(req.params.id, req.body, req.user?.role);
     ok(res, svc);
   } catch (e) { next(e); }
 }

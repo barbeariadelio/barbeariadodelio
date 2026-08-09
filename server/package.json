@@ -9,7 +9,8 @@
     "test": "vitest run",
     "seed": "tsx src/seed.ts",
     "seed:reset": "tsx src/seed.ts --reset",
-    "royalty:batch": "tsx src/jobs/batchRoyalty.ts"
+    "royalty:batch": "tsx src/jobs/batchRoyalty.ts",
+    "audit:legacy-vouchers": "tsx src/scripts/audit-legacy-vouchers.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1052.0",

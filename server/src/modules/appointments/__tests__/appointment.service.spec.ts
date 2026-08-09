@@ -3,10 +3,12 @@ import { AppointmentService } from '../appointment.service';
 import { AppointmentModel } from '../appointment.model';
 import { ServiceModel } from '../../services/service.model';
 import { UnitModel } from '../../units/unit.model';
+import { UserModel } from '../../auth/auth.model';
 
 vi.mock('../appointment.model');
 vi.mock('../../services/service.model');
 vi.mock('../../units/unit.model');
+vi.mock('../../auth/auth.model');
 
 describe('AppointmentService', () => {
   let service: AppointmentService;
@@ -130,6 +132,51 @@ describe('AppointmentService', () => {
         date: '2026-05-25',
         startTime: '13:00',
       } as any)).rejects.toThrow('Agendamentos online devem ser feitos com pelo menos 30 minutos de antecedência.');
+
+      vi.useRealTimers();
+    });
+
+    it('rejects a client reschedule outside the server-calculated availability', async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-05-25T09:00:00-03:00'));
+
+      const appt = {
+        _id: { toString: () => 'appointment-1' },
+        isBilled: false,
+        productsBilled: false,
+        status: 'confirmed',
+        serviceId: { toString: () => 'service-1' },
+        price: 40,
+        startTime: '10:00',
+        endTime: '10:30',
+        save: vi.fn(),
+        unitId: { toString: () => 'unit-1' },
+        employeeId: { toString: () => 'employee-1' },
+        date: '2026-05-25',
+      };
+      appt.save.mockResolvedValue(appt);
+      (AppointmentModel.findById as any).mockResolvedValue(appt);
+      (ServiceModel.findById as any).mockResolvedValue({ type: 'single', price: 40, durationMinutes: 30 });
+      (UnitModel.findById as any).mockReturnValue({
+        select: vi.fn().mockResolvedValue({ workingDays: [2] }),
+      });
+
+      const service = new AppointmentService();
+      vi.spyOn(service, 'getAvailableSlots').mockResolvedValue([]);
+      vi.spyOn(service, 'findById').mockResolvedValue(appt as any);
+      (UserModel.findById as any).mockReturnValue({
+        select: vi.fn().mockResolvedValue({
+          unitId: { toString: () => 'unit-1' },
+          role: 'employee',
+          isActive: true,
+        }),
+      });
+
+      await expect(service.update('appointment-1', {
+        source: 'client',
+        date: '2026-05-26',
+        startTime: '14:00',
+      } as any)).rejects.toMatchObject({ statusCode: 400 });
 
       vi.useRealTimers();
     });

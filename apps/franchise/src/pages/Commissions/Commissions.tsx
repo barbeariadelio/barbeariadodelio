@@ -43,20 +43,21 @@ interface PaymentHistoryItem {
   date: string;
 }
 
+/** Mirrors PaymentPreview in @barber/types — computed by the server, never here. */
+interface PaymentPreview {
+  commissionCount: number;
+  commissionTotal: number;
+  voucherDeduction: number;
+  netAmount: number;
+  vouchers: Array<{ voucherId: string; description: string; date: string; outstandingAmount: number; deduction: number }>;
+}
+
 function formatCurrency(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 }
 
 function formatDate(iso: string) {
   return iso.split('-').reverse().join('/');
-}
-
-function formatBR(n: number) {
-  return new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
-}
-
-function parseBR(s: string) {
-  return parseFloat(s.replace(/[^\d,]/g, '').replace(',', '.')) || 0;
 }
 
 function toISO(d: Date) {
@@ -137,7 +138,6 @@ export default function Commissions() {
   const [detailEmpName, setDetailEmpName] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showPayForm, setShowPayForm] = useState(false);
-  const [payAmount, setPayAmount] = useState('');
   const [payDate, setPayDate] = useState(toISO(new Date()));
   const [payDesc, setPayDesc] = useState('');
 
@@ -303,11 +303,38 @@ export default function Commissions() {
   const unpaid = commissions.filter(c => !c.isPaid);
   const paid   = commissions.filter(c => c.isPaid);
   const currentEmpSummary = summary.find(s => s.employeeId === detailEmpId);
-  const weeklyValeDiscount = currentEmpSummary?.valesAmount ?? 0;
   const selectedGrossTotal = unpaid.filter(c => selected.has(c._id)).reduce((s, c) => s + c.amount, 0);
-  const selectedTotal = selected.size > 0 ? Math.max(0, selectedGrossTotal - weeklyValeDiscount) : 0;
-  const totalPending  = currentEmpSummary?.pendingAmount ?? Math.max(0, unpaid.reduce((s, c) => s + c.amount, 0) - weeklyValeDiscount);
-  const aPagar = currentEmpSummary?.pendingAmount ?? totalPending;
+
+  // Exactly the ids handleSubmit will send, so the preview can never quote a
+  // different set of commissions than the one actually paid.
+  const commissionIdsToPay = useMemo(
+    () => [...(selected.size > 0 ? Array.from(selected) : unpaid.map(c => c._id))].sort(),
+    [selected, unpaid],
+  );
+
+  // The payout is whatever the server says it is. Deducting outstanding
+  // advances here by hand is what made this screen disagree with the ledger.
+  const { data: preview, isError: previewFailed } = useQuery<PaymentPreview>({
+    queryKey: ['payment-preview', detailEmpId, unitId, payDate, commissionIdsToPay],
+    queryFn: async () => {
+      const { data } = await api.post('/finance/payment/preview', {
+        employeeId: detailEmpId,
+        unitId,
+        commissionIds: commissionIdsToPay,
+        date: payDate,
+      });
+      return data;
+    },
+    enabled: !isEmployee && !!detailEmpId && commissionIdsToPay.length > 0,
+  });
+
+  const aPagar = preview?.netAmount ?? currentEmpSummary?.pendingAmount ?? 0;
+  const valeDeduction = preview?.voucherDeduction ?? 0;
+  // Derived rather than read from `isPending`: a disabled React Query stays
+  // `pending` forever. On failure we let the payment proceed — the server
+  // computes the real figure regardless, and blocking payroll on a failed
+  // read-only call would be worse than hiding the breakdown.
+  const previewPending = commissionIdsToPay.length > 0 && !preview && !previewFailed;
 
   function toggleSelect(id: string) {
     setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -317,7 +344,6 @@ export default function Commissions() {
     if (selected.size === 0) {
       setSelected(new Set(unpaid.map(c => c._id)));
     }
-    setPayAmount(formatBR(Math.max(0, aPagar)));
     setPayDesc('Pagamento semanal de comissões');
     setShowPayForm(true);
   }
@@ -329,16 +355,22 @@ export default function Commissions() {
       qc.invalidateQueries({ queryKey: ['commissions-summary'] });
       qc.invalidateQueries({ queryKey: ['commission-payments'] });
       qc.invalidateQueries({ queryKey: ['finance-summary'] });
+      qc.invalidateQueries({ queryKey: ['payment-preview'] });
+      qc.invalidateQueries({ queryKey: ['employee-vales'] });
       setShowPayForm(false); setSelected(new Set());
     },
   });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const amount = parseBR(payAmount);
-    const commissionIds = selected.size > 0 ? Array.from(selected) : unpaid.map(c => c._id);
-    if (commissionIds.length === 0) return;
-    registerPayment.mutate({ employeeId: detailEmpId, unitId, commissionIds, amount, description: payDesc, date: payDate, start: filterStart, end: filterEnd });
+    if (commissionIdsToPay.length === 0) return;
+    registerPayment.mutate({
+      employeeId: detailEmpId,
+      unitId,
+      commissionIds: commissionIdsToPay,
+      description: payDesc,
+      date: payDate,
+    });
   }
 
   function openDetail(empId: string, empName: string) {
@@ -587,7 +619,7 @@ export default function Commissions() {
                   <div className={styles.summaryDivider} />
                   <div className={styles.summaryItem}>
                     <span className={styles.summaryVal}>{selected.size} sel.</span>
-                    <span className={styles.summaryLbl}>{formatCurrency(selectedTotal)}</span>
+                    <span className={styles.summaryLbl}>{formatCurrency(selectedGrossTotal)}</span>
                   </div>
                 </>
               )}
@@ -605,14 +637,7 @@ export default function Commissions() {
             <form className={styles.form} onSubmit={handleSubmit}>
               <div className={styles.formRow}>
                 <div className={styles.field}>
-                  <label>Valor pago (R$)</label>
-                  <input type="text" inputMode="decimal" value={payAmount}
-                    onChange={e => setPayAmount(e.target.value.replace(/[^0-9,]/g, ''))}
-                    onBlur={() => { const n = parseBR(payAmount); if (n > 0) setPayAmount(formatBR(n)); }}
-                    required />
-                </div>
-                <div className={styles.field}>
-                  <label>Data</label>
+                  <label>Data do pagamento</label>
                   <input type="date" value={payDate} onChange={e => setPayDate(e.target.value)} required />
                 </div>
               </div>
@@ -620,9 +645,27 @@ export default function Commissions() {
                 <label>Descrição</label>
                 <input type="text" value={payDesc} onChange={e => setPayDesc(e.target.value)} />
               </div>
+              <div className={styles.payBreakdown}>
+                <div className={styles.payBreakdownRow}>
+                  <span>Comissões selecionadas ({preview?.commissionCount ?? commissionIdsToPay.length})</span>
+                  <span>{formatCurrency(preview?.commissionTotal ?? selectedGrossTotal)}</span>
+                </div>
+                {valeDeduction > 0 && (
+                  <div className={`${styles.payBreakdownRow} ${styles.payBreakdownDeduction}`}>
+                    <span>Vales abatidos ({preview?.vouchers.length ?? 0})</span>
+                    <span>− {formatCurrency(valeDeduction)}</span>
+                  </div>
+                )}
+                <div className={`${styles.payBreakdownRow} ${styles.payBreakdownTotal}`}>
+                  <span>A pagar em dinheiro</span>
+                  {/* Only the server's figure — the period-wide fallback would
+                      overstate a partial selection, the original bug. */}
+                  <span>{preview ? formatCurrency(preview.netAmount) : previewFailed ? '—' : 'calculando...'}</span>
+                </div>
+              </div>
               <div className={styles.formActions}>
                 <button type="button" className={styles.cancelBtn} onClick={() => setShowPayForm(false)}>Cancelar</button>
-                <button type="submit" className={styles.submitBtn} disabled={registerPayment.isPending}>
+                <button type="submit" className={styles.submitBtn} disabled={registerPayment.isPending || previewPending}>
                   {registerPayment.isPending ? 'Salvando...' : 'Confirmar Pagamento'}
                 </button>
               </div>

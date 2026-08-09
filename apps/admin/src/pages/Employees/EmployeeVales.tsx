@@ -74,6 +74,10 @@ export default function EmployeeVales({ employeeId, unitId }: Props) {
     qc.invalidateQueries({ queryKey: ['finance-summary'] });
     qc.invalidateQueries({ queryKey: ['commissions-summary'] });
     qc.invalidateQueries({ queryKey: ['remuneration-summary'] });
+    // This panel renders alongside the payment form on the Commissions page:
+    // creating, settling or deleting a vale changes what the next payment will
+    // deduct, so the payout preview must be recomputed too.
+    qc.invalidateQueries({ queryKey: ['payment-preview'] });
   };
 
   const createVale = useMutation({
