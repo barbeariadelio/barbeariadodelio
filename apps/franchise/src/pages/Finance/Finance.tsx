@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, getSelectedUnitId } from '../../api/client';
+import { selectOwnRemuneration } from '@barber/utils';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, BarChart, Bar, Legend, Cell, PieChart, Pie } from 'recharts';
 import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
@@ -289,6 +290,7 @@ export default function Finance() {
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
+    enabled: !isStaff,
   });
 
   const billedProductSales = useMemo(
@@ -330,6 +332,10 @@ export default function Finance() {
     () => new Map(remunerationSummary.map(item => [item.employeeId, item])),
     [remunerationSummary],
   );
+  const staffRemuneration = useMemo(
+    () => selectOwnRemuneration(remunerationSummary, userId ?? ''),
+    [remunerationSummary, userId],
+  );
 
   const { data: transactions = [] } = useQuery<Transaction[]>({
     queryKey: ['finance-transactions', unitId, period, filterStart, filterEnd],
@@ -346,6 +352,7 @@ export default function Finance() {
     staleTime: 0,
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
+    enabled: !isStaff,
   });
 
   const paymentPieData = useMemo(() => {
@@ -902,12 +909,36 @@ export default function Finance() {
               )}
             </div>
 
-            {(summary?.byEmployee ?? []).length === 0 && (
+            {isStaff && (
+              <div className={styles.summaryBar}>
+                <div className={styles.summaryItem}>
+                  <span className={styles.summaryLabel}>Comissões do período</span>
+                  <span className={`${styles.summaryValue} ${styles.blue}`}>{formatCurrency(staffRemuneration.totalAmount)}</span>
+                </div>
+                <div className={styles.summaryDivider} />
+                <div className={styles.summaryItem}>
+                  <span className={styles.summaryLabel}>Já pago</span>
+                  <span className={`${styles.summaryValue} ${styles.green}`}>{formatCurrency(staffRemuneration.paidAmount)}</span>
+                </div>
+                <div className={styles.summaryDivider} />
+                <div className={styles.summaryItem}>
+                  <span className={styles.summaryLabel}>Vales em aberto</span>
+                  <span className={`${styles.summaryValue} ${styles.red}`}>{formatCurrency(staffRemuneration.valesAmount)}</span>
+                </div>
+                <div className={styles.summaryDivider} />
+                <div className={styles.summaryItem}>
+                  <span className={styles.summaryLabel}>Saldo a pagar</span>
+                  <span className={`${styles.summaryValue} ${styles.amber}`}>{formatCurrency(staffRemuneration.pendingAmount)}</span>
+                </div>
+              </div>
+            )}
+
+            {!isStaff && (summary?.byEmployee ?? []).length === 0 && (
               <p className={styles.empty}>
                 Nenhum profissional cadastrado para {unitId === 'all' ? 'todas as unidades' : 'esta unidade'}.
               </p>
             )}
-            {(summary?.byEmployee ?? []).length > 0 && (() => {
+            {!isStaff && (summary?.byEmployee ?? []).length > 0 && (() => {
               type Emp = { id: string; name: string; unitId: string; unitName: string; appointments: number; grossRevenue: number; totalVouchers: number; commissionRate?: number };
               let empList: Emp[] = (summary!.byEmployee as Emp[]) || [];
 
