@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { normalizeApiError } from '@barber/utils';
 
 export const apiBaseUrl = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3001' : '');
 
@@ -102,7 +103,7 @@ export function setupInterceptors(instance: any) {
         const loginUrl = `${import.meta.env.BASE_URL}login`.replace('//', '/');
         window.location.href = loginUrl;
       }
-      return Promise.reject(error);
+      return Promise.reject(normalizeApiError(error));
     },
   );
 }
