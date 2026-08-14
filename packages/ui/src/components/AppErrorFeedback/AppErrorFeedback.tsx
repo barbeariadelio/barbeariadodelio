@@ -71,6 +71,7 @@ export function ApiErrorNotifications(): JSX.Element | null {
   if (!notice) return null;
 
   const { error, retry } = notice;
+  const fieldMessages = Object.values(error.details ?? {});
   const retryRequest = async () => {
     if (!retry || retrying) return;
     setRetrying(true);
@@ -87,6 +88,11 @@ export function ApiErrorNotifications(): JSX.Element | null {
       <div style={noticeStyle.content}>
         <strong style={noticeStyle.title}>Não foi possível concluir a ação</strong>
         <span style={noticeStyle.message}>{error.message}</span>
+        {fieldMessages.length > 0 && (
+          <ul style={noticeStyle.details}>
+            {fieldMessages.map((message, index) => <li key={`${message}-${index}`}>{message}</li>)}
+          </ul>
+        )}
         {error.requestId && <small style={noticeStyle.requestId}>Código: {error.requestId}</small>}
       </div>
       <div style={noticeStyle.actions}>
@@ -115,6 +121,7 @@ const noticeStyle: Record<string, React.CSSProperties> = {
   content: { display: 'flex', flexDirection: 'column', gap: '0.25rem' },
   title: { fontSize: '0.875rem' },
   message: { fontSize: '0.8125rem', lineHeight: 1.4 },
+  details: { margin: 0, paddingLeft: '1rem', fontSize: '0.75rem', lineHeight: 1.4 },
   requestId: { fontSize: '0.6875rem', color: '#7a3d3d' },
   actions: { display: 'flex', alignItems: 'flex-start', gap: '0.5rem' },
   retryButton: { border: 0, borderRadius: '0.25rem', padding: '0.375rem 0.5rem', background: '#8f1d1d', color: '#fff', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' },
