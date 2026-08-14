@@ -16,6 +16,7 @@ import { connectDb } from './config/db';
 import { env } from './config/env';
 import { logger } from './shared/utils/logger';
 import { errorHandler } from './shared/middlewares/errorHandler';
+import { AppError, NotFoundError } from './shared/errors/AppError';
 
 import { authRoutes } from './modules/auth/auth.routes';
 import { unitRoutes } from './modules/units/unit.routes';
@@ -75,33 +76,6 @@ app.use(cookieParser());
 app.use(mongoSanitize()); // Prevent NoSQL Injection
 app.use(hpp()); // Prevent Parameter Pollution
 
-// --- Rate Limiting ---
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // limit each IP to 1000 requests per windowMs
-  message: 'Muitas requisições originadas deste IP, tente novamente mais tarde.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-const publicAuthLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
-  message: 'Muitas tentativas de acesso. Tente novamente mais tarde.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-const publicBookingLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: 'Muitas tentativas de agendamento. Tente novamente mais tarde.',
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use('/auth/login', publicAuthLimiter);
-app.use('/auth/booking-login', publicAuthLimiter);
-app.use('/appointments/guest', publicBookingLimiter);
-app.use(limiter);
-
 // --- Logging & Correlation ID ---
 app.use(rtracer.expressMiddleware());
 app.use(pinoHttp({
@@ -115,6 +89,37 @@ app.use(pinoHttp({
     return 'info';
   },
 }));
+
+// --- Rate Limiting ---
+const rateLimitHandler = (_req: express.Request, _res: express.Response, next: express.NextFunction) => {
+  next(new AppError('Muitas tentativas. Tente novamente mais tarde.', 429, 'RATE_LIMITED'));
+};
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000, // limit each IP to 1000 requests per windowMs
+  handler: rateLimitHandler,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const publicAuthLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  handler: rateLimitHandler,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const publicBookingLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  handler: rateLimitHandler,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/auth/login', publicAuthLimiter);
+app.use('/auth/booking-login', publicAuthLimiter);
+app.use('/appointments/guest', publicBookingLimiter);
+app.use(limiter);
 
 // Serve static portal at root
 const publicDir = path.resolve(__dirname, '../public');
@@ -148,6 +153,17 @@ app.get('/health', (_req, res) => {
       database: mongoStatus,
     },
   });
+});
+
+const apiRoutePrefixes = [
+  '/auth', '/units', '/clients', '/services', '/employees', '/appointments',
+  '/finance', '/franchise', '/products', '/users', '/notifications', '/events', '/upload',
+];
+
+app.use((req, _res, next) => {
+  const isApiPath = apiRoutePrefixes.some(prefix => req.path === prefix || req.path.startsWith(`${prefix}/`));
+  if (isApiPath) return next(new NotFoundError('Rota'));
+  return next();
 });
 
 // --- SPA Mounting (production only) ---

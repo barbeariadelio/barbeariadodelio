@@ -178,7 +178,7 @@ export async function guestBookAppointment(req: Request, res: Response, next: Ne
   try {
     const { guestName, guestPhone, unitId, serviceId, employeeId, date, startTime, price, notes } = req.body;
     if (!guestName || !guestPhone || !unitId || !serviceId || !employeeId || !date || !startTime) {
-      res.status(400).json({ message: 'Missing required fields' });
+      next(new AppError('Preencha todos os campos obrigatórios.', 400, 'VALIDATION_ERROR'));
       return;
     }
     const result = await service.guestBook({ 

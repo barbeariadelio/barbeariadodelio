@@ -3,6 +3,7 @@ import { FinanceService } from './finance.service';
 import { AuthRequest } from '../../shared/middlewares/auth.middleware';
 import { ok, created } from '../../shared/utils/responseHelper';
 import { parsePagination } from '../../shared/utils/pagination';
+import { AppError } from '../../shared/errors/AppError';
 
 const service = new FinanceService();
 
@@ -86,7 +87,7 @@ export async function previewPayment(req: AuthRequest, res: Response, next: Next
     const rawQueryUnitId = Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string);
     const unitId = bodyUnitId || rawQueryUnitId || (req.user!.unitId as string);
     if (!employeeId || !commissionIds?.length || !date) {
-      res.status(400).json({ message: 'Campos obrigatórios: employeeId, commissionIds, date.' });
+      next(new AppError('Campos obrigatórios: employeeId, commissionIds, date.', 400, 'VALIDATION_ERROR'));
       return;
     }
     const appScope = req.headers['x-app-scope'] as string | undefined;
@@ -106,7 +107,7 @@ export async function registerPayment(req: AuthRequest, res: Response, next: Nex
     const rawQueryUnitId = Array.isArray(req.query.unitId) ? (req.query.unitId[0] as string) : (req.query.unitId as string);
     const unitId = bodyUnitId || rawQueryUnitId || (req.user!.unitId as string);
     if (!employeeId || !commissionIds?.length || !date) {
-      res.status(400).json({ message: 'Campos obrigatórios: employeeId, commissionIds, date.' });
+      next(new AppError('Campos obrigatórios: employeeId, commissionIds, date.', 400, 'VALIDATION_ERROR'));
       return;
     }
     const appScope = req.headers['x-app-scope'] as string | undefined;

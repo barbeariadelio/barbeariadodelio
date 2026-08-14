@@ -4,12 +4,13 @@ import { randomBytes } from 'crypto';
 import path from 'path';
 import { r2, R2_BUCKET, R2_PUBLIC_URL } from '../../shared/utils/r2';
 import { logger } from '../../shared/utils/logger';
+import { AppError } from '../../shared/errors/AppError';
 
 export async function uploadServiceImage(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const file = req.file;
     if (!file) {
-      res.status(400).json({ message: 'Nenhum arquivo enviado.' });
+      next(new AppError('Nenhum arquivo enviado.', 400, 'VALIDATION_ERROR'));
       return;
     }
 
@@ -33,7 +34,7 @@ export async function uploadAvatar(req: Request, res: Response, next: NextFuncti
   try {
     const file = req.file;
     if (!file) {
-      res.status(400).json({ message: 'Nenhum arquivo enviado.' });
+      next(new AppError('Nenhum arquivo enviado.', 400, 'VALIDATION_ERROR'));
       return;
     }
 

@@ -11,6 +11,11 @@ describe('public route rate limits', () => {
     }
 
     expect(response?.status).toBe(429);
+    expect(response?.headers['x-request-id']).toEqual(expect.any(String));
+    expect(response?.body).toMatchObject({
+      code: 'RATE_LIMITED',
+      requestId: expect.any(String),
+    });
   });
 
   it('counts guest bookings per client rather than globally', async () => {
@@ -29,5 +34,17 @@ describe('public route rate limits', () => {
     }
 
     expect(statuses).not.toContain(429);
+  });
+
+  it('returns the standard error contract for an unknown API endpoint', async () => {
+    const response = await request(app).get('/auth/does-not-exist');
+
+    expect(response.status).toBe(404);
+    expect(response.headers['x-request-id']).toEqual(expect.any(String));
+    expect(response.body).toMatchObject({
+      message: 'Rota não encontrado(a)',
+      code: 'NOT_FOUND',
+      requestId: expect.any(String),
+    });
   });
 });
