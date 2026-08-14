@@ -7,3 +7,5 @@ export type { ScheduleAppointment, ScheduleEmployee } from './components/StaffSc
 export { default as ConfirmModal } from './components/ConfirmModal/ConfirmModal';
 
 export { ThemeProvider, useTheme } from './contexts/ThemeContext';
+
+export { ApiErrorNotifications, AppErrorBoundary } from './components/AppErrorFeedback/AppErrorFeedback';
