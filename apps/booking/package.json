@@ -17,6 +17,7 @@
     "axios": "^1.7.0",
     "@barber/types": "*",
     "@barber/utils": "*",
+    "@barber/ui": "*",
     "@barber/styles": "*"
   },
   "devDependencies": {
