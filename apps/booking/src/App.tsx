@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { lazy, Suspense, useEffect } from 'react';
+import { bookingRouteDefinitions } from './routes';
 
 const Landing = lazy(() => import('./pages/Landing/Landing'));
 const Book = lazy(() => import('./pages/Book/Book'));
@@ -24,6 +25,13 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/appointments/guest" element={<GuestBook />} />
+        {bookingRouteDefinitions.map((route) => (
+          <Route
+            key={route.path}
+            path={route.path}
+            element={<Navigate to={route.redirectTo} replace />}
+          />
+        ))}
       </Routes>
     </Suspense>
   );
