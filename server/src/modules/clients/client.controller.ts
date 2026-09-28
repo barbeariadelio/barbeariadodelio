@@ -40,7 +40,11 @@ export async function getClient(req: AuthRequest, res: Response, next: NextFunct
 
 export async function createClient(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    const unitId = req.body.unitId || req.user!.unitId;
+    // Must match resolveUnitId's precedence (X-Unit-ID header / ?unitId=)
+    // used by listClients — otherwise a client created while an owner has a
+    // different unit selected in the UI silently lands on their JWT's home
+    // unit instead, and never shows up in the unit they were looking at.
+    const unitId = req.body.unitId || resolveUnitId(req) || req.user!.unitId;
 
     // Security check
     const isOwnerOrFranchisor = req.user!.role === 'owner';

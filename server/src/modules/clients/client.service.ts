@@ -14,7 +14,8 @@ const populateOptions = {
 
 export class ClientService {
   async findByUnit(unitId: string, pagination?: { skip: number, limit: number }): Promise<IClient[]> {
-    let query = ClientModel.find({ unitId }).populate(populateOptions).sort({ name: 1 });
+    // _id tiebreaker keeps skip/limit pages stable when names repeat.
+    let query = ClientModel.find({ unitId }).populate(populateOptions).sort({ name: 1, _id: 1 });
     if (pagination) {
       query = query.skip(pagination.skip).limit(pagination.limit);
     }
@@ -41,7 +42,7 @@ export class ClientService {
     let q = ClientModel.find({
       unitId,
       $or: orConditions,
-    }).populate(populateOptions).sort({ name: 1 });
+    }).populate(populateOptions).sort({ name: 1, _id: 1 });
 
     if (pagination) {
       q = q.skip(pagination.skip).limit(pagination.limit);

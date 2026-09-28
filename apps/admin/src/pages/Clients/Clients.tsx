@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
-import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation, useInfiniteQuery } from '@tanstack/react-query';
 import { api, getSelectedUnitId } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
 import ClientForm from './ClientForm';
@@ -83,6 +83,7 @@ const STATUS_LABELS: Record<string, string> = {
   completed: 'Concluído',
   cancelled: 'Cancelado',
 };
+const CLIENTS_PAGE_SIZE = 30;
 
 function formatCurrency(v: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
@@ -250,15 +251,43 @@ export default function Clients() {
     setTimeout(() => setCopiedField(null), 1500);
   };
 
-  const { data: clients = [], isLoading } = useQuery<Client[]>({
-    queryKey: ['clients', debouncedSearch, unitId],
-    queryFn: async () => {
-      const params = debouncedSearch ? `?q=${encodeURIComponent(debouncedSearch)}` : '';
-      const { data } = await api.get(`/clients${params}`);
-      return Array.isArray(data) ? data : data.clients ?? [];
+  const {
+    data: clientsData,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['clients', 'list', debouncedSearch, unitId],
+    queryFn: async ({ pageParam }) => {
+      const params = new URLSearchParams({ page: String(pageParam), limit: String(CLIENTS_PAGE_SIZE) });
+      if (debouncedSearch) params.set('q', debouncedSearch);
+      const { data } = await api.get(`/clients?${params.toString()}`);
+      return (Array.isArray(data) ? data : data.clients ?? []) as Client[];
     },
+    initialPageParam: 1,
+    getNextPageParam: (lastPage, allPages) => (lastPage.length === CLIENTS_PAGE_SIZE ? allPages.length + 1 : undefined),
     enabled: !!user,
   });
+  const clients = useMemo(() => clientsData?.pages.flat() ?? [], [clientsData]);
+
+  // Infinite scroll: load the next page as the user scrolls near the bottom
+  // of the (internally scrollable) client list.
+  const clientListRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = clientListRef.current;
+    const target = loadMoreRef.current;
+    if (!root || !target) return;
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage) fetchNextPage();
+      },
+      { root, rootMargin: '200px' }
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage, clients.length]);
 
   const { data: appointments = [] } = useQuery<AppointmentItem[]>({
     queryKey: ['client-appointments', selectedId],
@@ -300,7 +329,7 @@ export default function Clients() {
     queryKey: ['clients-merge-search', debouncedMergeSearch, unitId],
     queryFn: async () => {
       if (!debouncedMergeSearch.trim()) return [];
-      const { data } = await api.get(`/clients?q=${encodeURIComponent(debouncedMergeSearch)}`);
+      const { data } = await api.get(`/clients?limit=50&q=${encodeURIComponent(debouncedMergeSearch)}`);
       const all: Client[] = Array.isArray(data) ? data : data.clients ?? [];
       return all.filter(c => c._id !== selectedId);
     },
@@ -564,7 +593,7 @@ export default function Clients() {
             <p className={styles.empty}>Nenhum cliente encontrado.</p>
           )}
 
-          <div className={styles.clientList}>
+          <div className={styles.clientList} ref={clientListRef}>
             {clients.map(client => (
               <div
                 key={client._id}
@@ -583,6 +612,11 @@ export default function Clients() {
                 <span className={styles.arrow}>{selectedId === client._id ? '✕' : '›'}</span>
               </div>
             ))}
+            {hasNextPage && (
+              <div ref={loadMoreRef} className={styles.empty} style={{ padding: '0.5rem 0' }}>
+                {isFetchingNextPage ? 'Carregando mais...' : ''}
+              </div>
+            )}
           </div>
         </div>
 

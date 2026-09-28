@@ -88,21 +88,21 @@ export class AuthService {
           allowedApps: ['booking'],
         });
 
-        // Link existing Client record (internally created) or create a new one
+        // Only link Client records staff already created for this phone. Don't
+        // create one here: Client.unitId is required and the unit isn't known
+        // until booking — createAppointment creates the per-unit record then.
+        // (Creating it here without a unit threw, failing every first login.)
+        // Records still pointing at a deleted account are relinked too, since
+        // deleteAccount doesn't clear Client.userId; live accounts are left alone.
         const { ClientModel } = await import('../clients/client.model');
-        const existingClient = await ClientModel.findOne({ phone: cleanPhone });
-        if (existingClient) {
-          existingClient.userId = user._id as any;
-          await existingClient.save();
-        } else {
-          await ClientModel.create({
-            name,
-            phone: cleanPhone,
-            email: guestEmail,
-            userId: user._id,
-            isActive: true,
-          });
-        }
+        const linkedUserIds = await ClientModel.distinct('userId', { phone: cleanPhone });
+        const liveUserIds = linkedUserIds.length
+          ? await UserModel.distinct('_id', { _id: { $in: linkedUserIds } })
+          : [];
+        await ClientModel.updateMany(
+          { phone: cleanPhone, userId: { $nin: liveUserIds } },
+          { $set: { userId: user._id } }
+        );
       } else {
         // Ensure user is active
         if (!user.isActive) {
