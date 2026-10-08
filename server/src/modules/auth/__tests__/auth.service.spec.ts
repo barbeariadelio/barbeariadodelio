@@ -56,7 +56,7 @@ describe('AuthService.bookingLogin', () => {
   const newUser = {
     _id: { toString: () => 'client-1' },
     name: 'Cliente Novo',
-    phone: '11988887777',
+    phone: { $in: ['11988887777', '5511988887777'] },
     role: 'client',
     tokenVersion: 0,
     isActive: true,
@@ -74,7 +74,7 @@ describe('AuthService.bookingLogin', () => {
     expect(result.accessToken).toBeTruthy();
     expect(ClientModel.create).not.toHaveBeenCalled();
     expect(ClientModel.updateMany).toHaveBeenCalledWith(
-      { phone: '11988887777', userId: { $nin: [] } },
+      { phone: { $in: ['11988887777', '5511988887777'] }, userId: { $nin: [] } },
       { $set: { userId: newUser._id } },
     );
   });
@@ -92,10 +92,10 @@ describe('AuthService.bookingLogin', () => {
       _id: { $in: ['deleted-user', 'live-user'] },
       role: 'client',
       isActive: true,
-      phone: '11988887777',
+      phone: { $in: ['11988887777', '5511988887777'] },
     });
     expect(ClientModel.updateMany).toHaveBeenCalledWith(
-      { phone: '11988887777', userId: { $nin: ['live-user'] } },
+      { phone: { $in: ['11988887777', '5511988887777'] }, userId: { $nin: ['live-user'] } },
       { $set: { userId: newUser._id } },
     );
   });
@@ -105,7 +105,7 @@ describe('AuthService.bookingLogin', () => {
     const currentUser = {
       _id: { toString: () => 'current-client' },
       name: 'Cliente Atual',
-      phone: '11988887777',
+      phone: { $in: ['11988887777', '5511988887777'] },
       role: 'client',
       tokenVersion: 0,
       isActive: true,
@@ -123,10 +123,10 @@ describe('AuthService.bookingLogin', () => {
       _id: { $in: ['old-client'] },
       role: 'client',
       isActive: true,
-      phone: '11988887777',
+      phone: { $in: ['11988887777', '5511988887777'] },
     });
     expect(ClientModel.updateMany).toHaveBeenCalledWith(
-      { phone: '11988887777', userId: { $nin: [] } },
+      { phone: { $in: ['11988887777', '5511988887777'] }, userId: { $nin: [] } },
       { $set: { userId: currentUser._id } },
     );
   });

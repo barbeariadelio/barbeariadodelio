@@ -10,6 +10,8 @@ import { env } from '../../config/env';
 import { NotFoundError, AppError } from '../../shared/errors/AppError';
 import { getSlotCache, setSlotCache, invalidateSlotCache } from '../../shared/cache/slotCache';
 import type { AppointmentStatus, TransactionCategory } from '@barber/types';
+import { ClientOwnershipService } from '../clients/client-ownership.service';
+import { getPhoneVariants, normalizePhone } from '../../shared/utils/phone';
 
 interface GuestBookResult {
   appointment: IAppointment;
@@ -185,6 +187,8 @@ import { IClient } from '../clients/client.model';
 interface PopulatedService extends IService { _id: mongoose.Types.ObjectId }
 interface PopulatedClient extends IClient { _id: mongoose.Types.ObjectId }
 
+const clientOwnershipService = new ClientOwnershipService();
+
 export class AppointmentService {
   async findByUnitAndDate(unitId: string, date?: string, start?: string, end?: string, pagination?: { skip: number, limit: number }, employeeId?: string): Promise<IAppointment[]> {
     const filter: Record<string, unknown> = { unitId, status: { $ne: 'cancelled' } };
@@ -225,20 +229,7 @@ export class AppointmentService {
   }
 
   async findByUserId(userId: string): Promise<IAppointment[]> {
-    const user = await UserModel.findById(userId).select('phone').lean();
-
-    const orConditions: Record<string, unknown>[] = [{ userId: new mongoose.Types.ObjectId(userId) }];
-    if (user?.phone) {
-      // Fallback for client records created by staff that never got linked to
-      // this user's account (e.g. a duplicate registered because the phone
-      // search couldn't find the existing client). Only matches records that
-      // aren't already linked to a *different* user, so we never leak
-      // someone else's appointments.
-      orConditions.push({ userId: { $exists: false }, phone: user.phone });
-    }
-
-    const clients = await ClientModel.find({ $or: orConditions });
-    const clientIds = clients.map(c => c._id);
+    const clientIds = await clientOwnershipService.findClientIdsForUser(userId);
     return AppointmentModel.find({ clientId: { $in: clientIds } })
       .populate('serviceId', 'name price')
       .populate('employeeId', 'name')
@@ -534,7 +525,8 @@ export class AppointmentService {
       throw new AppError('Agendamentos online devem ser feitos com pelo menos 30 minutos de antecedência.', 400);
     }
 
-    const cleanPhone = guestPhone.replace(/\D/g, '');
+    const cleanPhone = normalizePhone(guestPhone);
+    const phoneVariants = getPhoneVariants(guestPhone);
     if (cleanPhone.length < 10) {
       throw new AppError('Informe um telefone válido.', 400);
     }
@@ -543,9 +535,9 @@ export class AppointmentService {
     // Batch 1: all independent reads in parallel
     const [svc, existingClient, userByEmail, userByPhone, employee] = await Promise.all([
       ServiceModel.findById(serviceId),
-      ClientModel.findOne({ phone: cleanPhone, unitId }),
+      ClientModel.findOne({ phone: { $in: phoneVariants }, unitId }),
       UserModel.findOne({ email: guestEmail }),
-      UserModel.findOne({ phone: cleanPhone }),
+      UserModel.findOne({ phone: { $in: phoneVariants } }),
       UserModel.findById(employeeId).select('unitId role isActive allowOnlineBooking serviceIds vacations blockedDays workSchedule daySchedules').lean(),
     ]);
 
@@ -640,7 +632,7 @@ export class AppointmentService {
           });
         } catch (error: any) {
           if (error?.code === 11000) {
-            userAccount = await UserModel.findOne({ $or: [{ email: guestEmail }, { phone: cleanPhone }] });
+            userAccount = await UserModel.findOne({ $or: [{ email: guestEmail }, { phone: { $in: phoneVariants } }] });
           }
           if (userAccount && userAccount.role !== 'client') {
             throw new AppError('Este telefone estÃ¡ vinculado a uma conta interna. Use outro telefone para o agendamento.', 409);

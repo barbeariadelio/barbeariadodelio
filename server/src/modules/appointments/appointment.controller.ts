@@ -5,11 +5,14 @@ import { ok, created } from '../../shared/utils/responseHelper';
 import { notificationService } from '../notifications/notification.service';
 import { ClientModel } from '../clients/client.model';
 import { AppointmentModel } from './appointment.model';
-import { UserModel } from '../auth/auth.model';
 import { AppError } from '../../shared/errors/AppError';
 import { sseService } from '../events/sse.service';
+import { ClientOwnershipService } from '../clients/client-ownership.service';
+import { ClientService } from '../clients/client.service';
 
 const service = new AppointmentService();
+const clientOwnershipService = new ClientOwnershipService();
+const clientService = new ClientService();
 
 export async function listAppointments(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -42,9 +45,8 @@ export async function getAppointment(req: AuthRequest, res: Response, next: Next
     if (!isOwnerOrFranchisor) {
       // If client, must be the owner of the appointment
       if (req.user!.role === 'client') {
-        const clients = await ClientModel.find({ userId: req.user!.id });
-        const clientIds = clients.map(c => c._id.toString());
-        if (!clientIds.includes(appt.clientId?.toString() || '')) {
+        const canAccess = await clientOwnershipService.canUserAccessClient(req.user!.id, appt.clientId?.toString() || '');
+        if (!canAccess) {
           throw new AppError('Access denied', 403);
         }
       } else {
@@ -103,7 +105,7 @@ export async function createAppointment(req: AuthRequest, res: Response, next: N
       const allowedClientFields = new Set(['unitId', 'serviceId', 'employeeId', 'date', 'startTime', 'notes']);
       const forbiddenField = Object.keys(data).find(field => !allowedClientFields.has(field));
       if (forbiddenField) {
-        throw new AppError(`Clientes nÃ£o podem definir o campo interno \"${forbiddenField}\".`, 403);
+        throw new AppError(`Clientes nÃ£o podem definir o campo interno "${forbiddenField}".`, 403);
       }
 
       data = Object.fromEntries(
@@ -131,28 +133,8 @@ export async function createAppointment(req: AuthRequest, res: Response, next: N
 
     // For blocked slots, no client lookup needed
     if (data.status !== 'blocked' && !data.clientId && req.user) {
-      // Always look up (or create) a client record scoped to the target unit.
-      // This ensures cross-unit bookings get their own client entry in that unit.
-      let client = await ClientModel.findOne({ userId: req.user.id, unitId: data.unitId });
-
-      if (!client) {
-        const user = await UserModel.findById(req.user.id);
-        if (user) {
-          client = await ClientModel.create({
-            name: user.name,
-            email: user.email || `user_${user._id}@delio.internal`,
-            phone: user.phone,
-            userId: user._id,
-            unitId: data.unitId,
-          });
-        }
-      }
-
-      if (client) {
-        data.clientId = client._id;
-      } else {
-        throw new AppError('Client record not found and could not be created', 404);
-      }
+      const client = await clientService.findOrCreateForUserAndUnit(req.user.id, data.unitId as string);
+      data.clientId = client._id;
     }
     data.source = req.user!.role === 'client' ? 'client' : 'admin';
     const appt = await service.create(data);
@@ -222,9 +204,8 @@ export async function updateAppointmentStatus(req: AuthRequest, res: Response, n
     }
     if (!isOwnerOrFranchisor) {
       if (req.user!.role === 'client') {
-        const clients = await ClientModel.find({ userId: req.user!.id });
-        const clientIds = clients.map(c => c._id.toString());
-        if (!clientIds.includes(appt.clientId?.toString() || '')) {
+        const canAccess = await clientOwnershipService.canUserAccessClient(req.user!.id, appt.clientId?.toString() || '');
+        if (!canAccess) {
           throw new AppError('You can only update your own appointments', 403);
         }
       } else {
@@ -289,9 +270,8 @@ export async function getClientAppointments(req: AuthRequest, res: Response, nex
     
     // Security check for client role
     if (req.user!.role === 'client') {
-      const clients = await ClientModel.find({ userId: req.user!.id });
-      const clientIds = clients.map(c => c._id.toString());
-      if (!clientIds.includes(clientId)) {
+      const canAccess = await clientOwnershipService.canUserAccessClient(req.user!.id, clientId);
+      if (!canAccess) {
         throw new AppError('Access denied', 403);
       }
     } else if (req.user!.role !== 'owner') {
@@ -317,9 +297,8 @@ export async function updateAppointment(req: AuthRequest, res: Response, next: N
     const isOwnerOrFranchisor = req.user!.role === 'owner';
     if (!isOwnerOrFranchisor) {
       if (req.user!.role === 'client') {
-        const clients = await ClientModel.find({ userId: req.user!.id });
-        const clientIds = clients.map(c => c._id.toString());
-        if (!clientIds.includes(appt.clientId?.toString() || '')) {
+        const canAccess = await clientOwnershipService.canUserAccessClient(req.user!.id, appt.clientId?.toString() || '');
+        if (!canAccess) {
           throw new AppError('You can only update your own appointments', 403);
         }
       } else {
@@ -335,7 +314,7 @@ export async function updateAppointment(req: AuthRequest, res: Response, next: N
       const allowedClientFields = new Set(['serviceId', 'employeeId', 'date', 'startTime', 'notes']);
       const forbiddenField = Object.keys(updateData).find(field => !allowedClientFields.has(field));
       if (forbiddenField) {
-        throw new AppError(`Clientes nÃ£o podem alterar o campo interno \"${forbiddenField}\".`, 403);
+        throw new AppError(`Clientes nÃ£o podem alterar o campo interno "${forbiddenField}".`, 403);
       }
 
       updateData = Object.fromEntries(

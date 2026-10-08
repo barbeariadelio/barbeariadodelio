@@ -61,6 +61,14 @@ describe('AppointmentService.guestBook', () => {
       guestName: 'Cliente Teste',
       guestPhone: '11999999999',
     })).rejects.toMatchObject({ statusCode: 409 });
+
+    expect(mocks.clientFindOne).toHaveBeenCalledWith({
+      phone: { $in: ['11999999999', '5511999999999'] },
+      unitId: 'unit-1',
+    });
+    expect(mocks.userFindOne).toHaveBeenCalledWith({
+      phone: { $in: ['11999999999', '5511999999999'] },
+    });
   });
 
   it('rejects a public booking outside the employee available slots', async () => {

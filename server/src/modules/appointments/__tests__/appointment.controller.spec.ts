@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   clientFindById: vi.fn(),
   notify: vi.fn(),
   emit: vi.fn(),
+  canUserAccessClient: vi.fn(),
 }));
 
 vi.mock('../appointment.service', () => ({
@@ -31,6 +32,11 @@ vi.mock('../../clients/client.model', () => ({
 }));
 
 vi.mock('../../auth/auth.model', () => ({ UserModel: {} }));
+vi.mock('../../clients/client-ownership.service', () => ({
+  ClientOwnershipService: class {
+    canUserAccessClient = mocks.canUserAccessClient;
+  },
+}));
 vi.mock('../../notifications/notification.service', () => ({ notificationService: { notify: mocks.notify } }));
 vi.mock('../../events/sse.service', () => ({ sseService: { emit: mocks.emit } }));
 
@@ -61,6 +67,7 @@ describe('appointment client permissions', () => {
     mocks.clientFind.mockResolvedValue([{ _id: { toString: () => 'client-1' } }]);
     mocks.clientFindById.mockResolvedValue({ name: 'Cliente' });
     mocks.notify.mockResolvedValue(undefined);
+    mocks.canUserAccessClient.mockResolvedValue(true);
   });
 
   it('rejects a client attempt to create a blocked slot', async () => {

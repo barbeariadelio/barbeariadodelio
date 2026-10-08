@@ -5,6 +5,7 @@ import { UserModel, type IUser } from './auth.model';
 import { env } from '../../config/env';
 import { AppError } from '../../shared/errors/AppError';
 import type { AuthTokens, UserRole, LoginResponse } from '@barber/types';
+import { getPhoneVariants, normalizePhone } from '../../shared/utils/phone';
 
 export class AuthService {
   async login(identifier: string, password: string, appId?: string): Promise<LoginResponse> {
@@ -49,19 +50,20 @@ export class AuthService {
 
   private async linkClientRecordsByPhone(userId: mongoose.Types.ObjectId, cleanPhone: string): Promise<void> {
     const { ClientModel } = await import('../clients/client.model');
-    const linkedUserIds = await ClientModel.distinct('userId', { phone: cleanPhone });
+    const phoneVariants = getPhoneVariants(cleanPhone);
+    const linkedUserIds = await ClientModel.distinct('userId', { phone: { $in: phoneVariants } });
     const activeMatchingClientUserIds = linkedUserIds.length
       ? await UserModel.distinct('_id', {
           _id: { $in: linkedUserIds },
           role: 'client',
           isActive: true,
-          phone: cleanPhone,
+          phone: { $in: phoneVariants },
         })
       : [];
 
     await ClientModel.updateMany(
       {
-        phone: cleanPhone,
+        phone: { $in: phoneVariants },
         userId: { $nin: activeMatchingClientUserIds },
       },
       { $set: { userId } },
@@ -70,7 +72,8 @@ export class AuthService {
 
   async bookingLogin(name: string, phone: string): Promise<LoginResponse> {
     try {
-      const cleanPhone = phone.replace(/\D/g, '');
+      const cleanPhone = normalizePhone(phone);
+      const phoneVariants = getPhoneVariants(phone);
       if (!name || cleanPhone.length < 10) {
         throw new AppError('Informe seu nome e um telefone válido.', 400);
       }
@@ -82,10 +85,10 @@ export class AuthService {
       // "11923415678" — letting a caller land a token for someone else's
       // account. Never loosen this back to a subsequence/regex match.)
       // Only a client account may be used by the public booking flow.
-      let user = await UserModel.findOne({ phone: cleanPhone, role: 'client' });
+      let user = await UserModel.findOne({ phone: { $in: phoneVariants }, role: 'client' });
 
       if (!user) {
-        const internalAccount = await UserModel.findOne({ phone: cleanPhone });
+        const internalAccount = await UserModel.findOne({ phone: { $in: phoneVariants } });
         if (internalAccount) {
           throw new AppError('Este telefone estÃ¡ vinculado a uma conta interna. Use outro telefone para o agendamento pÃºblico.', 409);
         }

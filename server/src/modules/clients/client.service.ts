@@ -1,11 +1,17 @@
+import mongoose from 'mongoose';
 import { ClientModel, IClient } from './client.model';
-import { NotFoundError, ForbiddenError } from '../../shared/errors/AppError';
+import { NotFoundError, ForbiddenError, AppError } from '../../shared/errors/AppError';
+import { getPhoneVariants, normalizePhone } from '../../shared/utils/phone';
+import { ClientOwnershipService } from './client-ownership.service';
+import { UserModel } from '../auth/auth.model';
 import { escapeRegex } from '../../shared/utils/regex';
 
 // Reassigning a client to a different unit, or re-linking it to a different
 // login account, moves the record (and its full history) across the unit
 // boundary — only the owner (full administrative access) may do that.
 const OWNER_ONLY_CLIENT_FIELDS = ['unitId', 'userId'];
+
+const clientOwnershipService = new ClientOwnershipService();
 
 const populateOptions = {
   path: 'packages.packageId',
@@ -58,30 +64,59 @@ export class ClientService {
   }
 
   async create(data: Partial<IClient>): Promise<IClient> {
-    const phoneDigits = (data.phone || '').replace(/\D/g, '');
+    const phoneDigits = normalizePhone(data.phone);
+    const phoneVariants = getPhoneVariants(data.phone);
 
-    // Guard against duplicate registrations: if a client with this phone
-    // already exists in the unit (e.g. staff couldn't find them via search
-    // and hit "Cadastrar novo cliente"), reuse the existing record instead
-    // of creating an unlinked duplicate that would hide future appointments
-    // from the client's own account.
-    if (phoneDigits && data.unitId) {
-      const existing = await ClientModel.findOne({ unitId: data.unitId, phone: phoneDigits });
-      if (existing) return existing;
+    if (phoneVariants.length && data.unitId) {
+      const existing = await ClientModel.findOne({ unitId: data.unitId, phone: { $in: phoneVariants } });
+      if (existing) {
+        if (!existing.userId) {
+          const matchingUser = await clientOwnershipService.findActiveClientUserByPhone(phoneDigits);
+          if (matchingUser) {
+            existing.userId = matchingUser._id;
+            await existing.save();
+          }
+        }
+        return existing;
+      }
     }
 
     const clientData: Partial<IClient> = phoneDigits ? { ...data, phone: phoneDigits } : data;
-
-    // Auto-link to a matching user account by phone (mirrors the guest
-    // self-booking flow), so appointments booked by staff for this client
-    // are visible in the client's own account from the start.
     if (!clientData.userId && phoneDigits) {
-      const { UserModel } = await import('../auth/auth.model');
-      const user = await UserModel.findOne({ phone: phoneDigits });
-      if (user) clientData.userId = user._id as any;
+      const matchingUser = await clientOwnershipService.findActiveClientUserByPhone(phoneDigits);
+      if (matchingUser) clientData.userId = matchingUser._id;
     }
 
     return ClientModel.create(clientData);
+  }
+
+  async findOrCreateForUserAndUnit(userId: string, unitId: string): Promise<IClient> {
+    const user = await UserModel.findById(userId);
+    if (!user) throw new NotFoundError('User');
+
+    const existingByUser = await ClientModel.findOne({ userId, unitId });
+    if (existingByUser) return existingByUser;
+
+    const phoneVariants = getPhoneVariants(user.phone);
+    if (phoneVariants.length) {
+      const existingByPhone = await ClientModel.findOne({ unitId, phone: { $in: phoneVariants } });
+      if (existingByPhone) {
+        if (existingByPhone.userId && existingByPhone.userId.toString() !== userId) {
+          throw new AppError('Este telefone já está vinculado a outra conta de cliente.', 409);
+        }
+        existingByPhone.userId = user._id;
+        await existingByPhone.save();
+        return existingByPhone;
+      }
+    }
+
+    return this.create({
+      name: user.name,
+      email: user.email || `user_${user._id}@delio.internal`,
+      phone: normalizePhone(user.phone),
+      userId: user._id,
+      unitId: unitId as unknown as IClient['unitId'],
+    });
   }
 
   async update(id: string, data: Partial<IClient>, requesterRole?: string): Promise<IClient> {
@@ -91,7 +126,26 @@ export class ClientService {
         throw new ForbiddenError(`Somente o dono pode alterar o campo "${forbiddenField}".`);
       }
     }
-    const client = await ClientModel.findByIdAndUpdate(id, data, { new: true, runValidators: true });
+
+    const updateData: Partial<IClient> = { ...data };
+    if (data.phone !== undefined) {
+      updateData.phone = normalizePhone(data.phone);
+      const current = await ClientModel.findById(id);
+      if (current?.userId) {
+        const linkedUser = await UserModel.findById(current.userId);
+        if (!linkedUser || normalizePhone(linkedUser.phone) !== updateData.phone) {
+          const client = await ClientModel.findByIdAndUpdate(
+            id,
+            { ...updateData, $unset: { userId: 1 } },
+            { new: true, runValidators: true },
+          );
+          if (!client) throw new NotFoundError('Client');
+          return client;
+        }
+      }
+    }
+
+    const client = await ClientModel.findByIdAndUpdate(id, updateData, { new: true, runValidators: true });
     if (!client) throw new NotFoundError('Client');
     return client;
   }
@@ -155,6 +209,17 @@ export class ClientService {
     ]);
     if (!source) throw new NotFoundError('Client');
     if (!target) throw new NotFoundError('Client');
+
+    const linkedUserIds = [source.userId, target.userId]
+      .filter((id): id is mongoose.Types.ObjectId => Boolean(id))
+      .map(id => id.toString());
+    const linkedUsers = linkedUserIds.length
+      ? await UserModel.find({ _id: { $in: [...new Set(linkedUserIds)] } })
+      : [];
+    const activeClientOwners = linkedUsers.filter(user => user.role === 'client' && user.isActive === true);
+    if (new Set(activeClientOwners.map(user => user._id.toString())).size > 1) {
+      throw new AppError('NÃ£o Ã© possÃ­vel mesclar registros vinculados a contas de clientes ativas diferentes.', 409);
+    }
 
     const { AppointmentModel } = await import('../appointments/appointment.model');
     await AppointmentModel.updateMany({ clientId: sourceId }, { $set: { clientId: targetId } });
