@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { UserModel } from './auth.model';
+import mongoose from 'mongoose';
+import jwt, { type SignOptions } from 'jsonwebtoken';
+import { UserModel, type IUser } from './auth.model';
 import { env } from '../../config/env';
 import { AppError } from '../../shared/errors/AppError';
 import type { AuthTokens, UserRole, LoginResponse } from '@barber/types';
@@ -43,11 +44,28 @@ export class AuthService {
       user.role !== 'client',
     );
 
-    const userObj = user.toObject();
-    delete (userObj as any).passwordHash;
-    delete (userObj as any).passwordPlain;
+    return { ...tokens, user: this.toLoginUser(user) };
+  }
 
-    return { ...tokens, user: userObj as any };
+  private async linkClientRecordsByPhone(userId: mongoose.Types.ObjectId, cleanPhone: string): Promise<void> {
+    const { ClientModel } = await import('../clients/client.model');
+    const linkedUserIds = await ClientModel.distinct('userId', { phone: cleanPhone });
+    const activeMatchingClientUserIds = linkedUserIds.length
+      ? await UserModel.distinct('_id', {
+          _id: { $in: linkedUserIds },
+          role: 'client',
+          isActive: true,
+          phone: cleanPhone,
+        })
+      : [];
+
+    await ClientModel.updateMany(
+      {
+        phone: cleanPhone,
+        userId: { $nin: activeMatchingClientUserIds },
+      },
+      { $set: { userId } },
+    );
   }
 
   async bookingLogin(name: string, phone: string): Promise<LoginResponse> {
@@ -88,21 +106,7 @@ export class AuthService {
           allowedApps: ['booking'],
         });
 
-        // Only link Client records staff already created for this phone. Don't
-        // create one here: Client.unitId is required and the unit isn't known
-        // until booking — createAppointment creates the per-unit record then.
-        // (Creating it here without a unit threw, failing every first login.)
-        // Records still pointing at a deleted account are relinked too, since
-        // deleteAccount doesn't clear Client.userId; live accounts are left alone.
-        const { ClientModel } = await import('../clients/client.model');
-        const linkedUserIds = await ClientModel.distinct('userId', { phone: cleanPhone });
-        const liveUserIds = linkedUserIds.length
-          ? await UserModel.distinct('_id', { _id: { $in: linkedUserIds } })
-          : [];
-        await ClientModel.updateMany(
-          { phone: cleanPhone, userId: { $nin: liveUserIds } },
-          { $set: { userId: user._id } }
-        );
+        await this.linkClientRecordsByPhone(user._id, cleanPhone);
       } else {
         // Ensure user is active
         if (!user.isActive) {
@@ -115,12 +119,7 @@ export class AuthService {
           await user.save();
         }
 
-        // Ensure any existing Client records for this phone are linked to this user
-        const { ClientModel } = await import('../clients/client.model');
-        await ClientModel.updateMany(
-          { phone: cleanPhone, userId: { $exists: false } },
-          { $set: { userId: user._id } }
-        );
+        await this.linkClientRecordsByPhone(user._id, cleanPhone);
       }
 
       const tokens = this.generateTokens(
@@ -130,11 +129,7 @@ export class AuthService {
         user.unitId?.toString(),
       );
 
-      const userObj = user.toObject();
-      delete (userObj as any).passwordHash;
-      delete (userObj as any).passwordPlain;
-
-      return { ...tokens, user: userObj as any };
+      return { ...tokens, user: this.toLoginUser(user) };
     } catch (e) {
       console.error('[bookingLogin Error]:', e);
       throw e;
@@ -263,12 +258,33 @@ export class AuthService {
     }
   }
 
+  private toLoginUser(user: IUser): LoginResponse['user'] {
+    const userObj = user.toObject();
+    const createdAt =
+      'createdAt' in userObj && userObj.createdAt instanceof Date
+        ? userObj.createdAt.toISOString()
+        : '';
+
+    return {
+      _id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      ...(user.unitId ? { unitId: user.unitId.toString() } : {}),
+      phone: user.phone,
+      ...(user.avatar ? { avatar: user.avatar } : {}),
+      isActive: user.isActive,
+      ...(user.allowedApps ? { allowedApps: user.allowedApps } : {}),
+      ...(user.theme ? { theme: user.theme } : {}),
+      createdAt,
+    };
+  }
   private generateTokens(id: string, role: UserRole, tokenVersion: number, unitId?: string, persistentSession = false): AuthTokens {
     const accessToken = this.signAccess(id, role, unitId, tokenVersion, persistentSession);
     const refreshPayload = { id, role, unitId, tokenVersion, persistentSession: persistentSession || undefined };
     const refreshToken = persistentSession
       ? jwt.sign(refreshPayload, env.jwtRefreshSecret)
-      : jwt.sign(refreshPayload, env.jwtRefreshSecret, { expiresIn: env.jwtRefreshExpiresIn as any });
+      : jwt.sign(refreshPayload, env.jwtRefreshSecret, { expiresIn: env.jwtRefreshExpiresIn as SignOptions['expiresIn'] });
     return { accessToken, refreshToken };
   }
 
@@ -276,6 +292,6 @@ export class AuthService {
     const accessPayload = { id, role, unitId, tokenVersion, persistentSession: persistentSession || undefined };
     return persistentSession
       ? jwt.sign(accessPayload, env.jwtSecret)
-      : jwt.sign(accessPayload, env.jwtSecret, { expiresIn: env.jwtExpiresIn as any });
+      : jwt.sign(accessPayload, env.jwtSecret, { expiresIn: env.jwtExpiresIn as SignOptions['expiresIn'] });
   }
 }

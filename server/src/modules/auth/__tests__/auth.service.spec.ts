@@ -88,10 +88,46 @@ describe('AuthService.bookingLogin', () => {
 
     await service.bookingLogin('Cliente Novo', '(11) 98888-7777');
 
-    expect(UserModel.distinct).toHaveBeenCalledWith('_id', { _id: { $in: ['deleted-user', 'live-user'] } });
+    expect(UserModel.distinct).toHaveBeenCalledWith('_id', {
+      _id: { $in: ['deleted-user', 'live-user'] },
+      role: 'client',
+      isActive: true,
+      phone: '11988887777',
+    });
     expect(ClientModel.updateMany).toHaveBeenCalledWith(
       { phone: '11988887777', userId: { $nin: ['live-user'] } },
       { $set: { userId: newUser._id } },
+    );
+  });
+
+  it('relinks client records owned by an old client account with a different phone', async () => {
+    const service = new AuthService();
+    const currentUser = {
+      _id: { toString: () => 'current-client' },
+      name: 'Cliente Atual',
+      phone: '11988887777',
+      role: 'client',
+      tokenVersion: 0,
+      isActive: true,
+      toObject: () => ({ role: 'client' }),
+      save: vi.fn(),
+    };
+
+    (UserModel.findOne as any).mockResolvedValue(currentUser);
+    (ClientModel.distinct as any).mockResolvedValue(['old-client']);
+    (UserModel.distinct as any).mockResolvedValue([]);
+
+    await service.bookingLogin('Cliente Atual', '(11) 98888-7777');
+
+    expect(UserModel.distinct).toHaveBeenCalledWith('_id', {
+      _id: { $in: ['old-client'] },
+      role: 'client',
+      isActive: true,
+      phone: '11988887777',
+    });
+    expect(ClientModel.updateMany).toHaveBeenCalledWith(
+      { phone: '11988887777', userId: { $nin: [] } },
+      { $set: { userId: currentUser._id } },
     );
   });
 });
