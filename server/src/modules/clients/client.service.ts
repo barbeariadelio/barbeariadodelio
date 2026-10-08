@@ -70,14 +70,7 @@ export class ClientService {
     if (phoneVariants.length && data.unitId) {
       const existing = await ClientModel.findOne({ unitId: data.unitId, phone: { $in: phoneVariants } });
       if (existing) {
-        if (!existing.userId) {
-          const matchingUser = await clientOwnershipService.findActiveClientUserByPhone(phoneDigits);
-          if (matchingUser) {
-            existing.userId = matchingUser._id;
-            await existing.save();
-          }
-        }
-        return existing;
+        throw new AppError('Este telefone já está cadastrado.', 409, 'DUPLICATE_RESOURCE', { phone: 'Este telefone já está cadastrado.' });
       }
     }
 

@@ -143,6 +143,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
   const [quickName, setQuickName] = useState('');
   const [quickPhone, setQuickPhone] = useState('');
   const [quickSaving, setQuickSaving] = useState(false);
+  const [quickError, setQuickError] = useState<string | null>(null);
   const [employeeId, setEmployeeId] = useState(initialEmployeeId ?? '');
   const [serviceId, setServiceId] = useState('');
   const [customDurationMinutes, setCustomDurationMinutes] = useState('');
@@ -360,6 +361,7 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
   const handleQuickRegister = useCallback(async () => {
     if (!quickName.trim()) return;
     setQuickSaving(true);
+    setQuickError(null);
     try {
       const res = await unitApi.post('/clients', { name: quickName.trim(), phone: quickPhone.replace(/\D/g, '') || undefined, unitId: unitId || undefined });
       const newClient: Client = res.data;
@@ -372,8 +374,8 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
       setShowQuickRegister(false);
       setQuickName('');
       setQuickPhone('');
-    } catch {
-      // silent
+    } catch (err: unknown) {
+      setQuickError(err instanceof Error ? err.message : 'Este telefone já está cadastrado.');
     } finally {
       setQuickSaving(false);
     }
@@ -605,10 +607,11 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
                       onChange={e => setQuickPhone(maskPhone(e.target.value))}
                       inputMode="tel"
                     />
+                    {quickError && <p role="alert" style={{ margin: 0, color: 'var(--danger, #b91c1c)', fontSize: '0.8rem', fontWeight: 600 }}>{quickError}</p>}
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button
                         type="button"
-                        onClick={() => { setShowQuickRegister(false); setQuickName(''); setQuickPhone(''); }}
+                        onClick={() => { setShowQuickRegister(false); setQuickName(''); setQuickPhone(''); setQuickError(null); }}
                         style={{ flex: 1, padding: '0.4rem', background: 'transparent', border: '1px solid var(--border-default)', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', color: 'var(--text-muted)' }}
                       >
                         Cancelar

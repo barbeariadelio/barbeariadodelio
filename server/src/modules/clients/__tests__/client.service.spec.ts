@@ -32,22 +32,24 @@ describe('ClientService phone ownership', () => {
     vi.clearAllMocks();
   });
 
-  it('reuses a client in the same unit when the phone has a country-code variant', async () => {
+  it('rejects a new client when the phone is already registered in the same unit', async () => {
     const existing = { _id: 'client-1', phone: '19983350939', unitId: 'unit-1' };
     mocks.clientFindOne.mockResolvedValue(existing);
     const service = new ClientService();
 
-    const result = await service.create({
+    await expect(service.create({
       name: 'Marina Torres',
       phone: '5519983350939',
       unitId: 'unit-1' as any,
+    })).rejects.toMatchObject({
+      message: 'Este telefone já está cadastrado.',
+      statusCode: 409,
     });
 
     expect(mocks.clientFindOne).toHaveBeenCalledWith({
       unitId: 'unit-1',
       phone: { $in: ['19983350939', '5519983350939'] },
     });
-    expect(result).toBe(existing);
     expect(mocks.clientCreate).not.toHaveBeenCalled();
   });
 
