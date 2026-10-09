@@ -277,13 +277,12 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
   });
 
   const { data: clients = [] } = useQuery<Client[]>({
-    queryKey: ['clients', unitId, debouncedClientSearch],
+    queryKey: ['clients', 'all', debouncedClientSearch],
     queryFn: () => {
-      const params = new URLSearchParams({ unitId });
+      const params = new URLSearchParams({ allUnits: 'true', limit: '1000' });
       if (debouncedClientSearch) params.set('q', debouncedClientSearch);
       return unitApi.get(`/clients?${params.toString()}`).then(r => Array.isArray(r.data) ? r.data : r.data?.clients ?? []);
     },
-    enabled: !!unitId,
   });
 
   const { data: services = [] } = useQuery<Service[]>({
@@ -308,11 +307,12 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     : services;
   const selectedService = services.find(s => s._id === serviceId);
 
-  const normalizedClientSearch = clientSearch.trim().toLowerCase();
-  const clientSearchDigits = normalizedClientSearch.replace(/\D/g, '');
+  const normalizeText = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const normalizedClientSearch = normalizeText(clientSearch.trim());
+  const clientSearchDigits = clientSearch.replace(/\D/g, '');
   const filteredClients = normalizedClientSearch
     ? clients.filter(c =>
-      c.name.toLowerCase().includes(normalizedClientSearch) ||
+      normalizeText(c.name).includes(normalizedClientSearch) ||
       (clientSearchDigits.length > 0 && (c.phone ?? '').replace(/\D/g, '').includes(clientSearchDigits))
     )
     : clients;

@@ -225,7 +225,7 @@ export default function Clients() {
   } = useInfiniteQuery({
     queryKey: ['clients', 'list', debouncedSearch, unitId],
     queryFn: async ({ pageParam }) => {
-      const params = new URLSearchParams({ page: String(pageParam), limit: String(CLIENTS_PAGE_SIZE) });
+      const params = new URLSearchParams({ page: String(pageParam), limit: String(CLIENTS_PAGE_SIZE), allUnits: 'true' });
       if (debouncedSearch) params.set('q', debouncedSearch);
       const { data } = await api.get(`/clients?${params.toString()}`);
       return (Array.isArray(data) ? data : data.clients ?? []) as Client[];

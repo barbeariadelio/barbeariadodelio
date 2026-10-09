@@ -10,12 +10,11 @@ const service = new ClientService();
 
 export async function listClients(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    // Soul540-style: non-owners are locked to their JWT unitId.
-    const unitId = resolveUnitId(req);
-    if (!unitId) { ok(res, []); return; }
+    const allUnits = req.query.allUnits === 'true';
+    const unitId = allUnits ? null : resolveUnitId(req);
     
     const q = req.query.q as string | undefined;
-    const { page, limit, skip } = (await import('../../shared/utils/pagination')).parsePagination(req.query as any);
+    const { limit, skip } = (await import('../../shared/utils/pagination')).parsePagination(req.query as any);
     
     const clients = q
       ? await service.search(unitId, q, { skip, limit })

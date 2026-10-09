@@ -208,10 +208,19 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
     enabled: !!unitId,
   });
 
+  const [debouncedClientSearch, setDebouncedClientSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedClientSearch(clientSearch.trim()), 250);
+    return () => clearTimeout(t);
+  }, [clientSearch]);
+
   const { data: clients = [] } = useQuery<Client[]>({
-    queryKey: ['clients', unitId],
-    queryFn: () => api.get(`/clients?unitId=${unitId}&limit=1000`).then(r => Array.isArray(r.data) ? r.data : r.data?.clients ?? []),
-    enabled: !!unitId,
+    queryKey: ['clients', 'all', debouncedClientSearch],
+    queryFn: () => {
+      const params = new URLSearchParams({ allUnits: 'true', limit: '1000' });
+      if (debouncedClientSearch) params.set('q', debouncedClientSearch);
+      return api.get(`/clients?${params.toString()}`).then(r => Array.isArray(r.data) ? r.data : r.data?.clients ?? []);
+    },
   });
 
   const { data: services = [] } = useQuery<Service[]>({
@@ -227,11 +236,12 @@ export default function AppointmentForm({ onClose, onSuccess, initialDate, initi
   });
   const activeProducts = products.filter(p => p.isActive && p.stockQuantity > 0);
 
-  const normalizedClientSearch = clientSearch.trim().toLowerCase();
-  const clientSearchDigits = normalizedClientSearch.replace(/\D/g, '');
+  const normalizeText = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const normalizedClientSearch = normalizeText(clientSearch.trim());
+  const clientSearchDigits = clientSearch.replace(/\D/g, '');
   const filteredClients = normalizedClientSearch
     ? clients.filter(c =>
-      c.name.toLowerCase().includes(normalizedClientSearch) ||
+      normalizeText(c.name).includes(normalizedClientSearch) ||
       (clientSearchDigits.length > 0 && (c.phone ?? '').replace(/\D/g, '').includes(clientSearchDigits))
     )
     : clients;

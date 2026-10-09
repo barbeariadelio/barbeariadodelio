@@ -19,16 +19,17 @@ const populateOptions = {
 };
 
 export class ClientService {
-  async findByUnit(unitId: string, pagination?: { skip: number, limit: number }): Promise<IClient[]> {
+  async findByUnit(unitId?: string | null, pagination?: { skip: number, limit: number }): Promise<IClient[]> {
     // _id tiebreaker keeps skip/limit pages stable when names repeat.
-    let query = ClientModel.find({ unitId }).populate(populateOptions).sort({ name: 1, _id: 1 });
+    const filter = unitId ? { unitId } : {};
+    let query = ClientModel.find(filter).populate(populateOptions).sort({ name: 1, _id: 1 });
     if (pagination) {
       query = query.skip(pagination.skip).limit(pagination.limit);
     }
     return query;
   }
 
-  async search(unitId: string, query: string, pagination?: { skip: number, limit: number }): Promise<IClient[]> {
+  async search(unitId: string | null | undefined, query: string, pagination?: { skip: number, limit: number }): Promise<IClient[]> {
     const safeQuery = escapeRegex(query);
     const orConditions: Record<string, unknown>[] = [
       { name: { $regex: safeQuery, $options: 'i' } },
@@ -45,10 +46,12 @@ export class ClientService {
       orConditions.push({ phone: { $regex: escapeRegex(digitsOnly), $options: 'i' } });
     }
 
-    let q = ClientModel.find({
-      unitId,
-      $or: orConditions,
-    }).populate(populateOptions).sort({ name: 1, _id: 1 });
+    const filter: Record<string, unknown> = { $or: orConditions };
+    if (unitId) {
+      filter.unitId = unitId;
+    }
+
+    let q = ClientModel.find(filter).populate(populateOptions).sort({ name: 1, _id: 1 });
 
     if (pagination) {
       q = q.skip(pagination.skip).limit(pagination.limit);
